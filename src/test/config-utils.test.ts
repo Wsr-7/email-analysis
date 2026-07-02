@@ -1,5 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { positiveNumber, parseFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "../lib/config-utils";
 
 describe("positiveNumber", () => {
@@ -24,6 +26,16 @@ describe("parseFolders", () => {
 
   it("returns fallback for empty input", () => {
     assert.deepEqual(parseFolders("", ["Inbox"]), ["Inbox"]);
+  });
+});
+
+describe("default folders", () => {
+  it("include Sent Items so self replies are collected for thread timelines", () => {
+    const defaults = JSON.parse(fs.readFileSync(path.join(process.cwd(), "default-config.json"), "utf8"));
+    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+
+    assert.deepEqual(defaults.folders, ["Inbox", "Sent Items"]);
+    assert.deepEqual(manifest.contributes.configuration.properties["easyMail.folders"].default, ["Inbox", "Sent Items"]);
   });
 });
 

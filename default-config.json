@@ -3,7 +3,8 @@
   "recentHours": 24,
   "maxItems": 50,
   "folders": [
-    "Inbox"
+    "Inbox",
+    "Sent Items"
   ],
   "bodyExcerptChars": 1500,
   "sampleMode": false,

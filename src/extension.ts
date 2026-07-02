@@ -340,7 +340,7 @@ class EasyMailApp {
     const maxItems = Number(config.maxItems || 50);
     const recentHours = Number(config.recentHours || 24);
     const rangeMode = String(config.rangeMode || "recentHours");
-    const folders = Array.isArray(config.folders) ? config.folders.map(String) : ["Inbox"];
+    const folders = Array.isArray(config.folders) ? config.folders.map(String) : ["Inbox", "Sent Items"];
     const currentIndex = pruneMailIndex(await this.data.readMailIndex(), Number(config.mailIndexRetentionDays || 7));
     args.push("--max-items", String(maxItems));
     args.push("--recent-hours", String(loadMore || rangeMode === "maxItems" ? 0 : recentHours));

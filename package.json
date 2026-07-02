@@ -87,7 +87,8 @@
             "type": "string"
           },
           "default": [
-            "Inbox"
+            "Inbox",
+            "Sent Items"
           ],
           "description": "Outlook folders to scan."
         },

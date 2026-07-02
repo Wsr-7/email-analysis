@@ -87,6 +87,46 @@ test("buildThreadRecords groups mails by conversationId when present", () => {
   assert.deepEqual(alpha.sourceMailIds, ["source-1", "source-2"]);
 });
 
+test("buildThreadRecords keeps collected self replies as separate timeline messages", () => {
+  const [thread] = buildThreadRecords([
+    mail({
+      mailId: "from-b-1",
+      sourceMailId: "source-b-1",
+      conversationId: "conv-self-reply",
+      conversationIndex: "0001",
+      subject: "Contract review",
+      from: "Bob <bob@example.com>",
+      receivedTime: "2026-06-16 09:00:00",
+      folder: "Inbox"
+    }),
+    mail({
+      mailId: "from-me",
+      sourceMailId: "source-me",
+      conversationId: "conv-self-reply",
+      conversationIndex: "0002",
+      subject: "RE: Contract review",
+      from: "Me <me@example.com>",
+      receivedTime: "2026-06-16 09:30:00",
+      sentTime: "2026-06-16 09:30:00",
+      folder: "Sent Items"
+    }),
+    mail({
+      mailId: "from-b-2",
+      sourceMailId: "source-b-2",
+      conversationId: "conv-self-reply",
+      conversationIndex: "0003",
+      subject: "RE: Contract review",
+      from: "Bob <bob@example.com>",
+      receivedTime: "2026-06-16 10:00:00",
+      folder: "Inbox"
+    })
+  ]);
+
+  assert.equal(thread.messageCount, 3);
+  assert.deepEqual(thread.timeline.map((item) => item.mailId), ["from-b-1", "from-me", "from-b-2"]);
+  assert.deepEqual(thread.folders, ["Inbox", "Sent Items"]);
+});
+
 test("buildThreadRecords falls back to normalized subject when conversationId is missing", () => {
   const records = buildThreadRecords([
     mail({

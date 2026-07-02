@@ -11,7 +11,7 @@ Set config = CreateObject("Scripting.Dictionary")
 config.CompareMode = 1
 config.Add "max-items", 50
 config.Add "recent-hours", 24
-config.Add "folders", "Inbox"
+config.Add "folders", "Inbox;Sent Items"
 config.Add "body-chars", 1500
 config.Add "output", ""
 config.Add "older-than-map", ""

@@ -159,7 +159,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   const analyzeNextLabel = formatAnalyzeNextLabel(labels, config);
   const batchSize = Number(config.analysisBatchSize || 5);
   const pendingCount = queue.pending.length + queue.allowed.length;
-  const configuredFolders = Array.isArray(config.folders) ? config.folders.map(String) : ["Inbox"];
+  const configuredFolders = Array.isArray(config.folders) ? config.folders.map(String) : ["Inbox", "Sent Items"];
   const hasHistoryAnchors = Object.keys(folderOldestReceivedTimes(index, configuredFolders)).length > 0;
 
   const queueCounts: Record<string, number> = {};
@@ -540,7 +540,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
         </label>
         ${renderRangeValueControl(config, labels)}
         <label>${escapeHtml(labels.settings.folders)}
-          <input id="folders" value="${escapeAttr(Array.isArray(config.folders) ? config.folders.join(";") : "Inbox")}" />
+          <input id="folders" value="${escapeAttr(Array.isArray(config.folders) ? config.folders.join(";") : "Inbox;Sent Items")}" />
         </label>
         <label><span>${escapeHtml(labels.settings.modelFamily)} <button class="sb-bottom-btn" onclick="post('loadModels')" style="display:inline;padding:1px 6px;">${escapeHtml(labels.toolbar.loadModels)}</button></span>
           <select id="modelFamily">${modelOptions}</select>
