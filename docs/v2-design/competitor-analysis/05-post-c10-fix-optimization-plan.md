@@ -214,7 +214,7 @@ Completion Notes:
 
 ### P0.2 Add manual-confirm analyze action for security-gated mail
 
-Status: [ ] Not started
+Status: [X] Done
 
 Goal:
 
@@ -247,12 +247,25 @@ Acceptance criteria:
 
 Completion Notes:
 
-- Status:
+- Status: Done.
 - Files changed:
+  - `src/lib/dashboard-labels.ts` — added localized `pending.confirmAnalyze`.
+  - `src/lib/sidebar-render.ts` — renders `Confirm and Analyze` only for `manual_confirm` blocked-queue rows.
+  - `src/lib/workbench-render.ts` — renders the same action in manual-confirm mail detail and dispatches existing `analyzeSelected`.
+  - `src/test/sidebar-render.test.ts` — verifies manual-confirm rows show the action and hard-blocked rows do not.
+  - `src/test/workbench-render.test.ts` — verifies workbench detail behavior and JS dispatch.
 - Tests:
+  - RED: `node --test out/test/sidebar-render.test.js` and `node --test out/test/workbench-render.test.js` failed before implementation because the action was absent.
+  - `npm run compile`: pass.
+  - `node --test out/test/sidebar-render.test.js`: pass.
+  - `node --test out/test/workbench-render.test.js`: pass.
+  - `npm test`: pass, 261 tests.
 - Manual validation:
+  - Not run in VS Code UI here. Automated rendering and existing `analyzeSelected` dispatch cover the behavior; hard-blocked mails remain excluded by `canAnalyzeMail`.
 - Known issues:
+  - None for P0.2.
 - Commit:
+  - `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
 
 ---
 
@@ -738,7 +751,7 @@ Known caution:
 Use this section to summarize completed task commits:
 
 - P0.1: implementation `04d96a5029b615d058a7bb28221863d80e432189`; manual Outlook validation pending.
-- P0.2:
+- P0.2: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
 - P0.3:
 - P0.4:
 - P1.1:
@@ -814,6 +827,68 @@ Uncommitted changes / dirty files:
 
 Next recommended step:
 - Start `P0.2 Add manual-confirm analyze action for security-gated mail`, unless manual Outlook validation is available immediately.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P0.2 start)
+
+Status: In progress
+
+Changed:
+- Claimed `P0.2 Add manual-confirm analyze action for security-gated mail`.
+
+Validated:
+- P0.1 implementation and plan update are committed:
+  - Implementation: `04d96a5029b615d058a7bb28221863d80e432189`
+  - Plan update: `482c5bc98d9a2a7d420caa0069d669fa013ec9d9`
+- Ran `git status --short --branch`: branch `v3`, ahead 3; unrelated dirty file `agents.md`.
+
+Known issues:
+- No P0.2 source code changed yet in this checkpoint.
+
+Last safe stopping point:
+- Before manual-confirm analyze path inspection.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+- `agents.md` unrelated pre-existing dirty file.
+
+Next recommended step:
+- Inspect security-gate explicit-selection behavior, sidebar/workbench blocked rendering, and message-handler analyze dispatch tests.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P0.2 complete)
+
+Status: Done
+
+Changed:
+- Added manual-confirm `Confirm and Analyze` action to sidebar blocked queue rows.
+- Added the same action to workbench blocked mail detail.
+- Reused existing `analyzeSelected` message path; no new security bypass, state store, or confirmation persistence added.
+- Hard-blocked mails do not render this action.
+- Commit: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
+
+Validated:
+- RED: targeted sidebar/workbench tests failed before implementation because `Confirm and Analyze` was absent.
+- `npm run compile`: pass.
+- `node --test out/test/sidebar-render.test.js`: pass.
+- `node --test out/test/workbench-render.test.js`: pass.
+- `npm test`: pass, 261 tests.
+
+Known issues:
+- No manual VS Code UI click test was run in this agent session.
+- P0.1 still needs classic Outlook manual validation before closing compose acceptance.
+
+Last safe stopping point:
+- P0.2 is complete and committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Start `P0.3 Fix analyze batch-size race and remove obsolete Auto Analyze setting UI`.
+- User decision: remove `easyMail.autoAnalyzeEnabled` from `package.json` settings directly, keep only internal/backward-compatible config handling if needed.
 
 ---
 
