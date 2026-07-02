@@ -445,7 +445,7 @@ Completion Notes:
 
 ### P1.2 Normalize metadata, action placement, classification, recipients, and body rendering
 
-Status: [ ] Not started
+Status: [~] In progress
 
 Goal:
 
@@ -1112,6 +1112,60 @@ Uncommitted changes / dirty files:
 
 Next recommended step:
 - Claim `P1.2 Normalize metadata, action placement, classification, recipients, and body rendering`.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P1.2 start)
+
+Status: In progress
+
+Changed:
+- Claimed `P1.2 Normalize metadata, action placement, classification, recipients, and body rendering`.
+
+Validated:
+- P1.1 implementation and plan update are committed:
+  - Implementation: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
+  - Plan update: `7fe10c6aa8e12d813d80494bbeaec39b3743fd9b`
+- Ran `git status --short --branch`: branch `v3`, ahead 8; clean working tree.
+
+Known issues:
+- No P1.2 source code changed yet in this checkpoint.
+- P0.1 still needs manual Outlook validation before closing compose acceptance.
+
+Last safe stopping point:
+- Before sidebar/workbench metadata and body rendering inspection.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Inspect sidebar row renderers, workbench detail renderers, dashboard state inputs, and tests; add RED tests for classification visibility, recipient/time/classification rows, action placement, and analyzed body rendering.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P1.2 paused)
+
+Status: In progress — paused before source inspection
+
+Changed:
+- `P1.2 Normalize metadata, action placement, classification, recipients, and body rendering` is claimed but no source/test files were changed.
+
+Validated:
+- No P1.2 tests were added or run after the claim.
+- Stop requested by user because quota is nearly exhausted.
+
+Known issues:
+- P1.2 acceptance criteria are not implemented yet.
+- P0.1 still needs manual Outlook validation before closing compose acceptance.
+
+Last safe stopping point:
+- Before P1.2 source inspection or RED tests.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Continue P1.2 from this checkpoint: inspect sidebar/workbench metadata renderers, add RED tests, then implement the smallest layout/body rendering changes.
 
 ---
 
