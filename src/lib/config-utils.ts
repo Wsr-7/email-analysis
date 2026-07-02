@@ -16,6 +16,11 @@ export function parseFolders(value: unknown, fallback: string[]): string[] {
   return parsed.length ? parsed : fallback;
 }
 
+export function normalizeMailFolders(value: unknown, fallback: string[]): string[] {
+  const folders = parseFolders(value, fallback);
+  return folders.length === 1 && folders[0]?.toLowerCase() === "inbox" ? ["Inbox", "Sent Items"] : folders;
+}
+
 export function mergeStringLists(a: string[], b: string[]): string[] {
   return [...new Set([...(a || []), ...(b || [])].map(String).map((item) => item.trim()).filter(Boolean))];
 }

@@ -17,6 +17,9 @@ export function buildThreadAnalysisPrompt(parts: ThreadPromptParts): string {
     "",
     "Output language:",
     parts.outputLanguage || "en-US",
+    parts.outputLanguage === "en-US"
+      ? "Write every natural-language JSON string in English. Translate Chinese source content into English, including questions, statuses, actions, risks, and person-name display text where possible. Keep email addresses and exact IDs unchanged."
+      : "用中文输出所有自然语言 JSON 字符串。邮箱地址和精确 ID 保持不变。",
     "",
     parts.outputSchemaPrompt.trim(),
     "",

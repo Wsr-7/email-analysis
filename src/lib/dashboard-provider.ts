@@ -26,4 +26,8 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     }
     this.view.webview.html = await this.renderHtml();
   }
+
+  public postMessage(message: unknown): Thenable<boolean> | undefined {
+    return this.view?.webview.postMessage(message);
+  }
 }

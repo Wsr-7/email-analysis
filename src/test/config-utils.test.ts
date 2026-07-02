@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy } from "../lib/config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy } from "../lib/config-utils";
 
 describe("positiveNumber", () => {
   it("returns parsed number when positive", () => {
@@ -36,6 +36,12 @@ describe("default folders", () => {
 
     assert.deepEqual(defaults.folders, ["Inbox", "Sent Items"]);
     assert.deepEqual(manifest.contributes.configuration.properties["easyMail.folders"].default, ["Inbox", "Sent Items"]);
+  });
+
+  it("migrates the old Inbox-only default to include Sent Items", () => {
+    assert.deepEqual(normalizeMailFolders(["Inbox"], ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
+    assert.deepEqual(normalizeMailFolders("Inbox", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
+    assert.deepEqual(normalizeMailFolders("Inbox;Archive", ["Inbox", "Sent Items"]), ["Inbox", "Archive"]);
   });
 });
 

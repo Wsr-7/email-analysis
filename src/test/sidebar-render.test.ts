@@ -235,6 +235,12 @@ describe("renderSidebarHtml", () => {
     assert.ok(!html.includes('data-action="unignore"'), "compact sidebar should not have action buttons");
   });
 
+  it("can focus the ignored queue from extension messages", () => {
+    const html = renderSidebarHtml(stubInput());
+    assert.ok(html.includes("focusQueue"));
+    assert.ok(html.includes("showQueue(msg.queueId)"));
+  });
+
   it("renders batch size selector in action bar", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes('id="batchSelect"'));

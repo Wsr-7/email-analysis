@@ -9,6 +9,7 @@ function stubContext(overrides?: Partial<MessageHandlerContext>): MessageHandler
     readConfig: mock.fn(async () => ({ rangeMode: "recentHours", recentHours: 24 })),
     updateSettings: mock.fn(async () => {}),
     refresh: mock.fn(async () => {}),
+    focusSidebarQueue: mock.fn(() => {}),
     copyToClipboard: mock.fn(async () => {}),
     showInfo: mock.fn(() => {}),
     showWarning: mock.fn(() => {}),
@@ -114,6 +115,7 @@ describe("handleWebviewMessage", () => {
     await handleWebviewMessage(ctx, { type: "ignore", mailId: "m-1" });
     assert.equal((ctx.writeIgnoredIds as any).mock.callCount(), 1);
     assert.equal((ctx.refresh as any).mock.callCount(), 1);
+    assert.deepEqual((ctx.focusSidebarQueue as any).mock.calls[0].arguments, ["ignored"]);
   });
 
   it("dispatches unignore and refreshes", async () => {
@@ -177,6 +179,20 @@ describe("saveConfigFromMessage", () => {
     const ctx = stubContext();
     await saveConfigFromMessage(ctx, { config: { folders: "Inbox" }, silent: true });
     assert.equal((ctx.showInfo as any).mock.callCount(), 0);
+  });
+
+  it("migrates old Inbox-only folder settings when saving", async () => {
+    const ctx = stubContext();
+    await saveConfigFromMessage(ctx, { config: { folders: "Inbox" }, silent: true });
+    const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
+    assert.deepEqual(saved.folders, ["Inbox", "Sent Items"]);
+  });
+
+  it("saves classification threshold labels as levels", async () => {
+    const ctx = stubContext();
+    await saveConfigFromMessage(ctx, { config: { autoAnalyzeMaxClassificationLevel: "REGISTERED" }, silent: true });
+    const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
+    assert.equal(saved.autoAnalyzeMaxClassificationLevel, 2);
   });
 });
 

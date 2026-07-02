@@ -1,4 +1,4 @@
-import { positiveNumber, parseFolders } from "./config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, parseClassificationLevel } from "./config-utils";
 
 export interface MessageHandlerContext {
   log: (event: string, data: Record<string, unknown>) => Promise<void>;
@@ -6,6 +6,7 @@ export interface MessageHandlerContext {
   readConfig: () => Promise<Record<string, any>>;
   updateSettings: (next: Record<string, unknown>) => Promise<void>;
   refresh: () => Promise<void>;
+  focusSidebarQueue: (queueId: string) => void;
   copyToClipboard: (text: string) => Promise<void>;
   showInfo: (message: string) => void;
   showWarning: (message: string) => void;
@@ -154,6 +155,7 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
     const locale = await ctx.readLocale();
     ctx.showInfo(locale === "zh-CN" ? "邮件已忽略。" : "Mail ignored.");
     await ctx.refresh();
+    ctx.focusSidebarQueue("ignored");
     return;
   }
 
@@ -327,12 +329,12 @@ export async function saveConfigFromMessage(
     rangeMode: Object.prototype.hasOwnProperty.call(patch, "rangeMode") ? (patch.rangeMode === "maxItems" ? "maxItems" : "recentHours") : current.rangeMode,
     recentHours: Object.prototype.hasOwnProperty.call(patch, "recentHours") ? positiveNumber(patch.recentHours, current.recentHours || 24) : current.recentHours,
     maxItems: Object.prototype.hasOwnProperty.call(patch, "maxItems") ? positiveNumber(patch.maxItems, current.maxItems || 50) : current.maxItems,
-    folders: Object.prototype.hasOwnProperty.call(patch, "folders") ? parseFolders(patch.folders, current.folders || ["Inbox"]) : current.folders,
+    folders: Object.prototype.hasOwnProperty.call(patch, "folders") ? normalizeMailFolders(patch.folders, current.folders || ["Inbox", "Sent Items"]) : normalizeMailFolders(current.folders, ["Inbox", "Sent Items"]),
     bodyExcerptChars: Object.prototype.hasOwnProperty.call(patch, "bodyExcerptChars") ? positiveNumber(patch.bodyExcerptChars, current.bodyExcerptChars || 1500) : current.bodyExcerptChars,
     outputLanguage: Object.prototype.hasOwnProperty.call(patch, "outputLanguage") ? (patch.outputLanguage === "zh-CN" ? "zh-CN" : "en-US") : current.outputLanguage,
     modelFamily: Object.prototype.hasOwnProperty.call(patch, "modelFamily") ? String(patch.modelFamily || current.modelFamily || "gpt-5.4").trim() : current.modelFamily,
     analysisBatchSize: Object.prototype.hasOwnProperty.call(patch, "analysisBatchSize") ? positiveNumber(patch.analysisBatchSize, current.analysisBatchSize || 5) : current.analysisBatchSize,
-    autoAnalyzeMaxClassificationLevel: Object.prototype.hasOwnProperty.call(patch, "autoAnalyzeMaxClassificationLevel") ? positiveNumber(patch.autoAnalyzeMaxClassificationLevel, current.autoAnalyzeMaxClassificationLevel || 2) : current.autoAnalyzeMaxClassificationLevel,
+    autoAnalyzeMaxClassificationLevel: Object.prototype.hasOwnProperty.call(patch, "autoAnalyzeMaxClassificationLevel") ? parseClassificationLevel(patch.autoAnalyzeMaxClassificationLevel, Number(current.autoAnalyzeMaxClassificationLevel || 2)) : current.autoAnalyzeMaxClassificationLevel,
     mailStoreRetentionDays: Object.prototype.hasOwnProperty.call(patch, "mailStoreRetentionDays") ? positiveNumber(patch.mailStoreRetentionDays, current.mailStoreRetentionDays || 1) : current.mailStoreRetentionDays,
     mailIndexRetentionDays: Object.prototype.hasOwnProperty.call(patch, "mailIndexRetentionDays") ? positiveNumber(patch.mailIndexRetentionDays, current.mailIndexRetentionDays || 7) : current.mailIndexRetentionDays,
     analysisRetentionDays: Object.prototype.hasOwnProperty.call(patch, "analysisRetentionDays") ? positiveNumber(patch.analysisRetentionDays, current.analysisRetentionDays || 7) : current.analysisRetentionDays,

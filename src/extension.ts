@@ -17,7 +17,7 @@ import { buildThreadReport } from "./lib/report-thread";
 import { CopilotProvider } from "./lib/copilot-provider";
 import { type AvailableModel, type LlmProvider } from "./lib/llm-provider";
 import { renderEasyMailGuideHtml } from "./lib/guide-webview";
-import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings } from "./lib/config-utils";
+import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
@@ -206,10 +206,17 @@ class EasyMailApp {
     const config = await this.readConfig();
     const prompt = `You are an email writing assistant. Polish the following draft reply: improve grammar, clarity, and tone while preserving the original intent and meaning. Keep the style concise, professional, and appropriate for internal workplace communication. Output only the improved reply text, nothing else.\n\nDraft:\n${draftText}`;
     try {
-      const { raw } = await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "polish");
+      const raw = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Polish draft", cancellable: false },
+        async (progress) => {
+          progress.report({ message: "Polishing reply draft..." });
+          return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "polish")).raw;
+        }
+      );
       const result = raw.trim();
       this.workingDrafts.set(itemId, result);
       this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId });
+      vscode.window.showInformationMessage("Draft polished.");
     } catch (err) {
       vscode.window.showWarningMessage(`Polish failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -220,10 +227,17 @@ class EasyMailApp {
     const config = await this.readConfig();
     const prompt = `You are an email writing assistant. Rewrite the following draft reply according to the user's instruction. Keep the style concise, professional, and appropriate for internal workplace communication unless the instruction says otherwise. Output only the rewritten reply text, nothing else.\n\nInstruction: ${instruction}\n\nDraft:\n${draftText}`;
     try {
-      const { raw } = await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "refine");
+      const raw = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Refine draft", cancellable: false },
+        async (progress) => {
+          progress.report({ message: "Refining reply draft..." });
+          return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "refine")).raw;
+        }
+      );
       const result = raw.trim();
       this.workingDrafts.set(itemId, result);
       this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId });
+      vscode.window.showInformationMessage("Draft refined.");
     } catch (err) {
       vscode.window.showWarningMessage(`Refine failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -878,12 +892,13 @@ class EasyMailApp {
     await this.data.ensureConfig();
     const defaults = await this.data.readDefaults();
     const settings = vscode.workspace.getConfiguration("easyMail");
+    const defaultFolders = Array.isArray(defaults.folders) ? defaults.folders.map(String) : ["Inbox", "Sent Items"];
     return {
       ...defaults,
       rangeMode: settings.get("rangeMode", defaults.rangeMode),
       recentHours: settings.get("recentHours", defaults.recentHours),
       maxItems: settings.get("maxItems", defaults.maxItems),
-      folders: settings.get("folders", defaults.folders),
+      folders: normalizeMailFolders(settings.get("folders", defaultFolders), defaultFolders),
       bodyExcerptChars: settings.get("bodyExcerptChars", defaults.bodyExcerptChars),
       sampleMode: settings.get("sampleMode", defaults.sampleMode),
       modelFamily: settings.get("modelFamily", defaults.modelFamily),
@@ -1056,6 +1071,7 @@ class EasyMailApp {
       readConfig: () => this.readConfig(),
       updateSettings: (next) => this.updateSettings(next),
       refresh: () => this.refresh(),
+      focusSidebarQueue: (queueId) => { void this.dashboardProvider.postMessage({ type: "focusQueue", queueId }); },
       copyToClipboard: async (text) => { await vscode.env.clipboard.writeText(text); },
       showInfo: (msg) => void vscode.window.showInformationMessage(msg),
       showWarning: (msg) => void vscode.window.showWarningMessage(msg),

@@ -566,6 +566,11 @@ function showQueue(queueId) {
   vscode.setState(Object.assign({}, vscode.getState() || {}, { currentQueue: queueId }));
 }
 
+window.addEventListener('message', function(e) {
+  var msg = e.data;
+  if (msg && msg.type === 'focusQueue' && msg.queueId) showQueue(msg.queueId);
+});
+
 function applyQueue(queueId, smooth) {
   for (const btn of document.querySelectorAll('.sb-queue-btn')) {
     btn.classList.toggle('active', btn.getAttribute('data-queue-id') === queueId);

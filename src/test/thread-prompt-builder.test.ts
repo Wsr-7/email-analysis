@@ -33,8 +33,22 @@ test("buildThreadAnalysisPrompt includes prompts, output language, and strict JS
   assert.match(prompt, /Analyze thread/);
   assert.match(prompt, /Return JSON/);
   assert.match(prompt, /Output language:\nzh-CN/);
+  assert.match(prompt, /用中文输出所有自然语言 JSON 字符串/);
   assert.match(prompt, /"threadId": "conversation:conv-1"/);
   assert.doesNotMatch(prompt, /## Mail:/);
+});
+
+test("buildThreadAnalysisPrompt instructs English translation for natural-language thread fields", () => {
+  const prompt = buildThreadAnalysisPrompt({
+    basePrompt: "Base rules",
+    analysisPrompt: "Analyze thread",
+    outputSchemaPrompt: "Return JSON",
+    outputLanguage: "en-US",
+    thread: thread()
+  });
+
+  assert.match(prompt, /Write every natural-language JSON string in English/);
+  assert.match(prompt, /Translate Chinese source content into English/);
 });
 
 function thread(): ThreadRecord {
