@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { redactText } from "../lib/redaction";
+import { redactStoredMails, redactText, redactThreadForPrompt } from "../lib/redaction";
 import type { RedactionPolicy } from "../lib/redaction";
+import type { StoredMail } from "../lib/mail-store";
+import type { ThreadRecord } from "../lib/thread-store";
 
 const basePolicy: RedactionPolicy = {
   enabled: true,
@@ -107,4 +109,105 @@ test("redactText applies custom patterns", () => {
   assert.equal(result.text, "[PROJECT] and [PROJECT] are confidential.");
   assert.equal(result.stats.byType.projectName, 2);
   assert.deepEqual(result.findings, [{ type: "projectName", replacement: "[PROJECT]", count: 2 }]);
+});
+
+test("redactStoredMails preserves metadata and redacts only body content", () => {
+  const mail: StoredMail = {
+    mailId: "mail-1",
+    sourceMailId: "source-1",
+    internetMessageId: "<mail-1@example.com>",
+    entryId: "entry-1",
+    conversationId: "conversation-1",
+    conversationIndex: "index-1",
+    subject: "Contract from alice@example.com",
+    from: "Alice <alice@example.com>",
+    senderName: "Alice",
+    senderEmail: "alice@example.com",
+    receivedTime: "2026-07-02T01:00:00.000Z",
+    sentTime: "2026-07-02T00:55:00.000Z",
+    folder: "Inbox",
+    unread: "false",
+    importance: "Normal",
+    toMe: "true",
+    ccMe: "false",
+    to: "Bob <bob@example.com>",
+    cc: "Carol <carol@example.com>",
+    attachmentCount: 1,
+    attachmentNames: ["alice-contract.pdf"],
+    bodyExcerpt: "Please call alice@example.com at +1 (415) 555-0100.",
+    bodyHash: "hash-1",
+    pulledAt: "2026-07-02T01:01:00.000Z"
+  };
+
+  const result = redactStoredMails([mail], {
+    ...basePolicy,
+    redactEmail: true,
+    redactPhone: true
+  });
+
+  assert.equal(result.items[0].subject, mail.subject);
+  assert.equal(result.items[0].from, mail.from);
+  assert.equal(result.items[0].senderEmail, mail.senderEmail);
+  assert.equal(result.items[0].to, mail.to);
+  assert.deepEqual(result.items[0].attachmentNames, mail.attachmentNames);
+  assert.equal(result.items[0].bodyExcerpt, "Please call [EMAIL_1] at [PHONE_1].");
+  assert.equal(result.totalReplacements, 2);
+});
+
+test("redactThreadForPrompt preserves thread metadata and redacts only body content", () => {
+  const thread: ThreadRecord = {
+    threadId: "thread-1",
+    conversationId: "conversation-1",
+    normalizedSubject: "contract from alice@example.com",
+    subject: "Contract from alice@example.com",
+    participants: ["Alice <alice@example.com>", "Bob <bob@example.com>"],
+    folders: ["Inbox"],
+    startTime: "2026-07-02T01:00:00.000Z",
+    lastTime: "2026-07-02T01:00:00.000Z",
+    messageCount: 1,
+    unreadCount: 1,
+    hasAttachments: true,
+    sourceMailIds: ["source-1"],
+    contentStatus: "available",
+    timeline: [
+      {
+        mailId: "mail-1",
+        internetMessageId: "<mail-1@example.com>",
+        entryId: "entry-1",
+        conversationId: "conversation-1",
+        conversationIndex: "index-1",
+        subject: "Contract from alice@example.com",
+        from: "Alice <alice@example.com>",
+        senderName: "Alice",
+        senderEmail: "alice@example.com",
+        receivedTime: "2026-07-02T01:00:00.000Z",
+        sentTime: "2026-07-02T00:55:00.000Z",
+        folder: "Inbox",
+        bodyPreview: "Email alice@example.com for details.",
+        bodyClean: "Email alice@example.com or call +1 (415) 555-0100.",
+        bodyDelta: "Call +1 (415) 555-0100.",
+        bodyHash: "hash-1",
+        isDuplicateBody: false,
+        contentAvailable: true,
+        attachmentCount: 1,
+        attachmentNames: ["alice-contract.pdf"]
+      }
+    ]
+  };
+
+  const result = redactThreadForPrompt(thread, {
+    ...basePolicy,
+    redactEmail: true,
+    redactPhone: true
+  });
+
+  assert.equal(result.subject, thread.subject);
+  assert.deepEqual(result.participants, thread.participants);
+  assert.equal(result.timeline[0].subject, thread.timeline[0].subject);
+  assert.equal(result.timeline[0].from, thread.timeline[0].from);
+  assert.equal(result.timeline[0].senderEmail, thread.timeline[0].senderEmail);
+  assert.deepEqual(result.timeline[0].attachmentNames, thread.timeline[0].attachmentNames);
+  assert.equal(result.timeline[0].bodyPreview, "Email [EMAIL_1] for details.");
+  assert.equal(result.timeline[0].bodyClean, "Email [EMAIL_1] or call [PHONE_1].");
+  assert.equal(result.timeline[0].bodyDelta, "Call [PHONE_1].");
 });

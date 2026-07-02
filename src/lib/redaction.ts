@@ -181,14 +181,10 @@ export function redactStoredMails(items: StoredMail[], policy: RedactionPolicy):
   let totalReplacements = 0;
   return {
     items: items.map((item) => {
-      const subject = redactText(item.subject, policy);
-      const from = redactText(item.from, policy);
       const bodyExcerpt = redactText(item.bodyExcerpt, policy);
-      totalReplacements += subject.stats.totalReplacements + from.stats.totalReplacements + bodyExcerpt.stats.totalReplacements;
+      totalReplacements += bodyExcerpt.stats.totalReplacements;
       return {
         ...item,
-        subject: subject.text,
-        from: from.text,
         bodyExcerpt: bodyExcerpt.text
       };
     }),
@@ -199,18 +195,11 @@ export function redactStoredMails(items: StoredMail[], policy: RedactionPolicy):
 export function redactThreadForPrompt(thread: ThreadStore["items"][number], policy: RedactionPolicy): ThreadStore["items"][number] {
   return {
     ...thread,
-    subject: redactText(thread.subject, policy).text,
-    participants: thread.participants.map((participant) => redactText(participant, policy).text),
     timeline: thread.timeline.map((message) => ({
       ...message,
-      subject: redactText(message.subject, policy).text,
-      from: redactText(message.from, policy).text,
-      senderName: redactText(message.senderName, policy).text,
-      senderEmail: redactText(message.senderEmail, policy).text,
       bodyPreview: redactText(message.bodyPreview, policy).text,
       bodyClean: redactText(message.bodyClean, policy).text,
-      bodyDelta: redactText(message.bodyDelta, policy).text,
-      attachmentNames: message.attachmentNames.map((name) => redactText(name, policy).text)
+      bodyDelta: redactText(message.bodyDelta, policy).text
     }))
   };
 }
