@@ -852,6 +852,27 @@ Known caution:
 - Several issues may share root causes: missing sent replies can affect thread timeline completeness and Follow-up/Must Handle Today categorization; redacted metadata can affect both display and LLM categorization.
 - Do not tune prompts before verifying whether stored/thread data is complete.
 
+### Snapshot - 2026-07-03 - Stabilization follow-up
+
+Status:
+
+- User validation found regressions after P0/P1 work; P2 work is paused.
+- First stabilization slice completed in `72970ebb038e3cf8aa64f52b622af6cb78ba760a`.
+- `Generate Draft` now dispatches a draft-only action instead of reusing analysis.
+- Batch analysis no longer removes analyzed mails from `mail-store`, preserving body/timeline/draft context for workbench detail and future thread construction.
+- Workbench metadata is forced onto separate lines, and Outlook Actions are rendered as a collapsed popover menu.
+
+Current recommendation:
+
+1. Continue stabilization before any P2 work.
+2. Next slice should verify and fix manual-confirm reason/button visibility end-to-end, then ignore navigation behavior.
+3. After installing the updated VSIX, re-pull/re-analyze mail to rebuild data affected by the earlier mail-store deletion behavior.
+
+Known caution:
+
+- Existing user data may already have lost analyzed mail bodies from prior builds; the fix prevents new loss but cannot reconstruct old removed mail bodies without pulling mail again.
+- P1.4 sent/self reply collection may still require explicit user setting migration or folder normalization if the user previously saved only `Inbox`.
+
 ---
 
 ## 7. Completion Notes Index
@@ -865,7 +886,7 @@ Use this section to summarize completed task commits:
 - P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
 - P1.2: `c65f435`
 - P1.3: `bcafc01`
-- P1.4: `e0100de91495373f36243e2a2898c86267d34450`
+- P1.4: `e0100de91495373f36243e2a2898c86267d34450`; stabilization follow-up `72970ebb038e3cf8aa64f52b622af6cb78ba760a`
 - P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
 - P2.1:
 - P2.2:
@@ -873,6 +894,37 @@ Use this section to summarize completed task commits:
 ---
 
 ## 8. Handover Log
+
+#### Handover - 2026-07-03 - Codex (Stabilization follow-up complete)
+
+Status: Complete for this stabilization slice
+
+Changed:
+- Fixed `Generate Draft` so it posts a dedicated `generateDraft` message and generates reply draft text only; it no longer reuses `analyzeSelected` or `analyzeThread`.
+- Added extension-side draft generation for single mails and threads, with notification progress and `updateDraft` webview refresh.
+- Stopped `analyzeBatchCore` from deleting analyzed mails out of `mail-store`; this preserves source bodies for workbench body display, draft generation context, and future thread/timeline data.
+- Forced workbench mail metadata onto separate lines via single-column `.wb-meta-grid`.
+- Changed Outlook Actions from always-visible inline buttons into a collapsed popover menu.
+- Rebuilt `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- `rtk npm run compile`
+- `rtk node --test out/test/dashboard-render.test.js`
+- `rtk npm test`
+- `rtk npm run package:vsix`
+
+Commit:
+- Implementation: `72970ebb038e3cf8aa64f52b622af6cb78ba760a`
+
+Known issues:
+- Manual-confirm reason/button visibility still needs an end-to-end follow-up based on the latest user report.
+- Ignore/restore navigation still needs a focused fix so ignored current items disappear or advance to the next appropriate item.
+- Existing data damaged by older builds may require re-pull/re-analysis because previously analyzed mails could already have been removed from `mail-store`.
+- P1.4 sent/self reply behavior may still fail for users with saved `folders = Inbox`; inspect config normalization before changing thread logic again.
+- Thread Spotlight mixed-language output needs prompt/result investigation after data integrity is stabilized.
+
+Next recommended step:
+- Claim a small stabilization step for manual-confirm visibility and explanation, then ignore navigation. Do not start P2.
 
 #### Handover - 2026-07-03 - Codex (P0.2 follow-up start)
 
