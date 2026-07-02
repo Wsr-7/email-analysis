@@ -224,6 +224,7 @@ class EasyMailApp {
       promptConfig?: PromptConfig;
       threadStore?: ThreadStore;
       threadAnalysis?: ThreadAnalysisResult;
+      ignoredIds?: Set<string>;
     };
     const availableModels = await this.data.readCachedAvailableModels(this.availableModelsCache, (event, d) => this.log(event, d));
     return renderWorkbenchHtml({
@@ -236,6 +237,7 @@ class EasyMailApp {
       promptConfig: extendedState.promptConfig || normalizePromptConfig({}),
       threadStore: extendedState.threadStore || emptyThreadStore(),
       threadAnalysis: extendedState.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+      ignoredIds: extendedState.ignoredIds,
       availableModels,
       busyKind: this.busy?.kind || "",
       isBusy: !!this.busy
@@ -688,6 +690,25 @@ class EasyMailApp {
     await this.data.writeNextActions(updated);
   }
 
+  public async ignoreThread(threadId: string): Promise<void> {
+    const threadStore = await this.data.readThreadStore();
+    const thread = threadStore.items.find((t) => t.threadId === threadId);
+    if (!thread) return;
+    const ignoredIds = await this.data.readIgnoredIds();
+    const set = new Set(ignoredIds);
+    for (const id of thread.sourceMailIds) set.add(id);
+    await this.data.writeIgnoredIds([...set]);
+  }
+
+  public async unignoreThread(threadId: string): Promise<void> {
+    const threadStore = await this.data.readThreadStore();
+    const thread = threadStore.items.find((t) => t.threadId === threadId);
+    if (!thread) return;
+    const ignoredIds = await this.data.readIgnoredIds();
+    const remove = new Set(thread.sourceMailIds);
+    await this.data.writeIgnoredIds(ignoredIds.filter((id) => !remove.has(id)));
+  }
+
   public async openMeetingInOutlook(meetingId: string): Promise<void> {
     if (!meetingId) return;
     const scriptPath = await this.findScript("open-outlook-mail.vbs");
@@ -917,6 +938,7 @@ class EasyMailApp {
       threadStore?: ThreadStore;
       threadAnalysis?: ThreadAnalysisResult;
       meetingStore?: MeetingStore;
+      ignoredIds?: Set<string>;
     };
     state.modelInfo = await this.data.readModelInfo();
     state.store = store;
@@ -928,6 +950,7 @@ class EasyMailApp {
     state.threadStore = securedThreadStore;
     state.threadAnalysis = threadAnalysis;
     state.meetingStore = pruneMeetingStore(await this.data.readMeetingStore());
+    state.ignoredIds = new Set(ignoredIds);
     return state;
   }
 
@@ -971,7 +994,9 @@ class EasyMailApp {
       polishDraft: (draftText, itemId) => this.polishDraft(draftText, itemId),
       refineDraft: (draftText, instruction, itemId) => this.refineDraft(draftText, instruction, itemId),
       composeOutlookMail: (mode, draftText, itemId) => this.composeOutlookMail(mode, draftText, itemId),
-      markNextAction: (actionId, status) => this.markNextAction(actionId, status)
+      markNextAction: (actionId, status) => this.markNextAction(actionId, status),
+      ignoreThread: (threadId) => this.ignoreThread(threadId),
+      unignoreThread: (threadId) => this.unignoreThread(threadId)
     };
   }
 
@@ -990,6 +1015,7 @@ class EasyMailApp {
       promptConfig?: PromptConfig;
       threadStore?: ThreadStore;
       threadAnalysis?: ThreadAnalysisResult;
+      ignoredIds?: Set<string>;
     };
     const availableModels = await this.data.readCachedAvailableModels(this.availableModelsCache, (event, d) => this.log(event, d));
     const nextActionsStore = await this.data.readNextActions();
@@ -1003,6 +1029,7 @@ class EasyMailApp {
       promptConfig: extendedState.promptConfig || normalizePromptConfig({}),
       threadStore: extendedState.threadStore || emptyThreadStore(),
       threadAnalysis: extendedState.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+      ignoredIds: extendedState.ignoredIds,
       nextActionsStore,
       availableModels,
       busyKind: this.busy?.kind || "",

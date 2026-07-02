@@ -37,6 +37,8 @@ export interface MessageHandlerContext {
   refineDraft: (draftText: string, instruction: string, itemId: string) => Promise<void>;
   composeOutlookMail: (mode: string, draftText: string, itemId: string) => Promise<void>;
   markNextAction: (actionId: string, status: string) => Promise<void>;
+  ignoreThread: (threadId: string) => Promise<void>;
+  unignoreThread: (threadId: string) => Promise<void>;
 }
 
 export async function handleWebviewMessage(ctx: MessageHandlerContext, message: unknown): Promise<void> {
@@ -110,6 +112,28 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
       return;
     }
     await ctx.markNextAction(actionId, status);
+    await ctx.refresh();
+    return;
+  }
+
+  if (typed.type === "ignoreThread") {
+    const threadId = String(typed.threadId || "");
+    if (!threadId) {
+      ctx.showWarning("No thread selected.");
+      return;
+    }
+    await ctx.ignoreThread(threadId);
+    await ctx.refresh();
+    return;
+  }
+
+  if (typed.type === "unignoreThread") {
+    const threadId = String(typed.threadId || "");
+    if (!threadId) {
+      ctx.showWarning("No thread selected.");
+      return;
+    }
+    await ctx.unignoreThread(threadId);
     await ctx.refresh();
     return;
   }

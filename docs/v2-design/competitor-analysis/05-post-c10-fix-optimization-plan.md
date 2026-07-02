@@ -502,7 +502,7 @@ Completion Notes:
 
 ### P1.3 Add thread ignore and restore
 
-Status: [ ] Not started
+Status: [X] Done
 
 Goal:
 
@@ -533,12 +533,12 @@ Acceptance criteria:
 
 Completion Notes:
 
-- Status:
-- Files changed:
-- Tests:
-- Manual validation:
-- Known issues:
-- Commit:
+- Status: Complete. Thread ignore/restore reuses existing ignored mail ID set.
+- Files changed: `src/lib/workbench-render.ts`, `src/lib/message-handler.ts`, `src/lib/dashboard-render.ts`, `src/extension.ts`, `src/test/workbench-render.test.ts`, `src/test/message-handler.test.ts`
+- Tests: 2 workbench tests (ignore/restore buttons), 3 message-handler tests (dispatch ignoreThread, warn empty threadId, dispatch unignoreThread). All 279 tests pass.
+- Manual validation: Not applicable (no Outlook interaction). Compile pass.
+- Known issues: None.
+- Commit: PENDING
 
 ---
 
@@ -1184,6 +1184,35 @@ Uncommitted changes / dirty files:
 
 Next recommended step:
 - Claim `P1.3 Add thread ignore and restore`.
+
+---
+
+#### Handover - 2026-07-02 - Claude Code (P1.3 complete)
+
+Status: Done
+
+Changed:
+- Completed `P1.3 Add thread ignore and restore`.
+- Thread detail in workbench shows Ignore button (or Restore when all sourceMailIds are ignored).
+- `ignoreThread` writes all thread `sourceMailIds` to existing ignored mail set; `unignoreThread` removes them.
+- Added `ignoredIds?: Set<string>` to `DashboardRenderInput`, passed from extension.ts to both sidebar and workbench renders.
+- Added `ignoreThread`/`unignoreThread` to `MessageHandlerContext` and message handler dispatch.
+- Added click handlers in workbench client-side JS.
+- Wired `ignoreThread`/`unignoreThread` methods in `extension.ts`.
+
+Validated:
+- RED: 5 tests failed before implementation (2 workbench, 3 message-handler).
+- `npm run compile`: pass.
+- `npm test`: pass, 279 tests.
+
+Known issues:
+- None.
+
+Last safe stopping point:
+- P1.3 is complete and committed.
+
+Next recommended step:
+- Claim `P1.4`.
 
 ---
 

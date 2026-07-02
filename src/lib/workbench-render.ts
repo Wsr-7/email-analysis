@@ -143,7 +143,8 @@ function renderThreadDetail(
   thread: ThreadStore["items"][number],
   labels: DashboardLabels,
   analysis: ThreadAnalysisResult["items"][number] | undefined,
-  busyKind: string
+  busyKind: string,
+  ignoredIds?: Set<string>
 ): string {
   const timelineItems = [...(thread.timeline || [])].sort(compareTimelineMessagesForDisplay);
   const timeline = timelineItems.map((msg) =>
@@ -165,6 +166,9 @@ function renderThreadDetail(
     </div>
     <div class="wb-actions">
       <button class="wb-btn${busyKind === "analyzeThread" ? " is-busy" : ""}" data-action="analyzeThread" data-thread-id="${escapeAttr(thread.threadId)}"${busyKind ? " disabled" : ""}>${escapeHtml(labels.threads.analyzeThread)}${renderButtonSpinner(busyKind === "analyzeThread")}</button>
+      ${ignoredIds && thread.sourceMailIds.length > 0 && thread.sourceMailIds.every((id) => ignoredIds.has(id))
+        ? `<button class="wb-btn ghost" data-action="unignoreThread" data-thread-id="${escapeAttr(thread.threadId)}">${escapeHtml(labels.card.restore)}</button>`
+        : `<button class="wb-btn ghost" data-action="ignoreThread" data-thread-id="${escapeAttr(thread.threadId)}">${escapeHtml(labels.card.ignore)}</button>`}
     </div>
     ${renderThreadSpotlight(analysis, labels)}
     ${timelineItems.length ? `<div class="wb-timeline-section"><h4>${escapeHtml(labels.threads.timeline)} (${timelineItems.length})</h4>${timeline}</div>` : ""}
@@ -263,7 +267,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
 
   const sortedThreads = [...(visibleThreadStore.items || [])].sort((a, b) => String(b.lastTime || "").localeCompare(String(a.lastTime || "")));
   for (const thread of sortedThreads) {
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, input.ignoredIds)}</div>`);
   }
 
   return `<!doctype html>
@@ -429,6 +433,8 @@ document.addEventListener('click', function(e) {
   if (a === 'openInOutlook') post('openInOutlook', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'analyzeSelected') post('analyzeSelected', { mailIds: [t.getAttribute('data-mail-id') || ''] });
   if (a === 'analyzeThread') post('analyzeThread', { threadId: t.getAttribute('data-thread-id') || '' });
+  if (a === 'ignoreThread') post('ignoreThread', { threadId: t.getAttribute('data-thread-id') || '' });
+  if (a === 'unignoreThread') post('unignoreThread', { threadId: t.getAttribute('data-thread-id') || '' });
   if (a === 'openMeetingInOutlook') post('openMeetingInOutlook', { meetingId: t.getAttribute('data-meeting-id') || '' });
 });
 </script>

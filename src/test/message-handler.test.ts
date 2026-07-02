@@ -40,6 +40,8 @@ function stubContext(overrides?: Partial<MessageHandlerContext>): MessageHandler
     refineDraft: mock.fn(async () => {}),
     composeOutlookMail: mock.fn(async () => {}),
     markNextAction: mock.fn(async () => {}),
+    ignoreThread: mock.fn(async () => {}),
+    unignoreThread: mock.fn(async () => {}),
     ...overrides
   };
 }
@@ -265,5 +267,32 @@ describe("composeMail", () => {
     await handleWebviewMessage(ctx, { type: "composeMail", mode: "invalid", draftText: "", itemId: "m1" });
     assert.equal((ctx.composeOutlookMail as any).mock.callCount(), 0);
     assert.equal((ctx.showWarning as any).mock.callCount(), 1);
+  });
+});
+
+describe("ignoreThread", () => {
+  it("dispatches ignoreThread with threadId and refreshes", async () => {
+    const ctx = stubContext();
+    await handleWebviewMessage(ctx, { type: "ignoreThread", threadId: "t1" });
+    assert.equal((ctx.ignoreThread as any).mock.callCount(), 1);
+    assert.deepEqual((ctx.ignoreThread as any).mock.calls[0].arguments, ["t1"]);
+    assert.equal((ctx.refresh as any).mock.callCount(), 1);
+  });
+
+  it("warns on empty threadId", async () => {
+    const ctx = stubContext();
+    await handleWebviewMessage(ctx, { type: "ignoreThread", threadId: "" });
+    assert.equal((ctx.ignoreThread as any).mock.callCount(), 0);
+    assert.equal((ctx.showWarning as any).mock.callCount(), 1);
+  });
+});
+
+describe("unignoreThread", () => {
+  it("dispatches unignoreThread with threadId and refreshes", async () => {
+    const ctx = stubContext();
+    await handleWebviewMessage(ctx, { type: "unignoreThread", threadId: "t1" });
+    assert.equal((ctx.unignoreThread as any).mock.callCount(), 1);
+    assert.deepEqual((ctx.unignoreThread as any).mock.calls[0].arguments, ["t1"]);
+    assert.equal((ctx.refresh as any).mock.callCount(), 1);
   });
 });

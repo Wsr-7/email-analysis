@@ -321,4 +321,45 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("openMeetingInOutlook"));
     assert.ok(html.includes("wb-mtg-notResponded"));
   });
+
+  it("renders ignore button on thread detail", () => {
+    const input = stubInput({
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "",
+        items: [{
+          threadId: "t1", conversationId: "c1", normalizedSubject: "thread",
+          subject: "Thread Subject", participants: ["alice@test.com"],
+          folders: ["Inbox"], startTime: "2024-01-01", lastTime: "2024-01-02",
+          messageCount: 2, unreadCount: 0, hasAttachments: false,
+          sourceMailIds: ["m1", "m2"], timeline: [],
+          contentStatus: "available",
+          security: { totalMessages: 2, allowedMessages: 2, manualConfirmMessages: 0, blockedMessages: 0, highestClassificationLevel: 0, partialContext: false, reasons: [] }
+        }]
+      }
+    });
+    const html = renderWorkbenchHtml(input);
+    assert.ok(html.includes('data-action="ignoreThread"'), "thread detail should have ignore action");
+    assert.ok(html.includes('data-thread-id="t1"'));
+  });
+
+  it("renders restore button on thread detail when all mails are ignored", () => {
+    const input = stubInput({
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "",
+        items: [{
+          threadId: "t1", conversationId: "c1", normalizedSubject: "thread",
+          subject: "Thread Subject", participants: ["alice@test.com"],
+          folders: ["Inbox"], startTime: "2024-01-01", lastTime: "2024-01-02",
+          messageCount: 2, unreadCount: 0, hasAttachments: false,
+          sourceMailIds: ["m1", "m2"], timeline: [],
+          contentStatus: "available",
+          security: { totalMessages: 2, allowedMessages: 2, manualConfirmMessages: 0, blockedMessages: 0, highestClassificationLevel: 0, partialContext: false, reasons: [] }
+        }]
+      },
+      ignoredIds: new Set(["m1", "m2"])
+    });
+    const html = renderWorkbenchHtml(input);
+    assert.ok(html.includes('data-action="unignoreThread"'), "ignored thread should have restore action");
+    assert.ok(!html.includes('data-action="ignoreThread"'), "ignored thread should not have ignore action");
+  });
 });
