@@ -271,7 +271,7 @@ Completion Notes:
 
 ### P0.3 Fix analyze batch-size race and remove obsolete Auto Analyze setting UI
 
-Status: [ ] Not started
+Status: [X] Done
 
 Goal:
 
@@ -306,12 +306,31 @@ Acceptance criteria:
 
 Completion Notes:
 
-- Status:
+- Status: Done.
 - Files changed:
+  - `src/lib/sidebar-render.ts` — Analyze now posts the selected `batchSize` directly; removed `Allow Analysis` setting control from sidebar settings.
+  - `src/lib/dashboard-render.ts` — removed legacy dashboard `Allow Analysis` setting control.
+  - `src/lib/message-handler.ts` — `analyze` accepts and validates optional `batchSize`.
+  - `src/extension.ts` — passes optional batch override into analysis.
+  - `src/lib/app-analysis.ts` — accepts numeric batch override and uses it instead of saved `analysisBatchSize`.
+  - `package.json` — removed contributed `easyMail.autoAnalyzeEnabled` setting; added `app-analysis.test.js` to `npm test`.
+  - `default-config.json` — removed `autoAnalyzeEnabled`.
+  - `src/test/app-analysis.test.ts` — new regression test proving override `50` beats saved config `5`.
+  - `src/test/message-handler.test.ts` and `src/test/sidebar-render.test.ts` — dispatch/render coverage.
 - Tests:
+  - RED: `npm run compile` failed before implementation because `analyzeBatchCore(..., 50)` was not supported.
+  - `npm run compile`: pass.
+  - `node --test out/test/message-handler.test.js`: pass.
+  - `node --test out/test/sidebar-render.test.js`: pass.
+  - `node --test out/test/app-analysis.test.js`: pass.
+  - `npm test`: pass, 264 tests.
+  - `Select-String` over `package.json`, `default-config.json`, `src/lib/sidebar-render.ts`, and `src/lib/dashboard-render.ts` found no `autoAnalyzeEnabled` or `analysisBatchSize: sel` remnants.
 - Manual validation:
+  - Not run in VS Code UI here. Automated tests cover first-click selected batch size and removed setting exposure.
 - Known issues:
+  - Internal compatibility still supports persisted `autoAnalyzeEnabled: false` if present in older user settings/config. It is no longer exposed in `package.json` or UI.
 - Commit:
+  - `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
 
 ---
 
@@ -752,7 +771,7 @@ Use this section to summarize completed task commits:
 
 - P0.1: implementation `04d96a5029b615d058a7bb28221863d80e432189`; manual Outlook validation pending.
 - P0.2: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
-- P0.3:
+- P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
 - P0.4:
 - P1.1:
 - P1.2:
@@ -889,6 +908,69 @@ Uncommitted changes / dirty files:
 Next recommended step:
 - Start `P0.3 Fix analyze batch-size race and remove obsolete Auto Analyze setting UI`.
 - User decision: remove `easyMail.autoAnalyzeEnabled` from `package.json` settings directly, keep only internal/backward-compatible config handling if needed.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P0.3 start)
+
+Status: In progress
+
+Changed:
+- Claimed `P0.3 Fix analyze batch-size race and remove obsolete Auto Analyze setting UI`.
+
+Validated:
+- P0.2 implementation and plan update are committed:
+  - Implementation: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
+  - Plan update: `b74affeb969182bc646053896d89edb65997dde3`
+- Ran `git status --short --branch`: branch `v3`, ahead 2; clean working tree.
+- Read `AGENTS.md` from repo root as project guidance.
+
+Known issues:
+- No P0.3 source code changed yet in this checkpoint.
+
+Last safe stopping point:
+- Before analyze/config path inspection.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Inspect sidebar analyze JS, message handler analyze dispatch, app-analysis batch selection, package/default config settings, and tests.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P0.3 complete)
+
+Status: Done
+
+Changed:
+- Fixed analyze count race by sending selected `batchSize` in the `analyze` message and honoring it in `analyzeBatchCore`.
+- Removed user-facing `Auto Analyze Enabled` / `Allow Analysis` setting from `package.json`, `default-config.json`, sidebar settings, and legacy dashboard settings.
+- Kept internal backward compatibility for old persisted `autoAnalyzeEnabled` values.
+- Added `src/test/app-analysis.test.ts` and included it in `npm test`.
+- Commit: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
+
+Validated:
+- RED: compile failed before implementation because core analysis did not accept numeric batch override.
+- `npm run compile`: pass.
+- `node --test out/test/message-handler.test.js`: pass.
+- `node --test out/test/sidebar-render.test.js`: pass.
+- `node --test out/test/app-analysis.test.js`: pass.
+- `npm test`: pass, 264 tests.
+- `Select-String` confirmed no `autoAnalyzeEnabled` / `analysisBatchSize: sel` remains in public config/render files.
+
+Known issues:
+- No manual VS Code UI click test was run here.
+- Legacy persisted `autoAnalyzeEnabled: false` can still affect internal security behavior until the user changes settings; this is intentional compatibility, not a visible setting.
+
+Last safe stopping point:
+- P0.3 is complete and committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Start `P0.4 Preserve metadata during redaction`.
 
 ---
 
