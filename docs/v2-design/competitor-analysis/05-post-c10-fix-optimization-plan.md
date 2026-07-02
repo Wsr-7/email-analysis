@@ -860,11 +860,16 @@ Status:
 - First stabilization slice completed in `72970ebb038e3cf8aa64f52b622af6cb78ba760a`.
 - Classification threshold normalization completed in `97f1564b3942a39e1711a740e3a8c9ed52c5e969`.
 - Workbench ignore focus advancement completed in `8606a11d67f220b5aa20715714de7e9499e2f48e`.
+- Remaining local stabilization completed in `62f5097d2a19515d4790e6e020873391f4186300`.
 - `Generate Draft` now dispatches a draft-only action instead of reusing analysis.
 - Batch analysis no longer removes analyzed mails from `mail-store`, preserving body/timeline/draft context for workbench detail and future thread construction.
 - Workbench metadata is forced onto separate lines, and Outlook Actions are rendered as a collapsed popover menu.
 - `autoAnalyzeMaxClassificationLevel` is parsed consistently from numeric values, numeric strings, or labels like `REGISTERED`; queue filtering and security gate now use the same threshold interpretation.
 - Ignoring an item from the workbench now advances focus to another item in the same queue or clears focus when none remains, instead of leaving the ignored item open as Restore.
+- Sidebar can now switch to the `ignored` queue after a workbench ignore action.
+- Old `folders = Inbox` settings are normalized to `Inbox; Sent Items` so self replies can be collected on the next pull.
+- Polish/Refine now show notification progress and completion messages.
+- Thread analysis prompts now explicitly require English translation for all natural-language JSON fields when `outputLanguage = en-US`.
 
 Current recommendation:
 
@@ -890,7 +895,7 @@ Use this section to summarize completed task commits:
 - P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
 - P1.2: `c65f435`
 - P1.3: `bcafc01`
-- P1.4: `e0100de91495373f36243e2a2898c86267d34450`; stabilization follow-up `72970ebb038e3cf8aa64f52b622af6cb78ba760a`
+- P1.4: `e0100de91495373f36243e2a2898c86267d34450`; stabilization follow-up `72970ebb038e3cf8aa64f52b622af6cb78ba760a`; remaining workflow follow-up `62f5097d2a19515d4790e6e020873391f4186300`
 - P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
 - P2.1:
 - P2.2:
@@ -981,6 +986,37 @@ Known issues:
 
 Next recommended step:
 - Add progress/toast behavior for Polish/Refine and then investigate existing-user Sent Items folder normalization for P1.4. Do not start P2.
+
+#### Handover - 2026-07-03 - Codex (Remaining local stabilization complete)
+
+Status: Complete for all locally verifiable fixes
+
+Changed:
+- Added notification progress and success messages for `Polish draft` and `Refine draft`.
+- Normalized old Inbox-only folder settings to include `Sent Items` on read and save, so collected self replies can appear in future thread timelines.
+- Added sidebar `focusQueue` handling and sends `focusQueue: ignored` after workbench ignore.
+- Strengthened thread analysis prompt language rules for `en-US`, requiring English natural-language JSON fields and translation of Chinese source content.
+- Preserved previous VSIX workflow by rebuilding `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- `rtk npm run compile`
+- `rtk node --test out/test/config-utils.test.js out/test/message-handler.test.js out/test/thread-prompt-builder.test.js`
+- `rtk node --test out/test/config-utils.test.js out/test/message-handler.test.js out/test/thread-prompt-builder.test.js out/test/sidebar-render.test.js`
+- `rtk npm test`
+- `rtk npm run package:vsix`
+
+Commit:
+- Implementation: `62f5097d2a19515d4790e6e020873391f4186300`
+
+Needs manual confirmation:
+- Install the updated VSIX and verify `Confirm and Analyze` reason/button with a real manual-confirm mail.
+- Pull mail after the folder normalization and verify Sent Items/self replies now appear in thread timelines.
+- Re-analyze the reported thread and confirm the Wait For Me classification regression is gone; if it remains, capture a sanitized example because local tests cannot prove model categorization.
+- Analyze a Chinese thread with `outputLanguage = en-US` and confirm Thread Spotlight natural-language fields are English.
+- Verify Outlook compose/draft flows in classic Outlook.
+
+Next recommended step:
+- Stop coding until these manual checks are done. If any check fails, reopen only that specific failing path.
 
 #### Handover - 2026-07-03 - Codex (P0.2 follow-up start)
 
