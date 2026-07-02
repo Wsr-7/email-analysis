@@ -266,6 +266,27 @@ Completion Notes:
   - None for P0.2.
 - Commit:
   - `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
+- Follow-up:
+  - Moved `Confirm and Analyze` out of sidebar compact rows; sidebar rows only navigate/select the mail.
+  - Kept `Confirm and Analyze` in the workbench top action row beside `Open in Outlook` / `Ignore`.
+  - Manual-confirm workbench detail now labels the reason as `Manual Confirmation Required`; hard-blocked mail still uses `Blocked by security gate`.
+  - `HIGH REGISTERED` above the configured max allowed classification now becomes `manual_confirm` by default instead of hard block; hard-block keywords still block.
+  - Regenerated `releases/easy-mail-0.2.0.vsix` for user install validation.
+- Follow-up tests:
+  - RED confirmed before fix:
+    - `node --test out/test/sidebar-render.test.js`
+    - `node --test out/test/config-utils.test.js`
+    - `node --test out/test/workbench-render.test.js`
+  - GREEN after fix:
+    - `npm run compile`
+    - `node --test out/test/sidebar-render.test.js`
+    - `node --test out/test/config-utils.test.js`
+    - `node --test out/test/workbench-render.test.js`
+    - `node --test out/test/security-gate.test.js`
+    - `npm test` (285 tests passing)
+    - `npm run package:vsix`
+- Follow-up commit:
+  - `280469911d4f0ab97a3ad0688def7ff03906225e`
 
 ---
 
@@ -838,7 +859,7 @@ Known caution:
 Use this section to summarize completed task commits:
 
 - P0.1: implementation `04d96a5029b615d058a7bb28221863d80e432189`; manual Outlook validation pending.
-- P0.2: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
+- P0.2: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`; follow-up `280469911d4f0ab97a3ad0688def7ff03906225e`
 - P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`; follow-up `6ede04dd9fe1da3d7a308fea65d4333d32d3a107`
 - P0.4: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
 - P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
@@ -852,6 +873,85 @@ Use this section to summarize completed task commits:
 ---
 
 ## 8. Handover Log
+
+#### Handover - 2026-07-03 - Codex (P0.2 follow-up start)
+
+Status: In progress
+
+Changed:
+- Reopened `P0.2 Add manual-confirm analyze action for security-gated mail` for user-reported placement and explanation issues.
+
+Validated:
+- P0.3 regression implementation and plan update are committed:
+  - Implementation: `6ede04dd9fe1da3d7a308fea65d4333d32d3a107`
+- Ran targeted P0.3 tests successfully before this checkpoint.
+- Inspected `src/lib/sidebar-render.ts`, `src/lib/workbench-render.ts`, `src/lib/security-gate.ts`, and current sidebar/workbench/security tests.
+
+Findings:
+- Sidebar compact rows still render `Confirm and Analyze`; user wants it removed from the sidebar row.
+- Workbench already renders `Confirm and Analyze` in the detail action row for `manual_confirm`, but tests should assert this is the supported location.
+- Current security gate hard-blocks classification above `maxManualClassificationLevel` where that level is hardcoded to 2, so `HIGH REGISTERED` can lack a confirm action instead of being manually confirmable.
+- Manual-confirm reasons exist in workbench metadata, but the copy does not clearly explain why direct analysis is blocked.
+
+Known issues:
+- No P0.2 follow-up source code changed yet in this checkpoint.
+
+Last safe stopping point:
+- Before RED test edits for P0.2 follow-up.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Add RED tests for sidebar button removal, HIGH REGISTERED manual-confirm behavior, and clear workbench manual-confirm reason text.
+
+---
+
+#### Handover - 2026-07-03 - Codex (P0.2 follow-up complete)
+
+Status: Done
+
+Changed:
+- Completed P0.2 follow-up for manual-confirm button placement and visible reasons.
+- Removed `Confirm and Analyze` from sidebar compact rows.
+- Kept `Confirm and Analyze` in the workbench detail top action row with `Open in Outlook` and `Ignore`.
+- Workbench manual-confirm details now show `Manual Confirmation Required` with the gate reason.
+- Default manual-confirm maximum classification is now level 3, so `HIGH REGISTERED` above the configured max allowed level is manually confirmable unless a hard-block keyword matches.
+- Regenerated `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- RED before fix:
+  - `node --test out/test/sidebar-render.test.js`
+  - `node --test out/test/config-utils.test.js`
+  - `node --test out/test/workbench-render.test.js`
+- GREEN after fix:
+  - `npm run compile`
+  - `node --test out/test/sidebar-render.test.js`
+  - `node --test out/test/config-utils.test.js`
+  - `node --test out/test/workbench-render.test.js`
+  - `node --test out/test/security-gate.test.js`
+  - `npm test` (285 tests passing)
+  - `npm run package:vsix`
+
+Known issues:
+- Manual VS Code UI validation is still needed with real pulled mails.
+
+Last safe stopping point:
+- P0.2 follow-up implementation and VSIX package are committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md` only, for this handover update.
+
+Commit:
+- Implementation/package commit: `280469911d4f0ab97a3ad0688def7ff03906225e`
+
+Next recommended step:
+- Install `releases/easy-mail-0.2.0.vsix` and manually validate:
+  - max allowed `REGISTERED` analyzes `INTERNAL` / `REGISTERED` on Analyze click.
+  - `HIGH REGISTERED` appears in manual confirmation with `Confirm and Analyze` in workbench, not sidebar.
+  - changing settings no longer reports unregistered `easyMail.autoAnalyzeEnabled`.
+
+---
 
 #### Handover - 2026-07-03 - Codex (P0.3 regression start)
 
