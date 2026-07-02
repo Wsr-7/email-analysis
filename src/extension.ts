@@ -1020,7 +1020,7 @@ class EasyMailApp {
       ignoredIds,
       classifications,
       true,
-      Number(config.autoAnalyzeMaxClassificationLevel || 2)
+      config.autoAnalyzeMaxClassificationLevel
     );
     const state = buildDashboardState(config, digest, analysis, ignoredIds, allowedCategoryIds(promptConfig), securedThreadStore) as DashboardState & {
       modelInfo?: Record<string, unknown>;

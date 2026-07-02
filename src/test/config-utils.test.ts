@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "../lib/config-utils";
+import { positiveNumber, parseFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy } from "../lib/config-utils";
 
 describe("positiveNumber", () => {
   it("returns parsed number when positive", () => {
@@ -71,6 +71,13 @@ describe("getLocaleFromConfig", () => {
 });
 
 describe("buildSecuritySettings", () => {
+  it("parses classification level labels and string numbers", () => {
+    assert.equal(parseClassificationLevel("REGISTERED", 1), 2);
+    assert.equal(parseClassificationLevel("HIGH REGISTERED", 1), 3);
+    assert.equal(parseClassificationLevel("2", 1), 2);
+    assert.equal(parseClassificationLevel("unknown", 1), 1);
+  });
+
   it("builds settings with defaults", () => {
     const settings = buildSecuritySettings({});
     assert.equal(settings.enabled, true);
@@ -82,6 +89,11 @@ describe("buildSecuritySettings", () => {
   it("ignores obsolete autoAnalyzeEnabled false", () => {
     const settings = buildSecuritySettings({ autoAnalyzeEnabled: false });
     assert.equal(settings.autoAnalyzeEnabled, true);
+  });
+
+  it("uses parsed max allowed classification level", () => {
+    const settings = buildSecuritySettings({ autoAnalyzeMaxClassificationLevel: "REGISTERED" });
+    assert.equal(settings.maxAutoClassificationLevel, 2);
   });
 });
 

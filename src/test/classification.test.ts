@@ -68,3 +68,25 @@ test("buildQueueState uses max classification level, not obsolete auto analyze f
   assert.equal(queue.allowed.length, 1);
   assert.equal(queue.allowed[0].mailId, "mail-1");
 });
+
+test("buildQueueState accepts classification level labels from settings", () => {
+  const registeredMail: StoredMail = {
+    ...mails[0],
+    mailId: "mail-3",
+    sourceMailId: "mail-003",
+    subject: "Registered contract",
+    bodyExcerpt: "Please review this contract."
+  };
+  const cache = ensureClassifications([...mails, registeredMail], normalizeClassificationCache({}));
+  const queue = buildQueueState(
+    [...mails, registeredMail],
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    [],
+    cache,
+    false,
+    "REGISTERED"
+  );
+
+  assert.deepEqual(queue.allowed.map((item) => item.mailId).sort(), ["mail-1", "mail-3"]);
+  assert.deepEqual(queue.blocked.map((item) => item.mailId), ["mail-2"]);
+});

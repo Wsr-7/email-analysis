@@ -31,11 +31,28 @@ export function getLocaleFromConfig(config: Record<string, unknown>): Locale {
   return config.outputLanguage === "zh-CN" ? "zh-CN" : "en-US";
 }
 
+export function parseClassificationLevel(value: unknown, fallback: number): number {
+  const labels: Record<string, number> = {
+    PUBLIC: 0,
+    INTERNAL: 1,
+    REGISTERED: 2,
+    "HIGH REGISTERED": 3
+  };
+  if (typeof value === "string") {
+    const normalized = value.trim().toUpperCase();
+    if (normalized in labels) {
+      return labels[normalized]!;
+    }
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 export function buildSecuritySettings(config: Record<string, unknown>): SecurityGateSettings {
   return {
     enabled: true,
     autoAnalyzeEnabled: true,
-    maxAutoClassificationLevel: Number(config.autoAnalyzeMaxClassificationLevel || 2),
+    maxAutoClassificationLevel: parseClassificationLevel(config.autoAnalyzeMaxClassificationLevel, 2),
     maxManualClassificationLevel: 3,
     hardBlockKeywords: ["password", "api_key", "access_token", "auth_token"],
     manualConfirmKeywords: []
