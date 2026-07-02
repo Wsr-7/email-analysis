@@ -445,7 +445,7 @@ Completion Notes:
 
 ### P1.2 Normalize metadata, action placement, classification, recipients, and body rendering
 
-Status: [~] In progress
+Status: [X] Done
 
 Goal:
 
@@ -480,12 +480,23 @@ Acceptance criteria:
 
 Completion Notes:
 
-- Status:
+- Status: Done.
 - Files changed:
+  - `src/lib/dashboard-labels.ts` — added `to`, `cc`, `body` labels to `card` record (zh-CN and en-US).
+  - `src/lib/workbench-render.ts` — `renderMailDetail` now shows `to`, `cc`, classification from cache, and moves actions (Open in Outlook / Ignore) above body. `renderAnalysisDetail` now shows `to`, `cc` from original mail, moves actions above summary, and renders original body below draft. Workbench render loop builds `mailById` lookup to pass original mail to analysis detail.
+  - `src/test/sidebar-render.test.ts` — added test for classification badge on analyzed rows (already passing — verified existing behavior).
+  - `src/test/workbench-render.test.ts` — added 3 tests: recipients/classification in mail detail, analyzed mail with original body, and action placement above summary.
 - Tests:
-- Manual validation:
+  - RED: 3 workbench tests failed before implementation (recipients, body, action placement). Sidebar classification test was already GREEN (existing `classificationBadge` helper covers analyzed rows).
+  - `npm run compile`: pass.
+  - `node --test out/test/sidebar-render.test.js`: pass, 30 tests.
+  - `node --test out/test/workbench-render.test.js`: pass, 17 tests.
+  - `npm test`: pass, 274 tests.
+- Manual validation: Not run; visual verification not performed in this session.
 - Known issues:
-- Commit:
+  - Analyzed mail body display depends on the original mail still being in `store.items`. If mail store retention has pruned it, body will be empty.
+  - P0.1 still needs manual Outlook validation before closing compose acceptance.
+- Commit: `c65f435`
 
 ---
 
@@ -793,7 +804,7 @@ Use this section to summarize completed task commits:
 - P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
 - P0.4: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
 - P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
-- P1.2:
+- P1.2: `c65f435`
 - P1.3:
 - P1.4:
 - P1.5:
@@ -1140,6 +1151,39 @@ Uncommitted changes / dirty files:
 
 Next recommended step:
 - Inspect sidebar row renderers, workbench detail renderers, dashboard state inputs, and tests; add RED tests for classification visibility, recipient/time/classification rows, action placement, and analyzed body rendering.
+
+---
+
+#### Handover - 2026-07-02 - Agent3 (P1.2 complete)
+
+Status: Done
+
+Changed:
+- Completed `P1.2 Normalize metadata, action placement, classification, recipients, and body rendering`.
+- Workbench mail detail now shows To, Cc, classification from cache, and moves Open in Outlook / Ignore above body.
+- Analyzed mail detail now shows To/Cc from original mail, moves actions above summary, and renders original body below draft.
+- Added `to`, `cc`, `body` labels to dashboard-labels (zh-CN and en-US).
+- Sidebar analyzed rows already showed classification badge via existing `classificationBadge` helper — confirmed, no change needed.
+
+Validated:
+- RED: 3 workbench tests failed before implementation. 1 sidebar test (classification on analyzed rows) was already GREEN.
+- `npm run compile`: pass.
+- `node --test out/test/sidebar-render.test.js`: pass, 30 tests.
+- `node --test out/test/workbench-render.test.js`: pass, 17 tests.
+- `npm test`: pass, 274 tests.
+
+Known issues:
+- Analyzed mail body depends on original mail in `store.items`. If retention prunes it, body is empty.
+- P0.1 still needs manual Outlook validation before closing compose acceptance.
+
+Last safe stopping point:
+- P1.2 is complete and committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md` (will be committed together)
+
+Next recommended step:
+- Claim `P1.3 Add thread ignore and restore`.
 
 ---
 
