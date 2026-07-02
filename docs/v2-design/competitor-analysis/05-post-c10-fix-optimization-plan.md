@@ -642,8 +642,11 @@ Completion Notes:
 - Files changed: `media/icon.png`
 - Tests: No code logic change. 279 existing tests pass. `npm run package:vsix` succeeds (431.25 KB, icon at `media/icon.png` 248.86 KB).
 - Manual validation: Pending user install in VS Code to confirm extension list, detail page, and activity bar rendering.
-- Known issues: None.
-- Commit: `605a75d`
+- Follow-up: User install screenshot showed `media/icon.png` rendered as a square in the Activity Bar. Added a dedicated mask-friendly Activity Bar SVG at `media/activity-icon.svg`, pointed `viewsContainers.activitybar.icon` at it, and lightly enlarged the visible content inside `media/icon.png` for the extension list/details surfaces.
+- Follow-up tests: `npm run compile` pass; `npm run package:vsix` pass (102 files, 467.18 KB); VSIX contains `extension/media/icon.png`, `extension/media/activity-icon.svg`, and `extension/package.json`; packaged manifest keeps package icon `media/icon.png` and Activity Bar icon `media/activity-icon.svg`.
+- Manual validation: Pending user reinstall in VS Code to confirm the Activity Bar no longer appears as a square and the extension list/details icon appears slightly larger.
+- Known issues: Activity Bar uses a separate SVG because VS Code Activity Bar icons are best treated as monochrome/mask icons; package/list/details keep the raster PNG.
+- Commit: `605a75d`; follow-up commit `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
 
 ---
 
@@ -823,7 +826,7 @@ Use this section to summarize completed task commits:
 - P1.2: `c65f435`
 - P1.3: `bcafc01`
 - P1.4: `e0100de91495373f36243e2a2898c86267d34450`
-- P1.5: `605a75d`
+- P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
 - P2.1:
 - P2.2:
 
@@ -1324,6 +1327,69 @@ Uncommitted changes / dirty files:
 
 Next recommended step:
 - Continue to `P2.2 Define and harden multiple Outlook account behavior`, or manually validate P0.1/P1.4 Outlook flows before P2 work.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P1.5 follow-up start)
+
+Status: In progress
+
+Changed:
+- Reopened P1.5 for user-validated icon follow-up.
+
+Validated:
+- User screenshot shows activity bar still renders as a square button.
+- `package.json` uses `media/icon.png` for both extension package icon and `viewsContainers.activitybar.icon`.
+- `media/icon.png` is 512x512 and is the final raster package icon.
+- Ran `git status --short --branch`: branch `v3`, ahead 17; dirty tracked `releases/easy-mail-0.2.0.vsix` from earlier packaging output.
+
+Known issues:
+- VS Code extension list icon display size is controlled by VS Code; only apparent size can be changed by reducing icon padding.
+- `releases/easy-mail-0.2.0.vsix` is unrelated dirty state for this follow-up and must not be staged unless regenerated intentionally.
+
+Last safe stopping point:
+- Before package/icon edits.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+- `releases/easy-mail-0.2.0.vsix` unrelated dirty tracked file
+
+Next recommended step:
+- Add a dedicated activity bar SVG icon, point `viewsContainers.activitybar.icon` at it, and lightly enlarge the raster package icon content inside `media/icon.png`.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P1.5 follow-up complete)
+
+Status: Done
+
+Changed:
+- Completed the user-reported P1.5 icon follow-up.
+- Added `media/activity-icon.svg` for the VS Code Activity Bar.
+- Updated `package.json` so the Activity Bar uses `media/activity-icon.svg` while package/list/details keep `media/icon.png`.
+- Lightly enlarged the visible content inside `media/icon.png` to reduce transparent padding on extension list/details surfaces.
+- Regenerated `releases/easy-mail-0.2.0.vsix` with the updated icon assets.
+
+Validated:
+- `npm run compile`: pass.
+- `npm run package:vsix`: pass, generated `releases/easy-mail-0.2.0.vsix` with 102 files.
+- VSIX package inspection confirms `extension/media/icon.png`, `extension/media/activity-icon.svg`, and `extension/package.json` are present.
+- Packaged manifest confirms package icon is `media/icon.png` and Activity Bar icon is `media/activity-icon.svg`.
+
+Known issues:
+- Manual VS Code reinstall/check is still needed to visually confirm Activity Bar and extension list rendering in the user's installed extension host.
+
+Last safe stopping point:
+- P1.5 icon follow-up implementation and package output committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md` only, for this handover update.
+
+Commit:
+- Implementation/package commit: `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
+
+Next recommended step:
+- Continue the current 05 plan from the next uncompleted item after P1.5, likely `P2.2` unless the user prioritizes `P2.1`.
 
 ---
 
