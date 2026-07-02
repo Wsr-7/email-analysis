@@ -538,7 +538,7 @@ Completion Notes:
 - Tests: 2 workbench tests (ignore/restore buttons), 3 message-handler tests (dispatch ignoreThread, warn empty threadId, dispatch unignoreThread). All 279 tests pass.
 - Manual validation: Not applicable (no Outlook interaction). Compile pass.
 - Known issues: None.
-- Commit: PENDING
+- Commit: `bcafc01`
 
 ---
 
@@ -805,7 +805,7 @@ Use this section to summarize completed task commits:
 - P0.4: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
 - P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
 - P1.2: `c65f435`
-- P1.3:
+- P1.3: `bcafc01`
 - P1.4:
 - P1.5:
 - P2.1:
