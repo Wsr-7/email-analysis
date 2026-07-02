@@ -383,7 +383,7 @@ Completion Notes:
 
 ### P1.1 Redesign draft editor, actions, and per-item draft binding
 
-Status: [ ] Not started
+Status: [X] Done
 
 Goal:
 
@@ -422,12 +422,24 @@ Acceptance criteria:
 
 Completion Notes:
 
-- Status:
+- Status: Done.
 - Files changed:
+  - `src/lib/dashboard-labels.ts` — added `Generate Draft` and `Outlook Actions` labels.
+  - `src/lib/dashboard-render.ts` — `renderEditableDraftBox` now supports item/source ids, empty-draft generate action, non-empty polish/refine actions, copy inside the editor, and grouped Outlook actions.
+  - `src/lib/workbench-render.ts` — passes `mail:<id>` / `thread:<id>` draft keys, dispatches draft actions from the draft box key instead of `currentId`, and adds theme-compatible responsive editor CSS.
+  - `src/test/dashboard-render.test.ts` — covers empty/non-empty draft action rendering and item/source attributes.
+  - `src/test/workbench-render.test.ts` — covers workbench draft key binding and empty draft generate dispatch.
 - Tests:
-- Manual validation:
+  - RED: `node --test out/test/dashboard-render.test.js` and `node --test out/test/workbench-render.test.js` failed before implementation because generate action, stable draft keys, and grouped Outlook actions were absent.
+  - `npm run compile`
+  - `node --test out/test/dashboard-render.test.js`
+  - `node --test out/test/workbench-render.test.js`
+  - `npm test` (270 tests passing)
+- Manual validation: Not run; visual browser/workbench verification was not used in this session per project rule against visual collaboration workflows.
 - Known issues:
-- Commit:
+  - `Generate Draft` reuses existing analyze actions (`analyzeSelected` / `analyzeThread`) rather than adding a new draft-only LLM flow.
+  - Draft changes are still in-webview only; persistent draft storage remains intentionally out of scope for this task.
+- Commit: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
 
 ---
 
@@ -780,7 +792,7 @@ Use this section to summarize completed task commits:
 - P0.2: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
 - P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
 - P0.4: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
-- P1.1:
+- P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
 - P1.2:
 - P1.3:
 - P1.4:
@@ -1037,6 +1049,69 @@ Uncommitted changes / dirty files:
 
 Next recommended step:
 - Claim `P1.1 Redesign draft editor, actions, and per-item draft binding`.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P1.1 start)
+
+Status: In progress
+
+Changed:
+- Claimed `P1.1 Redesign draft editor, actions, and per-item draft binding`.
+
+Validated:
+- Read this plan and latest handover.
+- Ran `git status --short --branch`: branch `v3`, ahead 6; clean working tree.
+- P0.4 implementation and plan update are committed:
+  - Implementation: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
+  - Plan update: `f92c43c1e3e3cf6d7aa6322e62beb1786e83e80d`
+
+Known issues:
+- No P1.1 source code changed yet in this checkpoint.
+- P0.1 still needs manual Outlook validation before closing compose acceptance.
+
+Last safe stopping point:
+- Before draft render/message-handler inspection.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Inspect draft render helpers, workbench JS message payloads, extension draft generation paths, and existing tests; add RED tests for action visibility and item-specific draft keys.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P1.1 complete)
+
+Status: Done
+
+Changed:
+- Completed `P1.1 Redesign draft editor, actions, and per-item draft binding`.
+- Empty draft boxes now show a `Generate Draft` action that reuses existing analyze paths.
+- Non-empty draft boxes show polish/refine, copy inside the editor, and grouped Outlook actions.
+- Workbench draft operations use `mail:<id>` / `thread:<id>` draft keys from the draft box instead of relying on `currentId`.
+
+Validated:
+- RED: `node --test out/test/dashboard-render.test.js` and `node --test out/test/workbench-render.test.js` failed before implementation on missing generate/action grouping/item-key behavior.
+- `npm run compile`: pass.
+- `node --test out/test/dashboard-render.test.js`: pass.
+- `node --test out/test/workbench-render.test.js`: pass.
+- `npm test`: pass, 270 tests.
+- Implementation commit: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
+
+Known issues:
+- No manual VS Code visual validation was run in this session.
+- `Generate Draft` is analyze-backed, not a separate draft-only generation flow.
+- P0.1 still needs manual Outlook validation before closing compose acceptance.
+
+Last safe stopping point:
+- P1.1 implementation is complete and committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Claim `P1.2 Normalize metadata, action placement, classification, recipients, and body rendering`.
 
 ---
 
