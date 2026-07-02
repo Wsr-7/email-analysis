@@ -249,6 +249,20 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("showReader"));
   });
 
+  it("updates workbench focus before ignoring the current item", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" }), stubAnalysisItem({ mailId: "a2" })] }
+      ])
+    });
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes('data-id="a1" data-queue="mustHandleToday"'));
+    assert.ok(html.includes("function focusAfterRemoving(id)"));
+    assert.ok(html.includes("focusAfterRemoving(removedId); post('ignore'"));
+    assert.ok(html.includes("focusAfterRemoving(threadId); post('ignoreThread'"));
+  });
+
   it("does not include filterQueue or selectItem (no list column)", () => {
     const html = renderWorkbenchHtml(stubInput());
     assert.ok(!html.includes("filterQueue"));

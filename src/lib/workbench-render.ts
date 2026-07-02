@@ -236,7 +236,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   for (const item of queue.pending) {
     const classification = classificationFor(item.mailId, classifications);
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>`;
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "pending", labels, extra, "", classifications)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="pending">${renderMailDetail(item, "pending", labels, extra, "", classifications)}</div>`);
   }
 
   for (const item of queue.blocked) {
@@ -245,7 +245,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     const gateTitle = gateDecision?.decision === "manual_confirm" ? labels.pending.blockedTitle : labels.pending.gateBlocked;
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>
       <div class="wb-field wb-warn"><strong>${escapeHtml(gateTitle)}:</strong> ${escapeHtml(gateDecision?.reasons.join("; ") || "-")}</div>`;
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "blocked", labels, extra, confirmAnalyzeButton(item.mailId, gateDecision, labels), classifications)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="blocked">${renderMailDetail(item, "blocked", labels, extra, confirmAnalyzeButton(item.mailId, gateDecision, labels), classifications)}</div>`);
   }
 
   const mailById = new Map((input.store?.items || []).map((m) => [m.mailId, m]));
@@ -254,21 +254,21 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     for (const item of cat.items) {
       const threadId = threadByMailId.get(item.mailId) || "";
       const originalMail = mailById.get(item.mailId);
-      detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderAnalysisDetail(item, cat.id, labels, threadId, classifications, originalMail)}</div>`);
+      detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="${escapeAttr(cat.id)}">${renderAnalysisDetail(item, cat.id, labels, threadId, classifications, originalMail)}</div>`);
     }
   }
 
   for (const item of (queue.ignoredPending || [])) {
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "ignored", labels, "", "", classifications)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="ignored">${renderMailDetail(item, "ignored", labels, "", "", classifications)}</div>`);
   }
 
   for (const mtg of sortedMeetings) {
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(mtg.entryId)}">${renderMeetingDetail(mtg, labels)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(mtg.entryId)}" data-queue="meetings">${renderMeetingDetail(mtg, labels)}</div>`);
   }
 
   const sortedThreads = [...(visibleThreadStore.items || [])].sort((a, b) => String(b.lastTime || "").localeCompare(String(a.lastTime || "")));
   for (const thread of sortedThreads) {
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, input.ignoredIds)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}" data-queue="threads">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, input.ignoredIds)}</div>`);
   }
 
   return `<!doctype html>
@@ -404,6 +404,24 @@ function showReader(id) {
   }
 }
 
+function focusAfterRemoving(id) {
+  var current = document.querySelector('.wb-reader[data-id="' + id + '"]');
+  if (!current) { currentId = ''; vscode.setState({ currentId: currentId }); hideReaders(); return; }
+  var queue = current.getAttribute('data-queue') || '';
+  var peers = Array.prototype.slice.call(document.querySelectorAll('.wb-reader[data-queue="' + queue + '"]')).filter(function(r) {
+    return r.getAttribute('data-id') !== id;
+  });
+  if (peers.length) {
+    currentId = peers[0].getAttribute('data-id') || '';
+    vscode.setState({ currentId: currentId });
+    showReader(currentId);
+    return;
+  }
+  currentId = '';
+  vscode.setState({ currentId: currentId });
+  hideReaders();
+}
+
 function hideReaders() {
   for (var r of document.querySelectorAll('.wb-reader')) r.classList.remove('active');
   document.getElementById('placeholder').hidden = false;
@@ -430,12 +448,12 @@ document.addEventListener('click', function(e) {
   if (a === 'polishDraft' || a === 'refineDraft') { var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; var itemId = box ? box.getAttribute('data-item-id') || '' : ''; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: itemId }); }
   if (a === 'composeMail') { var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
   if (a === 'generateDraft') { var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var itemId3 = box3 ? box3.getAttribute('data-item-id') || '' : ''; post('generateDraft', { itemId: itemId3, sourceId: sourceId }); }
-  if (a === 'ignore') post('ignore', { mailId: t.getAttribute('data-mail-id') || '' });
+  if (a === 'ignore') { var reader = t.closest('.wb-reader'); var removedId = reader ? reader.getAttribute('data-id') || '' : t.getAttribute('data-mail-id') || ''; focusAfterRemoving(removedId); post('ignore', { mailId: t.getAttribute('data-mail-id') || '' }); }
   if (a === 'unignore') post('unignore', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'openInOutlook') post('openInOutlook', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'analyzeSelected') post('analyzeSelected', { mailIds: [t.getAttribute('data-mail-id') || ''] });
   if (a === 'analyzeThread') post('analyzeThread', { threadId: t.getAttribute('data-thread-id') || '' });
-  if (a === 'ignoreThread') post('ignoreThread', { threadId: t.getAttribute('data-thread-id') || '' });
+  if (a === 'ignoreThread') { var threadId = t.getAttribute('data-thread-id') || ''; focusAfterRemoving(threadId); post('ignoreThread', { threadId: threadId }); }
   if (a === 'unignoreThread') post('unignoreThread', { threadId: t.getAttribute('data-thread-id') || '' });
   if (a === 'openMeetingInOutlook') post('openMeetingInOutlook', { meetingId: t.getAttribute('data-meeting-id') || '' });
 });
