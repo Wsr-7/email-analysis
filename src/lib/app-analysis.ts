@@ -58,7 +58,7 @@ export async function sendPromptToModel(
 
 export async function analyzeBatchCore(
   ctx: AnalysisContext,
-  selection?: "allAllowed" | string[]
+  selection?: "allAllowed" | string[] | number
 ): Promise<{ batchSize: number }> {
   const config = await ctx.readConfig();
   await ctx.data.importDigestIfStoreMissing();
@@ -83,7 +83,7 @@ export async function analyzeBatchCore(
     config.autoAnalyzeEnabled !== false,
     Number(config.autoAnalyzeMaxClassificationLevel || 2)
   );
-  const batchSize = Number(config.analysisBatchSize || 5);
+  const batchSize = typeof selection === "number" ? Math.max(1, Math.floor(selection)) : Number(config.analysisBatchSize || 5);
   const requestedBatch = Array.isArray(selection)
     ? store.items.filter((item) => selection.includes(item.mailId) && !ignoredIds.includes(item.mailId))
     : selection === "allAllowed"
@@ -111,7 +111,7 @@ export async function analyzeBatchCore(
   const replyTemplate = await ctx.data.readReplyTemplate((event, d) => ctx.log(event, d));
   const configuredModel = typeof config.modelFamily === "string" ? config.modelFamily.trim() : "gpt-5.4";
   await ctx.log("analyze:start", {
-    selection: Array.isArray(selection) ? "selected" : selection || "nextBatch",
+    selection: Array.isArray(selection) ? "selected" : typeof selection === "number" ? "batchSize" : selection || "nextBatch",
     requestedBatchSize: requestedBatch.length,
     batchSize: batch.length,
     redactionReplacements: redacted.totalReplacements,

@@ -545,12 +545,6 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
         <label><span>${escapeHtml(labels.settings.modelFamily)} <button class="sb-bottom-btn" onclick="post('loadModels')" style="display:inline;padding:1px 6px;">${escapeHtml(labels.toolbar.loadModels)}</button></span>
           <select id="modelFamily">${modelOptions}</select>
         </label>
-        <label>${escapeHtml(labels.settings.allowAnalyze)}
-          <select id="autoAnalyzeEnabled">
-            <option value="true" ${selected(config.autoAnalyzeEnabled, true)}>${escapeHtml(labels.pending.autoAllowed)}</option>
-            <option value="false" ${selected(config.autoAnalyzeEnabled, false)}>${escapeHtml(labels.pending.manualRequired)}</option>
-          </select>
-        </label>
         <label>${escapeHtml(labels.settings.maxClassification)}
           <select id="autoAnalyzeMaxClassificationLevel">
             ${renderClassificationOptions(Number(config.autoAnalyzeMaxClassificationLevel ?? 2), labels)}
@@ -620,10 +614,10 @@ document.addEventListener('click', function(e) {
 function runAnalyze() {
   var sel = document.getElementById('batchSelect').value;
   if (sel === 'all') { post('analyzeAllAllowed'); }
-  else { post('saveConfig', { silent: true, config: { analysisBatchSize: sel } }); post('analyze'); }
+  else { post('analyze', { batchSize: Number(sel) }); }
 }
 
-var configControlIds = ['rangeMode', 'rangeValue', 'folders', 'modelFamily', 'autoAnalyzeEnabled', 'autoAnalyzeMaxClassificationLevel'];
+var configControlIds = ['rangeMode', 'rangeValue', 'folders', 'modelFamily', 'autoAnalyzeMaxClassificationLevel'];
 var autoSave = debounce(function() { saveConfig(true, false); }, 450);
 for (var i = 0; i < configControlIds.length; i++) {
   var el = document.getElementById(configControlIds[i]);
@@ -644,7 +638,6 @@ function saveConfig(keepSettingsOpen, silent) {
       maxItems: rangeMode === 'maxItems' ? rangeValue.value : undefined,
       folders: document.getElementById('folders').value,
       modelFamily: document.getElementById('modelFamily').value,
-      autoAnalyzeEnabled: document.getElementById('autoAnalyzeEnabled').value,
       autoAnalyzeMaxClassificationLevel: document.getElementById('autoAnalyzeMaxClassificationLevel').value
     }
   });

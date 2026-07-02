@@ -28,7 +28,7 @@ function stubContext(overrides?: Partial<MessageHandlerContext>): MessageHandler
     openSingleMailReport: mock.fn(async () => {}),
     pullMail: mock.fn(async () => {}),
     loadMore: mock.fn(async () => {}),
-    analyze: mock.fn(async () => {}),
+    analyze: mock.fn(async (_batchSize?: number) => {}),
     analyzeAllAllowed: mock.fn(async () => {}),
     analyzeSelected: mock.fn(async () => {}),
     analyzeThread: mock.fn(async () => {}),
@@ -75,6 +75,13 @@ describe("handleWebviewMessage", () => {
     const ctx = stubContext();
     await handleWebviewMessage(ctx, { type: "analyze" });
     assert.equal((ctx.analyze as any).mock.callCount(), 1);
+  });
+
+  it("dispatches analyze with requested batch size", async () => {
+    const ctx = stubContext();
+    await handleWebviewMessage(ctx, { type: "analyze", batchSize: "50" });
+    assert.equal((ctx.analyze as any).mock.callCount(), 1);
+    assert.deepEqual((ctx.analyze as any).mock.calls[0].arguments, [50]);
   });
 
   it("dispatches analyzeThread with threadId", async () => {

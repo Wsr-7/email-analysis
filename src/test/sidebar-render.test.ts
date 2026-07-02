@@ -74,7 +74,7 @@ describe("renderSidebarHtml", () => {
   it("renders action buttons", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes("post('pullMail')"));
-    assert.ok(html.includes("post('analyze')"));
+    assert.ok(html.includes("post('analyze', { batchSize: Number(sel) })"));
   });
 
   it("disables buttons when busy", () => {
@@ -243,6 +243,12 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('<option value="10"'));
     assert.ok(html.includes('<option value="20"'));
     assert.ok(html.includes('<option value="all"'));
+  });
+
+  it("posts selected batch size directly when analyzing", () => {
+    const html = renderSidebarHtml(stubInput());
+    assert.ok(html.includes("post('analyze', { batchSize: Number(sel) })"));
+    assert.ok(!html.includes("analysisBatchSize: sel"));
   });
 
   it("selects current batch size in dropdown", () => {

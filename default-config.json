@@ -10,7 +10,6 @@
   "modelFamily": "gpt-5.4",
   "outputLanguage": "en-US",
   "analysisBatchSize": 5,
-  "autoAnalyzeEnabled": true,
   "autoAnalyzeMaxClassificationLevel": 2,
   "mailStoreRetentionDays": 1,
   "mailIndexRetentionDays": 7,

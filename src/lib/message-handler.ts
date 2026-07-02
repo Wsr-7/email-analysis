@@ -25,7 +25,7 @@ export interface MessageHandlerContext {
   openSingleMailReport: () => Promise<void>;
   pullMail: (forceSample: boolean) => Promise<void>;
   loadMore: () => Promise<void>;
-  analyze: () => Promise<void>;
+  analyze: (batchSize?: number) => Promise<void>;
   analyzeAllAllowed: () => Promise<void>;
   analyzeSelected: (mailIds: string[]) => Promise<void>;
   analyzeThread: (threadId: string) => Promise<void>;
@@ -44,7 +44,7 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
     return;
   }
 
-  const typed = message as { type?: string; draftReply?: string; draftText?: string; instruction?: string; itemId?: string; mode?: string; actionId?: string; status?: string; mailId?: string; mailIds?: string[]; threadId?: string; meetingId?: string; config?: unknown; silent?: boolean };
+  const typed = message as { type?: string; draftReply?: string; draftText?: string; instruction?: string; itemId?: string; mode?: string; actionId?: string; status?: string; mailId?: string; mailIds?: string[]; threadId?: string; meetingId?: string; batchSize?: unknown; config?: unknown; silent?: boolean };
   await ctx.log("message:received", {
     type: typed.type || "",
     mailId: typed.mailId || "",
@@ -220,7 +220,8 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
   }
 
   if (typed.type === "analyze") {
-    await ctx.analyze();
+    const batchSize = positiveNumber(typed.batchSize, 0);
+    await ctx.analyze(batchSize || undefined);
     return;
   }
 

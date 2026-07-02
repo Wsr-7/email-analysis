@@ -401,14 +401,14 @@ class EasyMailApp {
     }
   }
 
-  public async analyze(): Promise<void> {
+  public async analyze(batchSize?: number): Promise<void> {
     const locale = await this.readLocale();
     const labels = getLabels(locale);
     await this.runWithBusy(
       labels.progress.analyze,
       labels.progress.detail,
       "analyzeNext",
-      async () => await this.analyzeBatchCore(),
+      async () => await this.analyzeBatchCore(batchSize),
       (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`
     );
   }
@@ -448,7 +448,7 @@ class EasyMailApp {
     };
   }
 
-  private async analyzeBatchCore(selection?: "allAllowed" | string[]): Promise<{ batchSize: number }> {
+  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number): Promise<{ batchSize: number }> {
     return analyzeBatchCoreImpl(this.analysisContext(), selection);
   }
 
@@ -960,7 +960,7 @@ class EasyMailApp {
       openSingleMailReport: () => this.openSingleMailReport(),
       pullMail: (forceSample) => this.pullMail(forceSample),
       loadMore: () => this.loadMore(),
-      analyze: () => this.analyze(),
+      analyze: (batchSize) => this.analyze(batchSize),
       analyzeAllAllowed: () => this.analyzeAllAllowed(),
       analyzeSelected: (mailIds) => this.analyzeSelected(mailIds),
       analyzeThread: (threadId) => this.analyzeThread(threadId),
