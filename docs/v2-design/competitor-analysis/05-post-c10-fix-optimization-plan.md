@@ -328,9 +328,28 @@ Completion Notes:
 - Manual validation:
   - Not run in VS Code UI here. Automated tests cover first-click selected batch size and removed setting exposure.
 - Known issues:
-  - Internal compatibility still supports persisted `autoAnalyzeEnabled: false` if present in older user settings/config. It is no longer exposed in `package.json` or UI.
+  - Resolved by follow-up: persisted `autoAnalyzeEnabled: false` no longer affects security gating or allowed queue behavior.
 - Commit:
   - `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
+- Follow-up:
+  - Removed runtime read/write of unregistered `easyMail.autoAnalyzeEnabled` from `src/extension.ts` and `src/lib/message-handler.ts`.
+  - `buildSecuritySettings`, `security-gate`, queue building, and analysis selection now use `autoAnalyzeMaxClassificationLevel` as the control; obsolete `autoAnalyzeEnabled: false` is ignored.
+  - Threshold-allowed mails remain analyzable on first click; mails above max allowed classification still require explicit confirmation unless hard-blocked.
+- Follow-up tests:
+  - RED confirmed before fix:
+    - `node --test out/test/config-utils.test.js`
+    - `node --test out/test/security-gate.test.js`
+    - `node --test out/test/classification.test.js`
+    - `node --test out/test/message-handler.test.js`
+  - GREEN after fix:
+    - `npm run compile`
+    - `node --test out/test/config-utils.test.js`
+    - `node --test out/test/security-gate.test.js`
+    - `node --test out/test/classification.test.js`
+    - `node --test out/test/message-handler.test.js`
+  - `rg -n "autoAnalyzeEnabled" src package.json default-config.json` confirms no `package.json`, `default-config.json`, `extension.ts`, or `message-handler.ts` read/write registration path remains.
+- Follow-up commit:
+  - `6ede04dd9fe1da3d7a308fea65d4333d32d3a107`
 
 ---
 
@@ -820,7 +839,7 @@ Use this section to summarize completed task commits:
 
 - P0.1: implementation `04d96a5029b615d058a7bb28221863d80e432189`; manual Outlook validation pending.
 - P0.2: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
-- P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
+- P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`; follow-up `6ede04dd9fe1da3d7a308fea65d4333d32d3a107`
 - P0.4: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
 - P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
 - P1.2: `c65f435`
@@ -833,6 +852,80 @@ Use this section to summarize completed task commits:
 ---
 
 ## 8. Handover Log
+
+#### Handover - 2026-07-03 - Codex (P0.3 regression start)
+
+Status: In progress
+
+Changed:
+- Reopened `P0.3 Fix analyze batch-size race and remove obsolete Auto Analyze setting UI` for a user-reported regression after `easyMail.autoAnalyzeEnabled` removal.
+
+Validated:
+- Read this plan completely and latest handover entries.
+- Ran `git status --short --branch`: branch `v3`, ahead 19; clean working tree.
+- Inspected `src/extension.ts`, `src/lib/message-handler.ts`, `src/lib/config-utils.ts`, `src/lib/security-gate.ts`, `src/lib/classification.ts`, and related tests.
+
+Findings:
+- `package.json` no longer registers `easyMail.autoAnalyzeEnabled`, but `readConfig()` still reads it and `saveConfigFromMessage()` still writes it through `updateSettings()`.
+- `buildSecuritySettings()` still preserves old `autoAnalyzeEnabled: false`, causing `security-gate.ts` to return `manual_confirm` with reason `Automatic analysis is disabled.` even for mail at or below the max allowed classification.
+- Queue building in `extension.ts` and `app-analysis.ts` still passes `config.autoAnalyzeEnabled !== false`, so old persisted values can remove allowed items from the analyze batch.
+
+Known issues:
+- No source code changed yet in this checkpoint.
+- P0.2 still needs a separate follow-up for confirm button placement and visible confirmation reasons.
+
+Last safe stopping point:
+- Before RED test edits for P0.3 regression.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Add RED tests proving removed `autoAnalyzeEnabled` is not written and old `false` values do not force threshold-allowed mail into manual confirmation.
+
+---
+
+#### Handover - 2026-07-03 - Codex (P0.3 regression complete)
+
+Status: Done
+
+Changed:
+- Completed P0.3 regression fix for removed `easyMail.autoAnalyzeEnabled`.
+- Stopped reading unregistered `easyMail.autoAnalyzeEnabled` from VS Code settings.
+- Stopped writing `autoAnalyzeEnabled` during webview settings saves.
+- Ignored obsolete persisted `autoAnalyzeEnabled: false` in security settings, security gate decisions, queue building, and analysis selection.
+
+Validated:
+- RED before fix:
+  - `node --test out/test/config-utils.test.js`
+  - `node --test out/test/security-gate.test.js`
+  - `node --test out/test/classification.test.js`
+  - `node --test out/test/message-handler.test.js`
+- GREEN after fix:
+  - `npm run compile`
+  - `node --test out/test/config-utils.test.js`
+  - `node --test out/test/security-gate.test.js`
+  - `node --test out/test/classification.test.js`
+  - `node --test out/test/message-handler.test.js`
+- `rg -n "autoAnalyzeEnabled" src package.json default-config.json` confirms no package/default-config/extension/message-handler setting read or write path remains.
+
+Known issues:
+- P0.2 still needs a follow-up for `Confirm and Analyze` placement and visible manual-confirm reasons.
+- Full `npm test` should be run after the P0.2 follow-up to validate both fixes together.
+
+Last safe stopping point:
+- P0.3 regression implementation is committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md` only, for this handover update.
+
+Commit:
+- Implementation commit: `6ede04dd9fe1da3d7a308fea65d4333d32d3a107`
+
+Next recommended step:
+- Claim `P0.2` follow-up for moving `Confirm and Analyze` from sidebar rows into the workbench top action row and showing confirmation reasons.
+
+---
 
 #### Handover - 2026-07-02 - Codex (P0.1 start)
 
