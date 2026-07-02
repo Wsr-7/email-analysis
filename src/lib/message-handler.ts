@@ -33,6 +33,7 @@ export interface MessageHandlerContext {
   openPromptConfig: () => Promise<void>;
   clearLocalCache: () => Promise<void>;
   openWorkbench: (focusId?: string) => Promise<void>;
+  generateDraft: (itemId: string, sourceId: string) => Promise<void>;
   polishDraft: (draftText: string, itemId: string) => Promise<void>;
   refineDraft: (draftText: string, instruction: string, itemId: string) => Promise<void>;
   composeOutlookMail: (mode: string, draftText: string, itemId: string) => Promise<void>;
@@ -46,7 +47,7 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
     return;
   }
 
-  const typed = message as { type?: string; draftReply?: string; draftText?: string; instruction?: string; itemId?: string; mode?: string; actionId?: string; status?: string; mailId?: string; mailIds?: string[]; threadId?: string; meetingId?: string; batchSize?: unknown; config?: unknown; silent?: boolean };
+  const typed = message as { type?: string; draftReply?: string; draftText?: string; instruction?: string; itemId?: string; sourceId?: string; mode?: string; actionId?: string; status?: string; mailId?: string; mailIds?: string[]; threadId?: string; meetingId?: string; batchSize?: unknown; config?: unknown; silent?: boolean };
   await ctx.log("message:received", {
     type: typed.type || "",
     mailId: typed.mailId || "",
@@ -61,6 +62,11 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
     }
     await ctx.copyToClipboard(draftReply);
     ctx.showInfo("Draft reply copied.");
+    return;
+  }
+
+  if (typed.type === "generateDraft") {
+    await ctx.generateDraft(String(typed.itemId || ""), String(typed.sourceId || ""));
     return;
   }
 

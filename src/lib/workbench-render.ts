@@ -299,7 +299,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .wb-detail-header h3 { flex: 1; }
   .wb-priority { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); white-space: nowrap; flex-shrink: 0; margin-top: 4px; }
-  .wb-meta-grid { display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 8px 0; border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); margin-bottom: 12px; }
+  .wb-meta-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); margin-bottom: 12px; }
   .wb-field { font-size: 12px; line-height: 1.6; }
   .wb-warn { color: var(--vscode-errorForeground, #f48771); }
   .wb-section { margin-bottom: 12px; }
@@ -369,7 +369,8 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .draft-outlook-actions { position: relative; }
   .draft-outlook-actions > summary { list-style: none; cursor: pointer; }
   .draft-outlook-actions > summary::-webkit-details-marker { display: none; }
-  .draft-outlook-menu { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .draft-outlook-menu { position: absolute; z-index: 10; display: flex; flex-direction: column; gap: 4px; min-width: 150px; margin-top: 6px; padding: 6px; border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.25)); border-radius: 4px; background: var(--vscode-dropdown-background, var(--vscode-editor-background, #1e1e1e)); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+  .draft-outlook-actions:not([open]) .draft-outlook-menu { display: none; }
   .copy-icon-button { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; padding: 0; border-radius: 4px; background: var(--vscode-button-secondaryBackground, #3a3d41); color: var(--vscode-button-secondaryForeground, #fff); border: none; }
   .copy-icon { position: relative; display: inline-block; width: 12px; height: 14px; border: 1.5px solid currentColor; border-radius: 1px; box-sizing: border-box; }
   .copy-icon::before { content: ""; position: absolute; width: 12px; height: 14px; left: -5px; top: 3px; border: 1.5px solid currentColor; border-radius: 1px; background: var(--vscode-button-secondaryBackground, #3a3d41); box-sizing: border-box; }
@@ -428,7 +429,7 @@ document.addEventListener('click', function(e) {
   if (a === 'copyDraft') { var ta = t.closest('.draft-box-editable'); var v = ta ? ta.querySelector('.draft-textarea') : null; post('copyDraft', { draftReply: v ? v.value : (t.getAttribute('data-draft-reply') || '') }); }
   if (a === 'polishDraft' || a === 'refineDraft') { var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; var itemId = box ? box.getAttribute('data-item-id') || '' : ''; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: itemId }); }
   if (a === 'composeMail') { var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
-  if (a === 'generateDraft') { var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var generateAction = t.getAttribute('data-generate-action') || ''; if (generateAction === 'analyzeSelected') post(generateAction, { mailIds: [sourceId] }); if (generateAction === 'analyzeThread') post(generateAction, { threadId: sourceId }); }
+  if (a === 'generateDraft') { var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var itemId3 = box3 ? box3.getAttribute('data-item-id') || '' : ''; post('generateDraft', { itemId: itemId3, sourceId: sourceId }); }
   if (a === 'ignore') post('ignore', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'unignore') post('unignore', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'openInOutlook') post('openInOutlook', { mailId: t.getAttribute('data-mail-id') || '' });

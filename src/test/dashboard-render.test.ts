@@ -317,12 +317,11 @@ describe("renderEditableDraftBox", () => {
   it("renders generate action only when draft is empty", () => {
     const html = (renderEditableDraftBox as any)("", enLabels, {
       itemId: "mail:a1",
-      sourceId: "a1",
-      generateAction: "analyzeSelected"
+      sourceId: "a1"
     });
 
     assert.ok(html.includes('data-action="generateDraft"'));
-    assert.ok(html.includes('data-generate-action="analyzeSelected"'));
+    assert.ok(!html.includes("data-generate-action"));
     assert.ok(html.includes("Generate Draft"));
     assert.ok(!html.includes('data-action="polishDraft"'));
     assert.ok(!html.includes('data-action="refineDraft"'));

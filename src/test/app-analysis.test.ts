@@ -71,4 +71,63 @@ describe("analyzeBatchCore", () => {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }
   });
+
+  it("keeps analyzed mails in the mail store for body, draft, and thread context", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [mail(1)]
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+
+      const provider = new MockProvider({
+        responses: [JSON.stringify({
+          generatedAt: "",
+          overview: {},
+          items: [{
+            mailId: "mail-001",
+            category: "notice",
+            priority: "P3",
+            subject: "Subject 1",
+            sender: "sender1@example.com",
+            receivedTime: "2026-07-02 09:01:00",
+            summary: "Informational update.",
+            reason: "No action needed.",
+            suggestedAction: "No action.",
+            draftReply: "",
+            confidence: 0.9,
+            needsOriginalMailCheck: false
+          }]
+        })]
+      });
+
+      await analyzeBatchCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({
+          analysisBatchSize: 5,
+          autoAnalyzeMaxClassificationLevel: 2,
+          modelFamily: "mock-model",
+          outputLanguage: "en-US"
+        }),
+        log: async () => {},
+        availableModelsCache: null
+      });
+
+      const store = await data.readMailStore();
+      assert.equal(store.items.length, 1);
+      assert.equal(store.items[0].mailId, "mail-001");
+      assert.equal(store.items[0].bodyExcerpt, "Body 1");
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
 });

@@ -6,7 +6,7 @@ import { buildQueueState, ensureClassifications } from "./classification";
 import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "./config-utils";
 import { getLabels, buildCategoryLabels } from "./dashboard-labels";
 import { selectConfiguredModel, type AvailableModel, type LlmProvider } from "./llm-provider";
-import { buildBatchDigestMarkdown, removeStoredMailByIds } from "./mail-store";
+import { buildBatchDigestMarkdown } from "./mail-store";
 import { allowedCategoryIds, composeAnalysisPrompt } from "./prompt-config";
 import { redactStoredMails, redactThreadForPrompt } from "./redaction";
 import { applyReplyTemplateToAnalysis } from "./reply-template";
@@ -143,7 +143,6 @@ export async function analyzeBatchCore(
   const summaryLabels = buildCategoryLabels(getLabels(getLocaleFromConfig(config)), promptConfig, getLocaleFromConfig(config));
   await fs.promises.writeFile(ctx.data.getAnalysisPath(), `${JSON.stringify(merged, null, 2)}\n`, "utf8");
   await fs.promises.writeFile(ctx.data.getSummaryPath(), buildSummaryMarkdown(merged, summaryLabels), "utf8");
-  await ctx.data.writeMailStore(removeStoredMailByIds(await ctx.data.readMailStore(), batch.map((item) => item.mailId)));
   await ctx.log("analyze:done", { batchSize: batch.length, mergedItems: merged.items.length });
   return { batchSize: batch.length };
 }

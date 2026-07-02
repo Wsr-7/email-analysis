@@ -76,6 +76,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 export function deactivate(): void {}
 
+function extractDraftText(raw: string): string {
+  const text = String(raw || "").trim().replace(/^```(?:json|text)?\s*/i, "").replace(/\s*```$/, "").trim();
+  if (!text.startsWith("{")) {
+    return text;
+  }
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    if (typeof parsed.draftReply === "string") {
+      return parsed.draftReply.trim();
+    }
+  } catch {
+    return text;
+  }
+  return text;
+}
+
 class EasyMailApp {
   public readonly dashboardProvider: DashboardProvider;
   public readonly data: AppDataStore;
@@ -211,6 +227,86 @@ class EasyMailApp {
     } catch (err) {
       vscode.window.showWarningMessage(`Refine failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  private async generateDraft(itemId: string, sourceId: string): Promise<void> {
+    const targetItemId = String(itemId || "");
+    const targetSourceId = String(sourceId || "");
+    if (!targetItemId || !targetSourceId) {
+      vscode.window.showWarningMessage("No mail or thread is selected for draft generation.");
+      return;
+    }
+    await this.log("draft:generate", { itemId: targetItemId, sourceId: targetSourceId });
+    const config = await this.readConfig();
+    try {
+      const prompt = await this.buildDraftGenerationPrompt(targetItemId, targetSourceId);
+      const raw = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Generate draft", cancellable: false },
+        async (progress) => {
+          progress.report({ message: "Generating reply draft..." });
+          return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "draftGenerate")).raw;
+        }
+      );
+      const result = extractDraftText(raw);
+      if (!result.trim()) {
+        vscode.window.showWarningMessage("No reply draft was generated for this item.");
+        return;
+      }
+      this.workingDrafts.set(targetItemId, result);
+      this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId: targetItemId });
+      vscode.window.showInformationMessage("Draft generated.");
+    } catch (err) {
+      vscode.window.showWarningMessage(`Generate draft failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  private async buildDraftGenerationPrompt(itemId: string, sourceId: string): Promise<string> {
+    if (itemId.startsWith("thread:")) {
+      const threadStore = await this.data.readThreadStore();
+      const thread = threadStore.items.find((item) => item.threadId === sourceId);
+      if (!thread) {
+        throw new Error("Thread not found. Refresh or pull mail first.");
+      }
+      const threadAnalysis = (await this.data.readThreadAnalysisResult()).items.find((item) => item.threadId === sourceId);
+      return [
+        "You are an email writing assistant. Generate a concise professional reply draft for the selected Outlook thread.",
+        "Output only the reply draft text. Do not output JSON, Markdown, analysis, or explanation.",
+        "If no reply is appropriate, output an empty string.",
+        "",
+        `Thread subject: ${thread.subject || sourceId}`,
+        `Participants: ${(thread.participants || []).join(", ") || "-"}`,
+        threadAnalysis ? `Suggested action: ${threadAnalysis.suggestedAction || "-"}` : "",
+        threadAnalysis ? `Current status: ${threadAnalysis.currentStatus || threadAnalysis.oneLineSummary || "-"}` : "",
+        "",
+        "Timeline:",
+        ...(thread.timeline || []).map((message) => [
+          `- ${message.receivedTime || message.sentTime || ""} ${message.from || message.senderEmail || ""}`,
+          message.bodyDelta || message.bodyClean || message.bodyPreview || ""
+        ].join("\n"))
+      ].filter(Boolean).join("\n");
+    }
+
+    const store = await this.data.readMailStore();
+    const mail = store.items.find((item) => item.mailId === sourceId);
+    const analysis = (await this.data.readAnalysisResult(() => this.readConfig())).items.find((item) => item.mailId === sourceId);
+    if (!mail && !analysis) {
+      throw new Error("Mail not found. Pull mail again before generating a draft.");
+    }
+    return [
+      "You are an email writing assistant. Generate a concise professional reply draft for the selected Outlook mail.",
+      "Output only the reply draft text. Do not output JSON, Markdown, analysis, or explanation.",
+      "If no reply is appropriate, output an empty string.",
+      "",
+      `Subject: ${mail?.subject || analysis?.subject || sourceId}`,
+      `From: ${mail?.from || analysis?.sender || "-"}`,
+      mail?.to ? `To: ${mail.to}` : "",
+      mail?.cc ? `Cc: ${mail.cc}` : "",
+      analysis ? `Suggested action: ${analysis.suggestedAction || "-"}` : "",
+      analysis ? `Summary: ${analysis.summary || "-"}` : "",
+      "",
+      "Mail body:",
+      mail?.bodyExcerpt || ""
+    ].filter(Boolean).join("\n");
   }
 
   private async getWorkbenchHtml(): Promise<string> {
@@ -990,6 +1086,7 @@ class EasyMailApp {
       openPromptConfig: () => this.openPromptConfig(),
       clearLocalCache: () => this.clearLocalCache(),
       openWorkbench: (focusId) => this.openWorkbench(focusId),
+      generateDraft: (itemId, sourceId) => this.generateDraft(itemId, sourceId),
       polishDraft: (draftText, itemId) => this.polishDraft(draftText, itemId),
       refineDraft: (draftText, instruction, itemId) => this.refineDraft(draftText, instruction, itemId),
       composeOutlookMail: (mode, draftText, itemId) => this.composeOutlookMail(mode, draftText, itemId),

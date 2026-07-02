@@ -152,8 +152,8 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
 
     assert.ok(html.includes('data-action="generateDraft"'));
-    assert.ok(html.includes('data-generate-action="analyzeSelected"'));
-    assert.ok(html.includes("post(generateAction, { mailIds: [sourceId] })"));
+    assert.ok(html.includes("post('generateDraft', { itemId: itemId3, sourceId: sourceId })"));
+    assert.ok(!html.includes("post(generateAction, { mailIds: [sourceId] })"));
   });
 
   it("renders thread detail panels", () => {
@@ -281,6 +281,24 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("REGISTERED"), "should show classification");
     assert.ok(html.includes("alice@test.com"), "should show sender");
     assert.ok(html.includes("14:30"), "should show time");
+    assert.ok(html.includes(".wb-meta-grid { display: grid;"));
+    assert.ok(html.includes("grid-template-columns: 1fr;"));
+  });
+
+  it("renders Outlook actions as a collapsed popover menu", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1", draftReply: "Reply text" })] }
+      ])
+    });
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes("<details class=\"draft-outlook-actions\">"));
+    assert.ok(html.includes(".draft-outlook-menu { position: absolute;"));
+    assert.ok(html.includes(".draft-outlook-actions:not([open]) .draft-outlook-menu { display: none;"));
+    assert.ok(html.includes('data-mode="reply"'));
+    assert.ok(html.includes('data-mode="replyAll"'));
+    assert.ok(html.includes('data-mode="forward"'));
   });
 
   it("renders analyzed mail with original body from mail store", () => {

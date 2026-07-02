@@ -251,7 +251,7 @@ export function renderEditableDraftBox(
       </details>
     </div>`
     : `<div class="draft-actions">
-      <button class="wb-btn" data-action="generateDraft" data-generate-action="${escapeAttr(options.generateAction || "analyzeSelected")}">${escapeHtml(labels.card.generateDraft)}</button>
+      <button class="wb-btn" data-action="generateDraft">${escapeHtml(labels.card.generateDraft)}</button>
     </div>`;
   const copyButton = hasDraft
     ? `<button class="draft-copy-button" data-action="copyDraft" title="${escapeAttr(labels.card.copyDraft)}" aria-label="${escapeAttr(labels.card.copyDraft)}"><span class="copy-icon" aria-hidden="true"></span></button>`

@@ -36,6 +36,7 @@ function stubContext(overrides?: Partial<MessageHandlerContext>): MessageHandler
     openPromptConfig: mock.fn(async () => {}),
     clearLocalCache: mock.fn(async () => {}),
     openWorkbench: mock.fn(async () => {}),
+    generateDraft: mock.fn(async () => {}),
     polishDraft: mock.fn(async () => {}),
     refineDraft: mock.fn(async () => {}),
     composeOutlookMail: mock.fn(async () => {}),
@@ -180,6 +181,13 @@ describe("saveConfigFromMessage", () => {
 });
 
 describe("polishDraft", () => {
+  it("dispatches generate draft with item and source ids", async () => {
+    const ctx = stubContext();
+    await handleWebviewMessage(ctx, { type: "generateDraft", itemId: "mail:m1", sourceId: "m1" } as any);
+    assert.equal((ctx.generateDraft as any).mock.callCount(), 1);
+    assert.deepEqual((ctx.generateDraft as any).mock.calls[0].arguments, ["mail:m1", "m1"]);
+  });
+
   it("dispatches polish with draft text and itemId", async () => {
     const ctx = stubContext();
     await handleWebviewMessage(ctx, { type: "polishDraft", draftText: "Hello", itemId: "mail:m1" });
