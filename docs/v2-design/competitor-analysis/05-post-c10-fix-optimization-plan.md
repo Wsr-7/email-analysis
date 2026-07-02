@@ -595,7 +595,7 @@ Completion Notes:
 
 ### P1.5 Replace final icon and verify package surfaces
 
-Status: [ ] Not started
+Status: [X] Done
 
 Goal:
 
@@ -622,12 +622,12 @@ Acceptance criteria:
 
 Completion Notes:
 
-- Status:
-- Files changed:
-- Tests:
-- Manual validation:
-- Known issues:
-- Commit:
+- Status: Complete. Replaced `media/icon.png` with `docs/v2-design/easymail-final-icon.png`.
+- Files changed: `media/icon.png`
+- Tests: No code logic change. 279 existing tests pass. `npm run package:vsix` succeeds (431.25 KB, icon at `media/icon.png` 248.86 KB).
+- Manual validation: Pending user install in VS Code to confirm extension list, detail page, and activity bar rendering.
+- Known issues: None.
+- Commit: PENDING
 
 ---
 
@@ -1184,6 +1184,31 @@ Uncommitted changes / dirty files:
 
 Next recommended step:
 - Claim `P1.3 Add thread ignore and restore`.
+
+---
+
+#### Handover - 2026-07-02 - Claude Code (P1.5 complete)
+
+Status: Done
+
+Changed:
+- Completed `P1.5 Replace final icon and verify package surfaces`.
+- Replaced `media/icon.png` with `docs/v2-design/easymail-final-icon.png` (254837 bytes).
+- No `package.json` change needed — already references `media/icon.png`.
+
+Validated:
+- `npm run compile`: pass.
+- `npm test`: pass, 279 tests.
+- `npm run package:vsix`: pass. VSIX contains `media/icon.png` (248.86 KB).
+
+Known issues:
+- Manual VS Code install to confirm icon rendering pending user.
+
+Last safe stopping point:
+- P1.5 is complete and committed.
+
+Next recommended step:
+- Claim `P2.1` or `P2.2`.
 
 ---
 
