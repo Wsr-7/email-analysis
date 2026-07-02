@@ -859,10 +859,12 @@ Status:
 - User validation found regressions after P0/P1 work; P2 work is paused.
 - First stabilization slice completed in `72970ebb038e3cf8aa64f52b622af6cb78ba760a`.
 - Classification threshold normalization completed in `97f1564b3942a39e1711a740e3a8c9ed52c5e969`.
+- Workbench ignore focus advancement completed in `8606a11d67f220b5aa20715714de7e9499e2f48e`.
 - `Generate Draft` now dispatches a draft-only action instead of reusing analysis.
 - Batch analysis no longer removes analyzed mails from `mail-store`, preserving body/timeline/draft context for workbench detail and future thread construction.
 - Workbench metadata is forced onto separate lines, and Outlook Actions are rendered as a collapsed popover menu.
 - `autoAnalyzeMaxClassificationLevel` is parsed consistently from numeric values, numeric strings, or labels like `REGISTERED`; queue filtering and security gate now use the same threshold interpretation.
+- Ignoring an item from the workbench now advances focus to another item in the same queue or clears focus when none remains, instead of leaving the ignored item open as Restore.
 
 Current recommendation:
 
@@ -953,6 +955,32 @@ Known issues:
 
 Next recommended step:
 - Continue with manual-confirm workbench visibility/reason if still reproducible; otherwise fix ignore navigation. Do not start P2.
+
+#### Handover - 2026-07-03 - Codex (Ignore focus follow-up complete)
+
+Status: Complete
+
+Changed:
+- Added `data-queue` metadata to workbench reader panels.
+- Added client-side `focusAfterRemoving` behavior before `ignore` and `ignoreThread` messages.
+- Ignoring the active item now selects another reader in the same queue when available; otherwise it clears `currentId` and shows the placeholder.
+- Rebuilt `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- `rtk npm run compile`
+- `rtk node --test out/test/workbench-render.test.js`
+- `rtk npm test`
+- `rtk npm run package:vsix`
+
+Commit:
+- Implementation: `8606a11d67f220b5aa20715714de7e9499e2f48e`
+
+Known issues:
+- Sidebar queue focus itself is not yet programmatically switched to `ignored`; this slice only fixes the workbench staying on the ignored item.
+- Polish/refine notification progress, sent folder migration for existing settings, and mixed-language Thread Spotlight remain open.
+
+Next recommended step:
+- Add progress/toast behavior for Polish/Refine and then investigate existing-user Sent Items folder normalization for P1.4. Do not start P2.
 
 #### Handover - 2026-07-03 - Codex (P0.2 follow-up start)
 
