@@ -80,7 +80,7 @@ export async function analyzeBatchCore(
     currentAnalysis,
     ignoredIds,
     classificationCache,
-    config.autoAnalyzeEnabled !== false,
+    true,
     Number(config.autoAnalyzeMaxClassificationLevel || 2)
   );
   const batchSize = typeof selection === "number" ? Math.max(1, Math.floor(selection)) : Number(config.analysisBatchSize || 5);

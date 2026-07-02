@@ -98,9 +98,6 @@ function decideMail(input: MailSecurityGateInput, settings: SecurityGateSettings
   } else if (input.classification.level > maxManualLevel(settings)) {
     decision = "block";
     reasons.push(`Classification level ${input.classification.level} exceeds manual maximum ${maxManualLevel(settings)}.`);
-  } else if (!settings.autoAnalyzeEnabled) {
-    decision = "manual_confirm";
-    reasons.push("Automatic analysis is disabled.");
   } else if (input.classification.level > maxAutoLevel(settings)) {
     decision = "manual_confirm";
     reasons.push(`Classification level ${input.classification.level} exceeds automatic maximum ${maxAutoLevel(settings)}.`);

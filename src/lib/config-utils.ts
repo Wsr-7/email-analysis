@@ -34,7 +34,7 @@ export function getLocaleFromConfig(config: Record<string, unknown>): Locale {
 export function buildSecuritySettings(config: Record<string, unknown>): SecurityGateSettings {
   return {
     enabled: true,
-    autoAnalyzeEnabled: config.autoAnalyzeEnabled !== false,
+    autoAnalyzeEnabled: true,
     maxAutoClassificationLevel: Number(config.autoAnalyzeMaxClassificationLevel || 2),
     maxManualClassificationLevel: 2,
     hardBlockKeywords: ["password", "api_key", "access_token", "auth_token"],

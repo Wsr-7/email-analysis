@@ -157,6 +157,15 @@ describe("saveConfigFromMessage", () => {
     assert.equal(saved.recentHours, 48);
   });
 
+  it("does not write obsolete autoAnalyzeEnabled setting", async () => {
+    const ctx = stubContext({
+      readConfig: mock.fn(async () => ({ rangeMode: "recentHours", recentHours: 24, autoAnalyzeEnabled: false }))
+    });
+    await saveConfigFromMessage(ctx, { config: { recentHours: "48" } });
+    const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
+    assert.equal(Object.prototype.hasOwnProperty.call(saved, "autoAnalyzeEnabled"), false);
+  });
+
   it("skips when config is missing", async () => {
     const ctx = stubContext();
     await saveConfigFromMessage(ctx, {});

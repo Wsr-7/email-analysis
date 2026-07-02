@@ -793,7 +793,6 @@ class EasyMailApp {
       modelFamily: settings.get("modelFamily", defaults.modelFamily),
       outputLanguage: settings.get("outputLanguage", defaults.outputLanguage || "en-US"),
       analysisBatchSize: settings.get("analysisBatchSize", defaults.analysisBatchSize),
-      autoAnalyzeEnabled: settings.get("autoAnalyzeEnabled", defaults.autoAnalyzeEnabled),
       autoAnalyzeMaxClassificationLevel: settings.get("autoAnalyzeMaxClassificationLevel", defaults.autoAnalyzeMaxClassificationLevel),
       mailStoreRetentionDays: settings.get("mailStoreRetentionDays", defaults.mailStoreRetentionDays),
       mailIndexRetentionDays: settings.get("mailIndexRetentionDays", defaults.mailIndexRetentionDays),
@@ -924,7 +923,7 @@ class EasyMailApp {
       analysis,
       ignoredIds,
       classifications,
-      config.autoAnalyzeEnabled !== false,
+      true,
       Number(config.autoAnalyzeMaxClassificationLevel || 2)
     );
     const state = buildDashboardState(config, digest, analysis, ignoredIds, allowedCategoryIds(promptConfig), securedThreadStore) as DashboardState & {

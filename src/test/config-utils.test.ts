@@ -74,14 +74,13 @@ describe("buildSecuritySettings", () => {
   it("builds settings with defaults", () => {
     const settings = buildSecuritySettings({});
     assert.equal(settings.enabled, true);
-    assert.equal(settings.autoAnalyzeEnabled, true);
     assert.equal(settings.maxAutoClassificationLevel, 2);
     assert.ok(settings.hardBlockKeywords?.includes("password"));
   });
 
-  it("respects autoAnalyzeEnabled false", () => {
+  it("ignores obsolete autoAnalyzeEnabled false", () => {
     const settings = buildSecuritySettings({ autoAnalyzeEnabled: false });
-    assert.equal(settings.autoAnalyzeEnabled, false);
+    assert.equal(settings.autoAnalyzeEnabled, true);
   });
 });
 

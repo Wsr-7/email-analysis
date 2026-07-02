@@ -28,6 +28,17 @@ test("buildMailGateDecision requires manual confirmation above auto threshold", 
   assert.match(decision.reasons.join("\n"), /exceeds automatic maximum/);
 });
 
+test("buildMailGateDecision allows threshold mail when obsolete auto analyze config is false", () => {
+  const decision = buildMailGateDecision(mail({ mailId: "mail-old-config", subject: "Internal update" }), classification("mail-old-config", 1), {
+    autoAnalyzeEnabled: false,
+    maxAutoClassificationLevel: 1,
+    maxManualClassificationLevel: 2
+  });
+
+  assert.equal(decision.decision, "allow");
+  assert.ok(!decision.reasons.join("\n").includes("Automatic analysis is disabled"));
+});
+
 test("buildMailGateDecision blocks mail above manual threshold", () => {
   const decision = buildMailGateDecision(mail({ mailId: "mail-3", subject: "High registered plan" }), classification("mail-3", 3), {
     autoAnalyzeEnabled: true,

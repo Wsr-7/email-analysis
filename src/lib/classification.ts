@@ -76,7 +76,7 @@ export function buildQueueState(
   const pending = storeItems.filter((item) => !analysedIds.has(item.mailId) && !ignored.has(item.mailId));
   const allowed = pending.filter((item) => {
     const classification = classificationById.get(item.mailId);
-    return autoAnalyzeEnabled && Number(classification?.level || 0) <= maxAutoLevel;
+    return Number(classification?.level || 0) <= maxAutoLevel;
   });
   const blocked = pending.filter((item) => !allowed.includes(item));
   const analysed = storeItems.filter((item) => analysedIds.has(item.mailId) && !ignored.has(item.mailId));
