@@ -37,7 +37,7 @@ export type DashboardLabels = {
   stats: Record<"pulled" | "pending" | "analysed" | "blocked" | "mustHandle" | "risk" | "waiting" | "notice" | "threads", string>;
   categories: Record<string, string>;
   card: Record<"from" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "polish" | "refine" | "instructionPlaceholder" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "openInOutlook" | "noItems" | "thread", string>;
-  pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select", string>;
+  pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select" | "confirmAnalyze", string>;
   threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "attachments" | "mailIds", string>;
   meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
   nextActions: Record<"title" | "owner" | "task" | "deadline" | "source" | "markDone" | "markIgnored" | "reopen" | "noActions", string>;
@@ -153,7 +153,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       manualRequired: "不允许分析",
       gateBlocked: "安全阻断",
       securityReason: "安全原因",
-      select: "选择"
+      select: "选择",
+      confirmAnalyze: "确认并分析"
     },
     threads: {
       title: "邮件线程",
@@ -331,7 +332,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       manualRequired: "Not allowed",
       gateBlocked: "Blocked by security gate",
       securityReason: "Security reason",
-      select: "Select"
+      select: "Select",
+      confirmAnalyze: "Confirm and Analyze"
     },
     threads: {
       title: "Threads",

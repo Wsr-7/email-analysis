@@ -11,6 +11,7 @@ import { normalizePromptConfig } from "./prompt-config";
 import { emptyThreadStore, type ThreadStore } from "./thread-store";
 import { renderButtonSpinner, formatPriority, formatClassification, renderModelOptions, renderRangeValueControl, renderClassificationOptions, formatAnalyzeNextLabel, type DashboardRenderInput } from "./dashboard-render";
 import { emptyMeetingStore, type StoredMeeting } from "./meeting-store";
+import type { SecurityGateDecisionResult } from "./security-types";
 
 const QUEUE_ORDER = [
   "meetings",
@@ -74,12 +75,18 @@ function classificationBadge(mailId: string, classifications: ClassificationCach
   return `<span class="sb-cls-badge">${escapeHtml(label)}</span>`;
 }
 
-function renderCompactMailRow(item: StoredMail, queue: string, classifications: ClassificationCache): string {
+function confirmAnalyzeButton(mailId: string, decision: SecurityGateDecisionResult | undefined, labels: DashboardLabels): string {
+  if (decision?.decision !== "manual_confirm") return "";
+  return `<button class="sb-badge sb-action-status" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}" onclick="event.stopPropagation();post('analyzeSelected',{mailIds:['${escapeAttr(mailId)}']})">${escapeHtml(labels.pending.confirmAnalyze)}</button>`;
+}
+
+function renderCompactMailRow(item: StoredMail, queue: string, classifications: ClassificationCache, labels?: DashboardLabels, gateDecision?: SecurityGateDecisionResult): string {
   const time = shortTime(item.receivedTime || "");
   const meta = [item.from || "", time].filter(Boolean).join(" · ");
+  const action = labels ? confirmAnalyzeButton(item.mailId, gateDecision, labels) : "";
   return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}</div>
+    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}${action}</div>
   </div>`;
 }
 
@@ -190,7 +197,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   const classifications = input.classifications || normalizeClassificationCache({});
 
   const pendingRows = queue.pending.map((item) => renderCompactMailRow(item, "pending", classifications)).join("");
-  const blockedRows = queue.blocked.map((item) => renderCompactMailRow(item, "blocked", classifications)).join("");
+  const blockedRows = queue.blocked.map((item) => renderCompactMailRow(item, "blocked", classifications, labels, input.securityDecisions?.get(item.mailId))).join("");
   const analysisRows = state.categories.map((cat) =>
     cat.items.map((item) => renderCompactAnalysisRow(item, cat.id, labels, classifications)).join("")
   ).join("");

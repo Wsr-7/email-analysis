@@ -89,6 +89,32 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("wb-detail-card"));
   });
 
+  it("renders confirm analyze action for manual-confirm mail detail only", () => {
+    const input = stubInput({
+      queue: {
+        pending: [],
+        blocked: [
+          stubMail({ mailId: "manual-1", subject: "Needs review" }),
+          stubMail({ mailId: "block-1", subject: "Blocked" })
+        ],
+        analysed: [],
+        allowed: [],
+        ignoredPending: []
+      },
+      securityDecisions: new Map([
+        ["manual-1", { decision: "manual_confirm", reasons: ["Requires manual confirmation"] } as any],
+        ["block-1", { decision: "block", reasons: ["Hard block"] } as any]
+      ])
+    });
+
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes("Confirm and Analyze"));
+    assert.ok(html.includes('data-action="analyzeSelected" data-mail-id="manual-1"'));
+    assert.ok(!html.includes('data-action="analyzeSelected" data-mail-id="block-1"'));
+    assert.ok(html.includes("post('analyzeSelected', { mailIds: [t.getAttribute('data-mail-id') || ''] })"));
+  });
+
   it("renders detail panels for analysis items", () => {
     const input = stubInput({
       state: stubState({}, [

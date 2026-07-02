@@ -18,7 +18,12 @@ function ignoreOrRestore(queue: string, mailId: string, labels: DashboardLabels)
   return `<button class="wb-btn ghost" data-action="ignore" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.card.ignore)}</button>`;
 }
 
-function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabels, extra: string): string {
+function confirmAnalyzeButton(mailId: string, decision: SecurityGateDecisionResult | undefined, labels: DashboardLabels): string {
+  if (decision?.decision !== "manual_confirm") return "";
+  return `<button class="wb-btn" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.pending.confirmAnalyze)}</button>`;
+}
+
+function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabels, extra: string, extraActions = ""): string {
   return `<div class="wb-detail-card">
     <h3>${escapeHtml(item.subject || item.mailId)}</h3>
     <div class="wb-meta-grid">
@@ -28,6 +33,7 @@ function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabe
     </div>
     <div class="wb-body">${escapeHtml(item.bodyExcerpt || "")}</div>
     <div class="wb-actions">
+      ${extraActions}
       <button class="wb-btn" data-action="openInOutlook" data-mail-id="${escapeAttr(item.mailId)}">${escapeHtml(labels.card.openInOutlook)}</button>
       ${ignoreOrRestore(queue, item.mailId, labels)}
     </div>
@@ -219,7 +225,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     const gateDecision = securityDecisions.get(item.mailId);
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>
       <div class="wb-field wb-warn"><strong>${escapeHtml(labels.pending.gateBlocked)}:</strong> ${escapeHtml(gateDecision?.reasons.join("; ") || "-")}</div>`;
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "blocked", labels, extra)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "blocked", labels, extra, confirmAnalyzeButton(item.mailId, gateDecision, labels))}</div>`);
   }
 
   for (const cat of state.categories) {
@@ -370,6 +376,7 @@ document.addEventListener('click', function(e) {
   if (a === 'ignore') post('ignore', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'unignore') post('unignore', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'openInOutlook') post('openInOutlook', { mailId: t.getAttribute('data-mail-id') || '' });
+  if (a === 'analyzeSelected') post('analyzeSelected', { mailIds: [t.getAttribute('data-mail-id') || ''] });
   if (a === 'analyzeThread') post('analyzeThread', { threadId: t.getAttribute('data-thread-id') || '' });
   if (a === 'openMeetingInOutlook') post('openMeetingInOutlook', { meetingId: t.getAttribute('data-meeting-id') || '' });
 });
