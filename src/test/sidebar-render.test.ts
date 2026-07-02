@@ -111,7 +111,7 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("Classified"));
   });
 
-  it("renders confirm analyze action for manual-confirm items only", () => {
+  it("does not render confirm analyze action inside compact sidebar rows", () => {
     const input = stubInput({
       queue: {
         pending: [],
@@ -131,8 +131,8 @@ describe("renderSidebarHtml", () => {
 
     const html = renderSidebarHtml(input);
 
-    assert.ok(html.includes("Confirm and Analyze"));
-    assert.ok(html.includes("post('analyzeSelected',{mailIds:['manual-1']})"));
+    assert.ok(!html.includes("Confirm and Analyze"));
+    assert.ok(!html.includes("post('analyzeSelected',{mailIds:['manual-1']})"));
     assert.ok(!html.includes("post('analyzeSelected',{mailIds:['block-1']})"));
   });
 

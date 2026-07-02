@@ -12,7 +12,7 @@ import type {
 } from "./security-types";
 
 const DEFAULT_MAX_AUTO_CLASSIFICATION_LEVEL = 1;
-const DEFAULT_MAX_MANUAL_CLASSIFICATION_LEVEL = 2;
+const DEFAULT_MAX_MANUAL_CLASSIFICATION_LEVEL = 3;
 
 export function buildMailGateDecision(
   mail: StoredMail | MailSecurityGateInput,

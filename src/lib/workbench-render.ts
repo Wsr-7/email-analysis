@@ -242,8 +242,9 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   for (const item of queue.blocked) {
     const classification = classificationFor(item.mailId, classifications);
     const gateDecision = securityDecisions.get(item.mailId);
+    const gateTitle = gateDecision?.decision === "manual_confirm" ? labels.pending.blockedTitle : labels.pending.gateBlocked;
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>
-      <div class="wb-field wb-warn"><strong>${escapeHtml(labels.pending.gateBlocked)}:</strong> ${escapeHtml(gateDecision?.reasons.join("; ") || "-")}</div>`;
+      <div class="wb-field wb-warn"><strong>${escapeHtml(gateTitle)}:</strong> ${escapeHtml(gateDecision?.reasons.join("; ") || "-")}</div>`;
     detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "blocked", labels, extra, confirmAnalyzeButton(item.mailId, gateDecision, labels), classifications)}</div>`);
   }
 

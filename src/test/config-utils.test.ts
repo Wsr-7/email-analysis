@@ -75,6 +75,7 @@ describe("buildSecuritySettings", () => {
     const settings = buildSecuritySettings({});
     assert.equal(settings.enabled, true);
     assert.equal(settings.maxAutoClassificationLevel, 2);
+    assert.equal(settings.maxManualClassificationLevel, 3);
     assert.ok(settings.hardBlockKeywords?.includes("password"));
   });
 

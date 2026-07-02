@@ -36,7 +36,7 @@ export function buildSecuritySettings(config: Record<string, unknown>): Security
     enabled: true,
     autoAnalyzeEnabled: true,
     maxAutoClassificationLevel: Number(config.autoAnalyzeMaxClassificationLevel || 2),
-    maxManualClassificationLevel: 2,
+    maxManualClassificationLevel: 3,
     hardBlockKeywords: ["password", "api_key", "access_token", "auth_token"],
     manualConfirmKeywords: []
   };
