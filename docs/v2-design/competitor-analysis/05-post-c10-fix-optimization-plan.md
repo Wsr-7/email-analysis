@@ -544,7 +544,7 @@ Completion Notes:
 
 ### P1.4 Investigate and fix missing self replies in thread timelines and category outcomes
 
-Status: [ ] Not started
+Status: [X] Done
 
 Goal:
 
@@ -584,12 +584,28 @@ Acceptance criteria:
 
 Completion Notes:
 
-- Status:
+- Status: Done.
 - Files changed:
+  - `default-config.json` — default folders now include `Inbox` and `Sent Items`.
+  - `package.json` — contributed `easyMail.folders` default now includes `Inbox` and `Sent Items`.
+  - `scripts/collect-outlook-mails.vbs` — script fallback default now scans `Inbox;Sent Items`.
+  - `src/extension.ts` — pull-mail fallback folders now include `Inbox` and `Sent Items`.
+  - `src/lib/sidebar-render.ts` — settings/load-more fallback folders now include `Inbox` and `Sent Items`.
+  - `src/test/config-utils.test.ts` — covers package/default-config folder defaults.
+  - `src/test/thread-engine.test.ts` — covers `B -> A, A -> B, B -> A` timeline with the sent reply as a separate item.
 - Tests:
-- Manual validation:
+  - RED: `node --test out/test/config-utils.test.js` failed before implementation because defaults only contained `Inbox`.
+  - `npm run compile`
+  - `node --test out/test/config-utils.test.js`
+  - `node --test out/test/thread-engine.test.js`
+  - `npm test` (281 tests passing)
+  - `cscript.exe //nologo scripts/collect-outlook-mails.vbs --help`
+- Manual validation: Not run. Required manual validation remains: pull real Outlook data with Sent Items available and confirm a `B -> A, A -> B, B -> A` thread shows three timeline cards.
 - Known issues:
-- Commit:
+  - Existing users who explicitly configured only `Inbox` will keep that setting until they add `Sent Items` or reset folders.
+  - Category correction depends on re-pulling/re-analyzing after sent replies are present; no prompt tuning was done.
+  - `releases/easy-mail-0.2.0.vsix` remains an unrelated dirty tracked file from P1.5 packaging output and was not staged.
+- Commit: `e0100de91495373f36243e2a2898c86267d34450`
 
 ---
 
@@ -806,7 +822,7 @@ Use this section to summarize completed task commits:
 - P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
 - P1.2: `c65f435`
 - P1.3: `bcafc01`
-- P1.4:
+- P1.4: `e0100de91495373f36243e2a2898c86267d34450`
 - P1.5: `605a75d`
 - P2.1:
 - P2.2:
@@ -1238,6 +1254,76 @@ Last safe stopping point:
 
 Next recommended step:
 - Claim `P1.4`.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P1.4 start)
+
+Status: In progress
+
+Changed:
+- Claimed `P1.4 Investigate and fix missing self replies in thread timelines and category outcomes`.
+
+Validated:
+- Read `AGENTS.md`, this plan, P1.4 task details, completion index, and recent handovers.
+- Ran `git status --short --branch`: branch `v3`, ahead 15; dirty tracked file `releases/easy-mail-0.2.0.vsix`.
+- Ran `git log --oneline -10`; P1.2, P1.3, and P1.5 are committed.
+- Inspected `scripts/collect-outlook-mails.vbs`, `default-config.json`, `package.json`, `src/lib/thread-engine.ts`, and thread tests.
+
+Findings:
+- `thread-engine.ts` already groups sent mail as timeline items when sent mail exists in `StoredMail[]`.
+- `scripts/collect-outlook-mails.vbs` already resolves `Sent Items` via `ns.GetDefaultFolder(5)`.
+- Default config and package contributed setting still scan only `Inbox`, so Outlook sent replies are not collected unless the user manually adds `Sent Items`.
+
+Known issues:
+- `releases/easy-mail-0.2.0.vsix` is dirty from P1.5 packaging output; leave it unstaged for P1.4.
+- P0.1 still needs manual Outlook validation before closing compose acceptance.
+
+Last safe stopping point:
+- Before P1.4 RED tests.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+- `releases/easy-mail-0.2.0.vsix` unrelated dirty tracked file from package output
+
+Next recommended step:
+- Add RED tests proving defaults include `Sent Items` and a B -> A, A -> B, B -> A thread produces three timeline messages when all three mails are collected.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P1.4 complete)
+
+Status: Done
+
+Changed:
+- Completed `P1.4 Investigate and fix missing self replies in thread timelines and category outcomes`.
+- Default mail collection now includes `Sent Items` alongside `Inbox`.
+- Added regression coverage proving collected self replies appear as separate thread timeline messages.
+- Did not change prompts; the missing self-reply root cause was default collection scope.
+
+Validated:
+- RED: `node --test out/test/config-utils.test.js` failed before implementation because defaults only contained `Inbox`.
+- `npm run compile`: pass.
+- `node --test out/test/config-utils.test.js`: pass.
+- `node --test out/test/thread-engine.test.js`: pass.
+- `npm test`: pass, 281 tests.
+- `cscript.exe //nologo scripts/collect-outlook-mails.vbs --help`: pass.
+- Implementation commit: `e0100de91495373f36243e2a2898c86267d34450`
+
+Known issues:
+- Manual Outlook validation is still needed to confirm real Sent Items access and three-card thread rendering.
+- Existing users with an explicit `easyMail.folders` setting of only `Inbox` must add `Sent Items` manually or reset the setting.
+- `releases/easy-mail-0.2.0.vsix` remains dirty from earlier P1.5 packaging output and was left unstaged.
+
+Last safe stopping point:
+- P1.4 implementation is complete and committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+- `releases/easy-mail-0.2.0.vsix` unrelated dirty tracked file
+
+Next recommended step:
+- Continue to `P2.2 Define and harden multiple Outlook account behavior`, or manually validate P0.1/P1.4 Outlook flows before P2 work.
 
 ---
 
