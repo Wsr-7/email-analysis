@@ -627,7 +627,7 @@ Completion Notes:
 - Tests: No code logic change. 279 existing tests pass. `npm run package:vsix` succeeds (431.25 KB, icon at `media/icon.png` 248.86 KB).
 - Manual validation: Pending user install in VS Code to confirm extension list, detail page, and activity bar rendering.
 - Known issues: None.
-- Commit: PENDING
+- Commit: `605a75d`
 
 ---
 
@@ -807,7 +807,7 @@ Use this section to summarize completed task commits:
 - P1.2: `c65f435`
 - P1.3: `bcafc01`
 - P1.4:
-- P1.5:
+- P1.5: `605a75d`
 - P2.1:
 - P2.2:
 
