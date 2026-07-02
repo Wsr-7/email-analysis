@@ -23,31 +23,43 @@ function confirmAnalyzeButton(mailId: string, decision: SecurityGateDecisionResu
   return `<button class="wb-btn" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.pending.confirmAnalyze)}</button>`;
 }
 
-function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabels, extra: string, extraActions = ""): string {
+function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabels, extra: string, extraActions = "", classifications?: ReturnType<typeof normalizeClassificationCache>): string {
+  const toHtml = item.to ? `<div class="wb-field"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(item.to)}</div>` : "";
+  const ccHtml = item.cc ? `<div class="wb-field"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(item.cc)}</div>` : "";
+  const cls = classifications ? classificationFor(item.mailId, classifications) : undefined;
+  const clsFromExtra = extra.includes(labels.pending.classification);
+  const clsHtml = cls && !clsFromExtra ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(cls))}</div>` : "";
   return `<div class="wb-detail-card">
     <h3>${escapeHtml(item.subject || item.mailId)}</h3>
     <div class="wb-meta-grid">
       <div class="wb-field"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.from || "-")}</div>
+      ${toHtml}
+      ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
+      ${clsHtml}
       ${extra}
     </div>
-    <div class="wb-body">${escapeHtml(item.bodyExcerpt || "")}</div>
     <div class="wb-actions">
       ${extraActions}
       <button class="wb-btn" data-action="openInOutlook" data-mail-id="${escapeAttr(item.mailId)}">${escapeHtml(labels.card.openInOutlook)}</button>
       ${ignoreOrRestore(queue, item.mailId, labels)}
     </div>
+    <div class="wb-body">${escapeHtml(item.bodyExcerpt || "")}</div>
   </div>`;
 }
 
-function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, threadId: string, classifications: ReturnType<typeof normalizeClassificationCache>): string {
+function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, threadId: string, classifications: ReturnType<typeof normalizeClassificationCache>, originalMail?: StoredMail): string {
   const priority = formatPriority(item.priority, labels);
   const draftHtml = renderEditableDraftBox(item.draftReply || "", labels, { itemId: `mail:${item.mailId}`, sourceId: item.mailId, generateAction: "analyzeSelected" });
   const classification = classificationFor(item.mailId, classifications);
   const clsHtml = classification ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>` : "";
+  const toHtml = originalMail?.to ? `<div class="wb-field"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(originalMail.to)}</div>` : "";
+  const ccHtml = originalMail?.cc ? `<div class="wb-field"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(originalMail.cc)}</div>` : "";
   const threadLink = threadId
     ? `<div class="wb-field"><strong>${escapeHtml(labels.card.thread)}:</strong> ${escapeHtml(threadId)}</div>`
     : "";
+  const bodyText = originalMail?.bodyExcerpt || "";
+  const bodyHtml = bodyText ? `<div class="wb-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(bodyText)}</div></div>` : "";
   return `<div class="wb-detail-card">
     <div class="wb-detail-header">
       <h3>${escapeHtml(item.subject || item.mailId)}</h3>
@@ -55,8 +67,14 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
     </div>
     <div class="wb-meta-grid">
       <div class="wb-field"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.sender || "-")}</div>
+      ${toHtml}
+      ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
       ${clsHtml}
+    </div>
+    <div class="wb-actions">
+      <button class="wb-btn" data-action="openInOutlook" data-mail-id="${escapeAttr(item.mailId)}">${escapeHtml(labels.card.openInOutlook)}</button>
+      ${ignoreOrRestore(queue, item.mailId, labels)}
     </div>
     <div class="wb-section">
       <div class="wb-field"><strong>${escapeHtml(labels.card.summary)}:</strong></div>
@@ -72,10 +90,7 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
     </div>
     ${threadLink}
     ${draftHtml}
-    <div class="wb-actions">
-      <button class="wb-btn" data-action="openInOutlook" data-mail-id="${escapeAttr(item.mailId)}">${escapeHtml(labels.card.openInOutlook)}</button>
-      ${ignoreOrRestore(queue, item.mailId, labels)}
-    </div>
+    ${bodyHtml}
   </div>`;
 }
 
@@ -217,7 +232,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   for (const item of queue.pending) {
     const classification = classificationFor(item.mailId, classifications);
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>`;
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "pending", labels, extra)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "pending", labels, extra, "", classifications)}</div>`);
   }
 
   for (const item of queue.blocked) {
@@ -225,18 +240,21 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     const gateDecision = securityDecisions.get(item.mailId);
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>
       <div class="wb-field wb-warn"><strong>${escapeHtml(labels.pending.gateBlocked)}:</strong> ${escapeHtml(gateDecision?.reasons.join("; ") || "-")}</div>`;
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "blocked", labels, extra, confirmAnalyzeButton(item.mailId, gateDecision, labels))}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "blocked", labels, extra, confirmAnalyzeButton(item.mailId, gateDecision, labels), classifications)}</div>`);
   }
+
+  const mailById = new Map((input.store?.items || []).map((m) => [m.mailId, m]));
 
   for (const cat of state.categories) {
     for (const item of cat.items) {
       const threadId = threadByMailId.get(item.mailId) || "";
-      detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderAnalysisDetail(item, cat.id, labels, threadId, classifications)}</div>`);
+      const originalMail = mailById.get(item.mailId);
+      detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderAnalysisDetail(item, cat.id, labels, threadId, classifications, originalMail)}</div>`);
     }
   }
 
   for (const item of (queue.ignoredPending || [])) {
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "ignored", labels, "")}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, "ignored", labels, "", "", classifications)}</div>`);
   }
 
   for (const mtg of sortedMeetings) {

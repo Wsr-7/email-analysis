@@ -327,4 +327,16 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("09:15"), "second line should show time");
     assert.ok(html.includes("sb-badge"), "second line should show priority badge");
   });
+
+  it("renders classification badge on analyzed rows when classification is known", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1", subject: "Urgent" })] }
+      ]),
+      classifications: normalizeClassificationCache({ items: [{ mailId: "a1", level: 1 }] })
+    });
+    const html = renderSidebarHtml(input);
+    assert.ok(html.includes("sb-cls-badge"), "analyzed row should show classification badge");
+    assert.ok(html.includes("INTERNAL"), "badge should show classification level name");
+  });
 });

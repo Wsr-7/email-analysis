@@ -265,6 +265,47 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(!html.includes('data-action="ignore" data-mail-id="ig1"'));
   });
 
+  it("renders recipients and classification in workbench mail detail", () => {
+    const input = stubInput({
+      queue: {
+        pending: [stubMail({ mailId: "m1", subject: "Hello", from: "alice@test.com", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })],
+        blocked: [], analysed: [], allowed: [], ignoredPending: []
+      },
+      classifications: normalizeClassificationCache({ items: [{ mailId: "m1", level: 2, label: "REGISTERED" }] })
+    });
+    const html = renderWorkbenchHtml(input);
+    assert.ok(html.includes("bob@test.com"), "should show To recipients");
+    assert.ok(html.includes("carol@test.com"), "should show Cc recipients");
+    assert.ok(html.includes("REGISTERED"), "should show classification");
+    assert.ok(html.includes("alice@test.com"), "should show sender");
+    assert.ok(html.includes("14:30"), "should show time");
+  });
+
+  it("renders analyzed mail with original body from mail store", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1", subject: "Urgent" })] }
+      ]),
+      store: { ...emptyMailStore(), items: [stubMail({ mailId: "a1", bodyExcerpt: "Original body text here" })] }
+    });
+    const html = renderWorkbenchHtml(input);
+    assert.ok(html.includes("Original body text here"), "analyzed mail should show original body");
+  });
+
+  it("places Open in Outlook and Ignore above summary in analyzed detail", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1", subject: "Urgent", summary: "Do this now" })] }
+      ])
+    });
+    const html = renderWorkbenchHtml(input);
+    const actionsIdx = html.indexOf('data-action="openInOutlook"');
+    const summaryIdx = html.indexOf("Do this now");
+    assert.ok(actionsIdx !== -1, "should have Open in Outlook action");
+    assert.ok(summaryIdx !== -1, "should have summary");
+    assert.ok(actionsIdx < summaryIdx, "actions should come before summary");
+  });
+
   it("renders meeting detail panels", () => {
     const mtg: StoredMeetingItem = {
       meetingId: "mtg-1", entryId: "e-mtg-1", subject: "Standup", organizer: "Alice",
