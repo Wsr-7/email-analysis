@@ -858,9 +858,11 @@ Status:
 
 - User validation found regressions after P0/P1 work; P2 work is paused.
 - First stabilization slice completed in `72970ebb038e3cf8aa64f52b622af6cb78ba760a`.
+- Classification threshold normalization completed in `97f1564b3942a39e1711a740e3a8c9ed52c5e969`.
 - `Generate Draft` now dispatches a draft-only action instead of reusing analysis.
 - Batch analysis no longer removes analyzed mails from `mail-store`, preserving body/timeline/draft context for workbench detail and future thread construction.
 - Workbench metadata is forced onto separate lines, and Outlook Actions are rendered as a collapsed popover menu.
+- `autoAnalyzeMaxClassificationLevel` is parsed consistently from numeric values, numeric strings, or labels like `REGISTERED`; queue filtering and security gate now use the same threshold interpretation.
 
 Current recommendation:
 
@@ -881,7 +883,7 @@ Use this section to summarize completed task commits:
 
 - P0.1: implementation `04d96a5029b615d058a7bb28221863d80e432189`; manual Outlook validation pending.
 - P0.2: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`; follow-up `280469911d4f0ab97a3ad0688def7ff03906225e`
-- P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`; follow-up `6ede04dd9fe1da3d7a308fea65d4333d32d3a107`
+- P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`; follow-up `6ede04dd9fe1da3d7a308fea65d4333d32d3a107`; threshold follow-up `97f1564b3942a39e1711a740e3a8c9ed52c5e969`
 - P0.4: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
 - P1.1: `d7e7117bb8ca325482e2fa6db1a4faa976ebf4d2`
 - P1.2: `c65f435`
@@ -925,6 +927,32 @@ Known issues:
 
 Next recommended step:
 - Claim a small stabilization step for manual-confirm visibility and explanation, then ignore navigation. Do not start P2.
+
+#### Handover - 2026-07-03 - Codex (Classification threshold follow-up complete)
+
+Status: Complete
+
+Changed:
+- Added shared classification-threshold parsing for numeric values, numeric strings, and classification labels (`PUBLIC`, `INTERNAL`, `REGISTERED`, `HIGH REGISTERED`).
+- Updated security-gate settings and queue filtering to use the same parsed max allowed classification level.
+- Removed caller-side `Number(...)` coercion so label values are not converted to `NaN` before queue filtering.
+- Rebuilt `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- `rtk npm run compile`
+- `rtk node --test out/test/classification.test.js out/test/config-utils.test.js out/test/security-gate.test.js out/test/app-analysis.test.js`
+- `rtk npm test`
+- `rtk npm run package:vsix`
+
+Commit:
+- Implementation: `97f1564b3942a39e1711a740e3a8c9ed52c5e969`
+
+Known issues:
+- Manual-confirm workbench button/reason still needs validation against the latest installed build and current user data.
+- Ignore navigation, polish/refine progress feedback, sent folder migration for existing settings, and mixed-language Thread Spotlight remain open.
+
+Next recommended step:
+- Continue with manual-confirm workbench visibility/reason if still reproducible; otherwise fix ignore navigation. Do not start P2.
 
 #### Handover - 2026-07-03 - Codex (P0.2 follow-up start)
 
