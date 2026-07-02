@@ -336,7 +336,7 @@ Completion Notes:
 
 ### P0.4 Preserve metadata during redaction
 
-Status: [ ] Not started
+Status: [X] Done
 
 Goal:
 
@@ -365,12 +365,19 @@ Acceptance criteria:
 
 Completion Notes:
 
-- Status:
+- Status: Done.
 - Files changed:
+  - `src/lib/redaction.ts` — `redactStoredMails` now preserves display metadata and redacts only `bodyExcerpt`; `redactThreadForPrompt` preserves thread/message metadata and redacts only `bodyPreview`, `bodyClean`, and `bodyDelta`.
+  - `src/test/redaction.test.ts` — added coverage proving metadata fields stay readable while body content is still redacted.
 - Tests:
-- Manual validation:
-- Known issues:
-- Commit:
+  - RED: `node --test out/test/redaction.test.js` failed before implementation because subject metadata was replaced with `[EMAIL_1]`.
+  - `npm run compile`
+  - `node --test out/test/redaction.test.js`
+  - `node --test out/test/thread-prompt-builder.test.js`
+  - `npm test` (266 tests passing)
+- Manual validation: Not run; behavior is covered by redaction and prompt-builder regression tests.
+- Known issues: None for this step.
+- Commit: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
 
 ---
 
@@ -772,7 +779,7 @@ Use this section to summarize completed task commits:
 - P0.1: implementation `04d96a5029b615d058a7bb28221863d80e432189`; manual Outlook validation pending.
 - P0.2: `75c535c1f0961dafbc7e6260c5ba1302f82565e8`
 - P0.3: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
-- P0.4:
+- P0.4: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
 - P1.1:
 - P1.2:
 - P1.3:
@@ -971,6 +978,65 @@ Uncommitted changes / dirty files:
 
 Next recommended step:
 - Start `P0.4 Preserve metadata during redaction`.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P0.4 start)
+
+Status: In progress
+
+Changed:
+- Claimed `P0.4 Preserve metadata during redaction`.
+
+Validated:
+- P0.3 implementation and plan update are committed:
+  - Implementation: `791f7403b4113e26acfe9b9cf11eb6eb03b0e23d`
+  - Plan update: `920258331618e948c058a84d161a82f6814b04f5`
+- Ran `git status --short --branch`: branch `v3`, ahead 4; clean working tree.
+
+Known issues:
+- No P0.4 source code changed yet in this checkpoint.
+
+Last safe stopping point:
+- Before redaction path inspection.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Inspect `redaction.ts`, thread prompt payload construction, and redaction tests; add RED tests proving metadata is preserved while body fields are redacted.
+
+---
+
+#### Handover - 2026-07-02 - Codex (P0.4 complete)
+
+Status: Done
+
+Changed:
+- Completed `P0.4 Preserve metadata during redaction`.
+- `src/lib/redaction.ts` now preserves mail/thread metadata and redacts only body fields sent to prompt construction.
+- `src/test/redaction.test.ts` covers both stored mail and thread prompt redaction boundaries.
+
+Validated:
+- RED: `node --test out/test/redaction.test.js` failed before implementation because subject metadata was replaced with `[EMAIL_1]`.
+- `npm run compile`: pass.
+- `node --test out/test/redaction.test.js`: pass.
+- `node --test out/test/thread-prompt-builder.test.js`: pass.
+- `npm test`: pass, 266 tests.
+- Implementation commit: `3b9acf30371c62e9d51f2fdaef7d0b0815eb0dde`
+
+Known issues:
+- No manual VS Code UI/LLM run was performed for this step.
+- P0.1 still needs manual Outlook validation before it can be fully closed.
+
+Last safe stopping point:
+- P0.4 implementation is complete and committed.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+
+Next recommended step:
+- Claim `P1.1 Redesign draft editor, actions, and per-item draft binding`.
 
 ---
 
