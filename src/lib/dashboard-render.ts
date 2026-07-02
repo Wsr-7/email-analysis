@@ -228,21 +228,43 @@ export function renderDraftBox(draftReply: string): string {
   return `<div class="draft-box"><pre>${escapeHtml(draft)}</pre><button class="copy-icon-button" data-action="copyDraft" data-draft-reply="${escapeAttr(draft)}" title="Copy draft" aria-label="Copy draft"><span class="copy-icon" aria-hidden="true"></span></button></div>`;
 }
 
-export function renderEditableDraftBox(draftReply: string, labels: DashboardLabels): string {
+export function renderEditableDraftBox(
+  draftReply: string,
+  labels: DashboardLabels,
+  options: { itemId?: string; sourceId?: string; generateAction?: "analyzeSelected" | "analyzeThread" } = {}
+): string {
   const draft = String(draftReply || "");
-  return `<div class="draft-box draft-box-editable">
-    <div class="wb-field"><strong>${escapeHtml(labels.threads.draftReply)}:</strong></div>
-    <textarea class="draft-textarea" rows="6">${escapeHtml(draft)}</textarea>
-    <div class="draft-hint muted">${escapeHtml(labels.card.draftHint)}</div>
-    <input class="draft-instruction" type="text" placeholder="${escapeAttr(labels.card.instructionPlaceholder)}" />
-    <div class="draft-actions">
+  const itemId = String(options.itemId || "");
+  const sourceId = String(options.sourceId || "");
+  const hasDraft = Boolean(draft.trim());
+  const actions = hasDraft
+    ? `<div class="draft-actions">
       <button class="wb-btn" data-action="polishDraft">${escapeHtml(labels.card.polish)}</button>
       <button class="wb-btn" data-action="refineDraft">${escapeHtml(labels.card.refine)}</button>
-      <button class="wb-btn" data-action="copyDraft">${escapeHtml(labels.card.copyDraft)}</button>
-      <button class="wb-btn" data-action="composeMail" data-mode="reply">${escapeHtml(labels.card.openReply)}</button>
-      <button class="wb-btn" data-action="composeMail" data-mode="replyAll">${escapeHtml(labels.card.openReplyAll)}</button>
-      <button class="wb-btn" data-action="composeMail" data-mode="forward">${escapeHtml(labels.card.openForward)}</button>
+      <details class="draft-outlook-actions">
+        <summary class="wb-btn">${escapeHtml(labels.card.outlookActions)}</summary>
+        <div class="draft-outlook-menu">
+          <button class="wb-btn" data-action="composeMail" data-mode="reply">${escapeHtml(labels.card.openReply)}</button>
+          <button class="wb-btn" data-action="composeMail" data-mode="replyAll">${escapeHtml(labels.card.openReplyAll)}</button>
+          <button class="wb-btn" data-action="composeMail" data-mode="forward">${escapeHtml(labels.card.openForward)}</button>
+        </div>
+      </details>
+    </div>`
+    : `<div class="draft-actions">
+      <button class="wb-btn" data-action="generateDraft" data-generate-action="${escapeAttr(options.generateAction || "analyzeSelected")}">${escapeHtml(labels.card.generateDraft)}</button>
+    </div>`;
+  const copyButton = hasDraft
+    ? `<button class="draft-copy-button" data-action="copyDraft" title="${escapeAttr(labels.card.copyDraft)}" aria-label="${escapeAttr(labels.card.copyDraft)}"><span class="copy-icon" aria-hidden="true"></span></button>`
+    : "";
+  return `<div class="draft-box draft-box-editable" data-item-id="${escapeAttr(itemId)}" data-source-id="${escapeAttr(sourceId)}">
+    <div class="wb-field"><strong>${escapeHtml(labels.threads.draftReply)}:</strong></div>
+    <div class="draft-editor-wrap">
+      <textarea class="draft-textarea">${escapeHtml(draft)}</textarea>
+      ${copyButton}
     </div>
+    <div class="draft-hint muted">${escapeHtml(labels.card.draftHint)}</div>
+    <input class="draft-instruction" type="text" placeholder="${escapeAttr(labels.card.instructionPlaceholder)}" />
+    ${actions}
   </div>`;
 }
 

@@ -36,7 +36,7 @@ export type DashboardLabels = {
   meta: Record<"range" | "folders" | "generated" | "requestedModel" | "lastUsedModel" | "lastPull" | "lastImport", string>;
   stats: Record<"pulled" | "pending" | "analysed" | "blocked" | "mustHandle" | "risk" | "waiting" | "notice" | "threads", string>;
   categories: Record<string, string>;
-  card: Record<"from" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "polish" | "refine" | "instructionPlaceholder" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "openInOutlook" | "noItems" | "thread", string>;
+  card: Record<"from" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "openInOutlook" | "noItems" | "thread", string>;
   pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select" | "confirmAnalyze", string>;
   threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "attachments" | "mailIds", string>;
   meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
@@ -133,9 +133,11 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       suggestedAction: "建议动作",
       copyDraft: "复制回复草稿",
       draftHint: "不满意？写下你自己的回复，再润色或优化。",
+      generateDraft: "生成草稿",
       polish: "润色",
       refine: "优化",
       instructionPlaceholder: "可选指令，例如：写短一些、请他们确认截止日期",
+      outlookActions: "Outlook 操作",
       openReply: "Outlook 回复",
       openReplyAll: "Outlook 全部回复",
       openForward: "Outlook 转发",
@@ -312,9 +314,11 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       suggestedAction: "Suggested Action",
       copyDraft: "Copy Draft",
       draftHint: "Not satisfied? Draft your own reply, then refine or polish it.",
+      generateDraft: "Generate Draft",
       polish: "Polish",
       refine: "Refine",
       instructionPlaceholder: "Optional instruction, e.g. make it shorter or ask them to confirm the deadline",
+      outlookActions: "Outlook Actions",
       openReply: "Open Reply",
       openReplyAll: "Open Reply All",
       openForward: "Open Forward",

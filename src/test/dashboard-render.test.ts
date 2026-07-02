@@ -314,6 +314,37 @@ describe("renderEditableDraftBox", () => {
     assert.ok(html.includes(enLabels.card.copyDraft));
   });
 
+  it("renders generate action only when draft is empty", () => {
+    const html = (renderEditableDraftBox as any)("", enLabels, {
+      itemId: "mail:a1",
+      sourceId: "a1",
+      generateAction: "analyzeSelected"
+    });
+
+    assert.ok(html.includes('data-action="generateDraft"'));
+    assert.ok(html.includes('data-generate-action="analyzeSelected"'));
+    assert.ok(html.includes("Generate Draft"));
+    assert.ok(!html.includes('data-action="polishDraft"'));
+    assert.ok(!html.includes('data-action="refineDraft"'));
+    assert.ok(!html.includes('data-action="composeMail"'));
+    assert.ok(!html.includes('data-action="copyDraft"'));
+  });
+
+  it("renders non-empty draft actions with stable item id and Outlook grouping", () => {
+    const html = (renderEditableDraftBox as any)("text", enLabels, {
+      itemId: "mail:a1",
+      sourceId: "a1"
+    });
+
+    assert.ok(html.includes('data-item-id="mail:a1"'));
+    assert.ok(html.includes('data-source-id="a1"'));
+    assert.ok(html.includes('class="draft-editor-wrap"'));
+    assert.ok(html.includes('class="draft-copy-button"'));
+    assert.ok(html.includes("Outlook Actions"));
+    assert.ok(html.includes('data-action="composeMail" data-mode="reply"'));
+    assert.ok(!html.includes('data-action="generateDraft"'));
+  });
+
   it("escapes HTML in draft text", () => {
     const html = renderEditableDraftBox("<script>alert(1)</script>", enLabels);
     assert.ok(!html.includes("<script>alert"));

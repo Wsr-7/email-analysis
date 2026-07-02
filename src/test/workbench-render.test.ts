@@ -126,6 +126,34 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("Urgent task"));
   });
 
+  it("binds single-mail draft actions to the mail draft key", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1", draftReply: "Reply text" })] }
+      ])
+    });
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes('data-item-id="mail:a1"'));
+    assert.ok(html.includes('data-source-id="a1"'));
+    assert.ok(html.includes("var itemId = box ? box.getAttribute('data-item-id') || '' : '';"));
+    assert.ok(html.includes("getAttribute('data-source-id') || ''"));
+    assert.ok(!html.includes("itemId: currentId || ''"));
+  });
+
+  it("renders generate draft action for empty single-mail drafts", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1", draftReply: "" })] }
+      ])
+    });
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes('data-action="generateDraft"'));
+    assert.ok(html.includes('data-generate-action="analyzeSelected"'));
+    assert.ok(html.includes("post(generateAction, { mailIds: [sourceId] })"));
+  });
+
   it("renders thread detail panels", () => {
     const input = stubInput({
       threadStore: {

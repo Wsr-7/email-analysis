@@ -42,7 +42,7 @@ function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabe
 
 function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, threadId: string, classifications: ReturnType<typeof normalizeClassificationCache>): string {
   const priority = formatPriority(item.priority, labels);
-  const draftHtml = renderEditableDraftBox(item.draftReply || "", labels);
+  const draftHtml = renderEditableDraftBox(item.draftReply || "", labels, { itemId: `mail:${item.mailId}`, sourceId: item.mailId, generateAction: "analyzeSelected" });
   const classification = classificationFor(item.mailId, classifications);
   const clsHtml = classification ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>` : "";
   const threadLink = threadId
@@ -120,7 +120,7 @@ function renderThreadSpotlight(analysis: ThreadAnalysisResult["items"][number] |
       ${renderSpotlightRisks(analysis, labels)}
       <div class="wb-field"><strong>${escapeHtml(labels.threads.needMyReply)}:</strong> ${escapeHtml(analysis.needMyReply ? labels.threads.yes : labels.threads.no)}</div>
       ${analysis.suggestedAction ? `<div class="wb-field"><strong>${escapeHtml(labels.threads.suggestedAction)}:</strong></div><div class="wb-section-body">${escapeHtml(analysis.suggestedAction)}</div>` : ""}
-      ${renderEditableDraftBox(analysis.draftReply || "", labels)}
+      ${renderEditableDraftBox(analysis.draftReply || "", labels, { itemId: `thread:${analysis.threadId}`, sourceId: analysis.threadId, generateAction: "analyzeThread" })}
     </section>`;
 }
 
@@ -315,6 +315,38 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   /* Draft box */
   .draft-box { position: relative; margin-top: 8px; }
   .draft-box pre { margin: 0; padding: 10px 40px 10px 14px; font-size: 12px; white-space: pre-wrap; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; line-height: 1.6; }
+  .draft-box-editable { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .draft-editor-wrap { position: relative; width: 100%; }
+  .draft-textarea {
+    width: 100%;
+    min-height: 180px;
+    max-height: 42vh;
+    resize: vertical;
+    padding: 10px 38px 10px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, rgba(128,128,128,0.35)));
+    background: var(--vscode-input-background, var(--vscode-editor-background, #1e1e1e));
+    color: var(--vscode-input-foreground, var(--vscode-editor-foreground, #cccccc));
+    font: inherit;
+    line-height: 1.55;
+  }
+  .draft-textarea:focus, .draft-instruction:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: -1px; }
+  .draft-instruction {
+    width: 100%;
+    min-height: 34px;
+    padding: 7px 9px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, rgba(128,128,128,0.35)));
+    background: var(--vscode-input-background, var(--vscode-editor-background, #1e1e1e));
+    color: var(--vscode-input-foreground, var(--vscode-editor-foreground, #cccccc));
+    font: inherit;
+  }
+  .draft-copy-button { position: absolute; top: 7px; right: 7px; width: 26px; height: 26px; padding: 0; border-radius: 4px; background: var(--vscode-button-secondaryBackground, #3a3d41); color: var(--vscode-button-secondaryForeground, #fff); border: none; }
+  .draft-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+  .draft-outlook-actions { position: relative; }
+  .draft-outlook-actions > summary { list-style: none; cursor: pointer; }
+  .draft-outlook-actions > summary::-webkit-details-marker { display: none; }
+  .draft-outlook-menu { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .copy-icon-button { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; padding: 0; border-radius: 4px; background: var(--vscode-button-secondaryBackground, #3a3d41); color: var(--vscode-button-secondaryForeground, #fff); border: none; }
   .copy-icon { position: relative; display: inline-block; width: 12px; height: 14px; border: 1.5px solid currentColor; border-radius: 1px; box-sizing: border-box; }
   .copy-icon::before { content: ""; position: absolute; width: 12px; height: 14px; left: -5px; top: 3px; border: 1.5px solid currentColor; border-radius: 1px; background: var(--vscode-button-secondaryBackground, #3a3d41); box-sizing: border-box; }
@@ -361,8 +393,8 @@ window.addEventListener('message', function(e) {
     vscode.setState({ currentId: currentId });
   }
   if (msg && msg.type === 'updateDraft' && msg.itemId) {
-    var reader = document.querySelector('.wb-reader[data-id="' + msg.itemId + '"]');
-    if (reader) { var ta = reader.querySelector('.draft-textarea'); if (ta) ta.value = msg.text || ''; }
+    var box = document.querySelector('.draft-box-editable[data-item-id="' + msg.itemId + '"]');
+    if (box) { var ta = box.querySelector('.draft-textarea'); if (ta) ta.value = msg.text || ''; }
   }
 });
 
@@ -371,8 +403,9 @@ document.addEventListener('click', function(e) {
   if (!t) return;
   var a = t.getAttribute('data-action');
   if (a === 'copyDraft') { var ta = t.closest('.draft-box-editable'); var v = ta ? ta.querySelector('.draft-textarea') : null; post('copyDraft', { draftReply: v ? v.value : (t.getAttribute('data-draft-reply') || '') }); }
-  if (a === 'polishDraft' || a === 'refineDraft') { var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: currentId || '' }); }
-  if (a === 'composeMail') { var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: currentId || '' }); }
+  if (a === 'polishDraft' || a === 'refineDraft') { var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; var itemId = box ? box.getAttribute('data-item-id') || '' : ''; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: itemId }); }
+  if (a === 'composeMail') { var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
+  if (a === 'generateDraft') { var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var generateAction = t.getAttribute('data-generate-action') || ''; if (generateAction === 'analyzeSelected') post(generateAction, { mailIds: [sourceId] }); if (generateAction === 'analyzeThread') post(generateAction, { threadId: sourceId }); }
   if (a === 'ignore') post('ignore', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'unignore') post('unignore', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'openInOutlook') post('openInOutlook', { mailId: t.getAttribute('data-mail-id') || '' });
