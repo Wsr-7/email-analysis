@@ -917,7 +917,7 @@ Use this section to summarize completed task commits:
 - P1.3: `bcafc01`
 - P1.4: `e0100de91495373f36243e2a2898c86267d34450`; stabilization follow-up `72970ebb038e3cf8aa64f52b622af6cb78ba760a`; remaining workflow follow-up `62f5097d2a19515d4790e6e020873391f4186300`
 - P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
-- User validation follow-up 3: `b2ca90670a778d7536db6273e1ea50432d95a16a` - fixes thread store disappearance after reload/re-analyze, fixed fetch folders setting, manual-confirm reason formatting/keyword detail, Outlook action chevron/focus best effort, and English-only draft fallback.
+- User validation follow-up 3: `9f51ebfa22769394f84f3f2953ca723821ecc9fa` - fixes thread store disappearance after reload/re-analyze, fixed fetch folders setting, manual-confirm reason formatting/keyword detail, Outlook action chevron/focus best effort, and English-only draft fallback.
 - P2.1:
 - P2.2:
 
@@ -974,7 +974,7 @@ Uncommitted changes / dirty files:
 - `src/test/workbench-render.test.ts`
 
 Commit:
-- Implementation/package commit: `b2ca90670a778d7536db6273e1ea50432d95a16a`
+- Implementation/package commit: `9f51ebfa22769394f84f3f2953ca723821ecc9fa`
 
 Next recommended step:
 - Install the regenerated VSIX and manually validate: thread count/Thread Spotlight after pull/analyze/reload; real manual-confirm workbench reason/button; Outlook foreground behavior; English-only draft and Thread Spotlight output.
