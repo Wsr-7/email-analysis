@@ -643,7 +643,6 @@ for (var i = 0; i < configControlIds.length; i++) {
   var el = document.getElementById(configControlIds[i]);
   if (!el) continue;
   el.addEventListener('change', autoSave);
-  if (el.tagName === 'INPUT') el.addEventListener('input', autoSave);
 }
 document.getElementById('rangeMode').addEventListener('change', function(e) {
   var mode = e.target.value === 'maxItems' ? 'maxItems' : 'recentHours';
