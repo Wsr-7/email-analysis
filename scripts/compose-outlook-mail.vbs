@@ -154,6 +154,17 @@ Sub ComposeOutlookMail(ByVal entryIdValue, ByVal storeIdValue, ByVal composeMode
     End If
     On Error GoTo 0
   End If
+
+  BringOutlookToFront
+End Sub
+
+Sub BringOutlookToFront()
+  On Error Resume Next
+  WScript.Sleep 200
+  Dim shell
+  Set shell = CreateObject("WScript.Shell")
+  shell.AppActivate "Outlook"
+  On Error GoTo 0
 End Sub
 
 Function TextToHtml(ByVal plainText)

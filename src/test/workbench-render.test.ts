@@ -81,7 +81,7 @@ describe("renderWorkbenchHtml", () => {
 
   it("renders detail panels for pending mails", () => {
     const input = stubInput({
-      queue: { pending: [stubMail({ mailId: "m1", subject: "Hello" })], blocked: [], analysed: [], allowed: [], ignoredPending: [] }
+      queue: { pending: [stubMail({ mailId: "m1", subject: "Hello" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Hello" })], ignoredPending: [] }
     });
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes('data-id="m1"'));
@@ -115,6 +115,26 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("Manual Confirmation Required"));
     assert.ok(html.includes("Requires manual confirmation"));
     assert.ok(html.includes("post('analyzeSelected', { mailIds: [t.getAttribute('data-mail-id') || ''] })"));
+  });
+
+  it("does not render manual-confirm mail as a plain pending reader first", () => {
+    const input = stubInput({
+      queue: {
+        pending: [stubMail({ mailId: "manual-1", subject: "Needs review" })],
+        blocked: [stubMail({ mailId: "manual-1", subject: "Needs review" })],
+        analysed: [],
+        allowed: [],
+        ignoredPending: []
+      },
+      securityDecisions: new Map([
+        ["manual-1", { decision: "manual_confirm", reasons: ["Requires manual confirmation"] } as any]
+      ])
+    });
+
+    const html = renderWorkbenchHtml(input);
+    assert.ok(!html.includes('data-id="manual-1" data-queue="pending"'));
+    assert.ok(html.includes('data-id="manual-1" data-queue="blocked"'));
+    assert.ok(html.includes("Confirm and Analyze"));
   });
 
   it("renders detail panels for analysis items", () => {
@@ -285,7 +305,7 @@ describe("renderWorkbenchHtml", () => {
     const input = stubInput({
       queue: {
         pending: [stubMail({ mailId: "m1", subject: "Hello", from: "alice@test.com", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })],
-        blocked: [], analysed: [], allowed: [], ignoredPending: []
+        blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Hello", from: "alice@test.com", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })], ignoredPending: []
       },
       classifications: normalizeClassificationCache({ items: [{ mailId: "m1", level: 2, label: "REGISTERED" }] })
     });
@@ -308,6 +328,8 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
 
     assert.ok(html.includes("<details class=\"draft-outlook-actions\">"));
+    assert.ok(html.includes("outlook-chevron"));
+    assert.ok(html.includes("menu.removeAttribute('open')"));
     assert.ok(html.includes(".draft-outlook-menu { position: absolute;"));
     assert.ok(html.includes(".draft-outlook-actions:not([open]) .draft-outlook-menu { display: none;"));
     assert.ok(html.includes('data-mode="reply"'));

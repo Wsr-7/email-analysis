@@ -85,7 +85,7 @@ describe("renderSidebarHtml", () => {
 
   it("renders queue navigation for pending items", () => {
     const input = stubInput({
-      queue: { pending: [stubMail()], blocked: [], analysed: [], allowed: [], ignoredPending: [] }
+      queue: { pending: [stubMail()], blocked: [], analysed: [], allowed: [stubMail()], ignoredPending: [] }
     });
     const html = renderSidebarHtml(input);
     assert.ok(html.includes('data-queue-id="pending"'));
@@ -93,7 +93,7 @@ describe("renderSidebarHtml", () => {
 
   it("renders mail rows with data-queue attributes", () => {
     const input = stubInput({
-      queue: { pending: [stubMail({ mailId: "m1", from: "bob@test.com", subject: "Hello" })], blocked: [], analysed: [], allowed: [], ignoredPending: [] }
+      queue: { pending: [stubMail({ mailId: "m1", from: "bob@test.com", subject: "Hello" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", from: "bob@test.com", subject: "Hello" })], ignoredPending: [] }
     });
     const html = renderSidebarHtml(input);
     assert.ok(html.includes('data-queue="pending"'));
@@ -255,12 +255,29 @@ describe("renderSidebarHtml", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes("post('analyze', { batchSize: Number(sel) })"));
     assert.ok(!html.includes("analysisBatchSize: sel"));
+    assert.ok(html.includes("batchSelect: sel"));
   });
 
-  it("selects current batch size in dropdown", () => {
+  it("uses local webview state for batch size instead of persisted settings", () => {
     const input = stubInput({ state: stubState({ analysisBatchSize: 10 }) });
     const html = renderSidebarHtml(input);
-    assert.ok(html.includes('<option value="10" selected'));
+    assert.ok(html.includes('<option value="5" selected'));
+    assert.ok(html.includes("prev.batchSelect"));
+  });
+
+  it("keeps manual-confirm mails out of the pending compact queue", () => {
+    const input = stubInput({
+      queue: {
+        pending: [stubMail({ mailId: "manual-1", subject: "Needs review" })],
+        blocked: [stubMail({ mailId: "manual-1", subject: "Needs review" })],
+        analysed: [],
+        allowed: [],
+        ignoredPending: []
+      }
+    });
+    const html = renderSidebarHtml(input);
+    assert.ok(!html.includes('data-queue="pending" data-mail-id="manual-1"'));
+    assert.ok(html.includes('data-queue="blocked" data-mail-id="manual-1"'));
   });
 
   it("shows all stable queues even when empty", () => {
@@ -312,7 +329,7 @@ describe("renderSidebarHtml", () => {
 
   it("renders two-line rows with tooltip on subject", () => {
     const input = stubInput({
-      queue: { pending: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "alice@test.com", receivedTime: "2024-01-01 14:30" })], blocked: [], analysed: [], allowed: [], ignoredPending: [] }
+      queue: { pending: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "alice@test.com", receivedTime: "2024-01-01 14:30" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "alice@test.com", receivedTime: "2024-01-01 14:30" })], ignoredPending: [] }
     });
     const html = renderSidebarHtml(input);
     assert.ok(html.includes('title="Long subject line for testing"'), "subject should have tooltip");

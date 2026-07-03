@@ -242,7 +242,7 @@ export function renderEditableDraftBox(
       <button class="wb-btn" data-action="polishDraft">${escapeHtml(labels.card.polish)}</button>
       <button class="wb-btn" data-action="refineDraft">${escapeHtml(labels.card.refine)}</button>
       <details class="draft-outlook-actions">
-        <summary class="wb-btn">${escapeHtml(labels.card.outlookActions)}</summary>
+        <summary class="wb-btn">${escapeHtml(labels.card.outlookActions)} <span class="outlook-chevron" aria-hidden="true">⌄</span></summary>
         <div class="draft-outlook-menu">
           <button class="wb-btn" data-action="composeMail" data-mode="reply">${escapeHtml(labels.card.openReply)}</button>
           <button class="wb-btn" data-action="composeMail" data-mode="replyAll">${escapeHtml(labels.card.openReplyAll)}</button>

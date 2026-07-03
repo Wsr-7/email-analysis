@@ -233,7 +233,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
 
   const detailData: string[] = [];
 
-  for (const item of queue.pending) {
+  for (const item of queue.allowed) {
     const classification = classificationFor(item.mailId, classifications);
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>`;
     detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="pending">${renderMailDetail(item, "pending", labels, extra, "", classifications)}</div>`);
@@ -369,6 +369,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .draft-outlook-actions { position: relative; }
   .draft-outlook-actions > summary { list-style: none; cursor: pointer; }
   .draft-outlook-actions > summary::-webkit-details-marker { display: none; }
+  .outlook-chevron { font-size: 11px; opacity: 0.8; }
   .draft-outlook-menu { position: absolute; z-index: 10; display: flex; flex-direction: column; gap: 4px; min-width: 150px; margin-top: 6px; padding: 6px; border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.25)); border-radius: 4px; background: var(--vscode-dropdown-background, var(--vscode-editor-background, #1e1e1e)); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
   .draft-outlook-actions:not([open]) .draft-outlook-menu { display: none; }
   .copy-icon-button { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; padding: 0; border-radius: 4px; background: var(--vscode-button-secondaryBackground, #3a3d41); color: var(--vscode-button-secondaryForeground, #fff); border: none; }
@@ -446,7 +447,7 @@ document.addEventListener('click', function(e) {
   var a = t.getAttribute('data-action');
   if (a === 'copyDraft') { var ta = t.closest('.draft-box-editable'); var v = ta ? ta.querySelector('.draft-textarea') : null; post('copyDraft', { draftReply: v ? v.value : (t.getAttribute('data-draft-reply') || '') }); }
   if (a === 'polishDraft' || a === 'refineDraft') { var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; var itemId = box ? box.getAttribute('data-item-id') || '' : ''; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: itemId }); }
-  if (a === 'composeMail') { var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
+  if (a === 'composeMail') { var menu = t.closest('.draft-outlook-actions'); if (menu) menu.removeAttribute('open'); var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
   if (a === 'generateDraft') { var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var itemId3 = box3 ? box3.getAttribute('data-item-id') || '' : ''; post('generateDraft', { itemId: itemId3, sourceId: sourceId }); }
   if (a === 'ignore') { var reader = t.closest('.wb-reader'); var removedId = reader ? reader.getAttribute('data-id') || '' : t.getAttribute('data-mail-id') || ''; focusAfterRemoving(removedId); post('ignore', { mailId: t.getAttribute('data-mail-id') || '' }); }
   if (a === 'unignore') post('unignore', { mailId: t.getAttribute('data-mail-id') || '' });

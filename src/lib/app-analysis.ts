@@ -181,13 +181,52 @@ export async function analyzeThreadCore(
   const configuredModel = typeof config.modelFamily === "string" ? config.modelFamily.trim() : "gpt-5.4";
   await ctx.log("threadAnalyze:start", { threadId, configuredModel, partialContext: gate.partialContext });
   const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "threadAnalyze");
-  const parsed = parseThreadAnalysisJson(raw, allowedCategoryIds(await ctx.data.readPromptConfig()));
+  let parsed = parseThreadAnalysisJson(raw, allowedCategoryIds(await ctx.data.readPromptConfig()));
   parsed.language = getLocaleFromConfig(config);
+  if (parsed.language === "en-US" && threadAnalysisContainsCjk(parsed)) {
+    try {
+      const translatedPrompt = buildAnalysisTranslationPrompt({
+        mail: emptyAnalysisResult("en-US"),
+        threads: parsed,
+        targetLanguage: "en-US"
+      });
+      const translatedRaw = await sendPromptToModel(ctx, translatedPrompt, configuredModel, "threadTranslate");
+      parsed = normalizeThreadAnalysis(applyAnalysisTranslation({
+        mail: emptyAnalysisResult("en-US"),
+        threads: parsed,
+        translated: JSON.parse(stripCodeFence(translatedRaw.raw.trim())),
+        targetLanguage: "en-US"
+      }).threads, allowedCategoryIds(await ctx.data.readPromptConfig()));
+    } catch (error) {
+      await ctx.log("threadAnalyze:translateFallbackFailed", { threadId, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
   const current = await ctx.data.readThreadAnalysisResult();
   const merged = mergeThreadAnalysisResults(current, parsed, allowedCategoryIds(await ctx.data.readPromptConfig()));
   await ctx.data.writeThreadAnalysisResult(merged);
   await ctx.log("threadAnalyze:done", { threadId, mergedItems: merged.items.length });
   return { subject: thread.subject || thread.threadId };
+}
+
+function emptyAnalysisResult(language: Locale) {
+  return {
+    generatedAt: "",
+    language,
+    overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 },
+    items: []
+  };
+}
+
+function threadAnalysisContainsCjk(threads: ReturnType<typeof parseThreadAnalysisJson>): boolean {
+  return /[\u3400-\u9fff]/.test(JSON.stringify((threads.items || []).map((item) => ({
+    oneLineSummary: item.oneLineSummary,
+    currentStatus: item.currentStatus,
+    keyDecisions: item.keyDecisions,
+    openQuestions: item.openQuestions,
+    actionItems: item.actionItems.map((action) => action.task),
+    risks: item.risks.map((risk) => risk.description),
+    suggestedAction: item.suggestedAction
+  }))));
 }
 
 export async function translateExistingAnalysis(

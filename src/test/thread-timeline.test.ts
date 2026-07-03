@@ -39,6 +39,12 @@ test("extractReplyDelta removes Chinese Outlook quoted history", () => {
   assert.equal(extractReplyDelta(body), "请以第二版报价为准。\n\n谢谢。");
 });
 
+test("extractReplyDelta removes common reply-chain separators", () => {
+  assert.equal(extractReplyDelta("Latest reply.\n\nOn Tue, Alice wrote:\nOld reply."), "Latest reply.");
+  assert.equal(extractReplyDelta("最新回复。\n\n在 2026年7月1日 Alice 写道:\n旧邮件。"), "最新回复。");
+  assert.equal(extractReplyDelta("Latest reply.\n\n______________________________\nFrom: Alice\nSent: Today\nOld reply."), "Latest reply.");
+});
+
 test("hashBody is deterministic for equivalent cleaned body text", () => {
   const first = hashBody("Status update\r\n\r\nReady.  ");
   const second = hashBody("Status update\n\nReady.");

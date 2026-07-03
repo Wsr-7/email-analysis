@@ -150,8 +150,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   const pullMailBusy = busyKind === "pullMail";
   const analyzeNextBusy = busyKind === "analyzeNext";
   const analyzeNextLabel = formatAnalyzeNextLabel(labels, config);
-  const batchSize = Number(config.analysisBatchSize || 5);
-  const pendingCount = queue.pending.length + queue.allowed.length;
+  const batchSize: number = 5;
   const configuredFolders = Array.isArray(config.folders) ? config.folders.map(String) : ["Inbox", "Sent Items"];
   const hasHistoryAnchors = Object.keys(folderOldestReceivedTimes(index, configuredFolders)).length > 0;
 
@@ -167,7 +166,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   const nextActionsItems = (input.nextActionsStore?.items || []).filter((a) => a.status === "open");
   queueCounts["meetings"] = meetingStore.items.length;
   queueCounts["nextActions"] = nextActionsItems.length;
-  queueCounts["pending"] = queue.pending.length;
+  queueCounts["pending"] = queue.allowed.length;
   queueCounts["blocked"] = queue.blocked.length;
   queueCounts["threads"] = visibleThreadStore.items.length;
   queueCounts["ignored"] = (queueCounts["ignored"] || 0) + (queue.ignoredPending?.length || 0);
@@ -189,7 +188,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
 
   const classifications = input.classifications || normalizeClassificationCache({});
 
-  const pendingRows = queue.pending.map((item) => renderCompactMailRow(item, "pending", classifications)).join("");
+  const pendingRows = queue.allowed.map((item) => renderCompactMailRow(item, "pending", classifications)).join("");
   const blockedRows = queue.blocked.map((item) => renderCompactMailRow(item, "blocked", classifications)).join("");
   const analysisRows = state.categories.map((cat) =>
     cat.items.map((item) => renderCompactAnalysisRow(item, cat.id, labels, classifications)).join("")
@@ -557,6 +556,7 @@ let currentQueue = prev.currentQueue || '${escapeAttr(defaultQueue)}';
 
 applyQueue(currentQueue, false);
 if (prev.settingsOpen) { document.getElementById('settingsPanel').hidden = false; }
+if (prev.batchSelect) { document.getElementById('batchSelect').value = prev.batchSelect; }
 
 function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, extra || {})); }
 
@@ -611,9 +611,14 @@ document.addEventListener('click', function(e) {
 
 function runAnalyze() {
   var sel = document.getElementById('batchSelect').value;
+  vscode.setState(Object.assign({}, vscode.getState() || {}, { batchSelect: sel }));
   if (sel === 'all') { post('analyzeAllAllowed'); }
   else { post('analyze', { batchSize: Number(sel) }); }
 }
+
+document.getElementById('batchSelect').addEventListener('change', function(e) {
+  vscode.setState(Object.assign({}, vscode.getState() || {}, { batchSelect: e.target.value }));
+});
 
 var configControlIds = ['rangeMode', 'rangeValue', 'folders', 'modelFamily', 'autoAnalyzeMaxClassificationLevel'];
 var autoSave = debounce(function() { saveConfig(true, false); }, 450);
