@@ -16,10 +16,8 @@ export function parseFolders(value: unknown, fallback: string[]): string[] {
   return parsed.length ? parsed : fallback;
 }
 
-export const REQUIRED_MAIL_FOLDERS = ["Inbox", "Sent Items"] as const;
-
 export function normalizeMailFolders(value: unknown, fallback: string[]): string[] {
-  return mergeStringLists([...REQUIRED_MAIL_FOLDERS], parseFolders(value, fallback));
+  return parseFolders(value, fallback);
 }
 
 export function mergeStringLists(a: string[], b: string[]): string[] {

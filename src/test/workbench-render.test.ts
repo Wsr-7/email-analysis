@@ -284,6 +284,13 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("focusAfterRemoving(threadId); post('ignoreThread'"));
   });
 
+  it("switches generated draft controls from Generate to edit actions", () => {
+    const html = renderWorkbenchHtml(stubInput());
+    assert.ok(html.includes("showDraftActionButtons(box)"));
+    assert.ok(html.includes("data-action=\"polishDraft\""));
+    assert.ok(html.includes("data-action=\"composeMail\""));
+  });
+
   it("does not include filterQueue or selectItem (no list column)", () => {
     const html = renderWorkbenchHtml(stubInput());
     assert.ok(!html.includes("filterQueue"));

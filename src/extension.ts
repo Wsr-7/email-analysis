@@ -503,11 +503,7 @@ class EasyMailApp {
     const prunedStore = pruneMailStore(merge.store, Number(config.mailStoreRetentionDays || 1));
     await this.data.writeMailStore(prunedStore);
     await this.data.writeMailIndex(nextIndex);
-    const builtThreadStore = buildThreadStore(prunedStore.items);
-    const nextThreadStore = pruneThreadStore(
-      mergeThreadStores(await this.data.readThreadStore(), builtThreadStore),
-      Number(config.mailStoreRetentionDays || 1)
-    );
+    const nextThreadStore = buildThreadStore(prunedStore.items);
     await this.data.writeThreadStore(nextThreadStore);
     const classificationCache = ensureClassifications(prunedStore.items, await this.data.readClassificationCache());
     await this.data.writeClassificationCache(classificationCache);
@@ -924,7 +920,7 @@ class EasyMailApp {
       rangeMode: settings.get("rangeMode", defaults.rangeMode),
       recentHours: settings.get("recentHours", defaults.recentHours),
       maxItems: settings.get("maxItems", defaults.maxItems),
-      folders: normalizeMailFolders(settings.get("fetchFolders", settings.get("folders", defaultFolders)), defaultFolders),
+      folders: normalizeMailFolders(settings.get("folders", defaultFolders), defaultFolders),
       bodyExcerptChars: settings.get("bodyExcerptChars", defaults.bodyExcerptChars),
       sampleMode: settings.get("sampleMode", defaults.sampleMode),
       modelFamily: settings.get("modelFamily", defaults.modelFamily),
@@ -1042,8 +1038,7 @@ class EasyMailApp {
     const store = await this.data.readMailStore();
     const index = pruneMailIndex(await this.data.readMailIndex(), Number(config.mailIndexRetentionDays || 7));
     await this.data.writeMailIndex(index);
-    const rebuiltThreadStore = buildThreadStore(store.items);
-    const threadStore = mergeThreadStores(await this.data.readThreadStore(), rebuiltThreadStore);
+    const threadStore = buildThreadStore(store.items);
     const classifications = ensureClassifications(store.items, await this.data.readClassificationCache());
     await this.data.writeClassificationCache(classifications);
     const securitySettings = buildSecuritySettings(config);
@@ -1099,6 +1094,7 @@ class EasyMailApp {
       updateSettings: (next) => this.updateSettings(next),
       refresh: () => this.refresh(),
       focusSidebarQueue: (queueId) => { void this.dashboardProvider.postMessage({ type: "focusQueue", queueId }); },
+      focusSidebarItem: (itemId) => { void this.dashboardProvider.postMessage({ type: "focusItem", id: itemId }); },
       copyToClipboard: async (text) => { await vscode.env.clipboard.writeText(text); },
       showInfo: (msg) => void vscode.window.showInformationMessage(msg),
       showWarning: (msg) => void vscode.window.showWarningMessage(msg),

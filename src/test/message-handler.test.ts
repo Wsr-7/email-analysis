@@ -10,6 +10,7 @@ function stubContext(overrides?: Partial<MessageHandlerContext>): MessageHandler
     updateSettings: mock.fn(async () => {}),
     refresh: mock.fn(async () => {}),
     focusSidebarQueue: mock.fn(() => {}),
+    focusSidebarItem: mock.fn(() => {}),
     copyToClipboard: mock.fn(async () => {}),
     showInfo: mock.fn(() => {}),
     showWarning: mock.fn(() => {}),
@@ -115,7 +116,14 @@ describe("handleWebviewMessage", () => {
     await handleWebviewMessage(ctx, { type: "ignore", mailId: "m-1" });
     assert.equal((ctx.writeIgnoredIds as any).mock.callCount(), 1);
     assert.equal((ctx.refresh as any).mock.callCount(), 1);
-    assert.deepEqual((ctx.focusSidebarQueue as any).mock.calls[0].arguments, ["ignored"]);
+    assert.equal((ctx.focusSidebarQueue as any).mock.callCount(), 0);
+  });
+
+  it("dispatches sidebar item focus without changing queue", async () => {
+    const ctx = stubContext();
+    await handleWebviewMessage(ctx, { type: "focusSidebarItem", mailId: "m-1" });
+    assert.deepEqual((ctx.focusSidebarItem as any).mock.calls[0].arguments, ["m-1"]);
+    assert.equal((ctx.focusSidebarQueue as any).mock.callCount(), 0);
   });
 
   it("dispatches unignore and refreshes", async () => {
@@ -181,11 +189,12 @@ describe("saveConfigFromMessage", () => {
     assert.equal((ctx.showInfo as any).mock.callCount(), 0);
   });
 
-  it("saves fetch folders with fixed default folders when saving", async () => {
+  it("saves the registered folders setting when saving", async () => {
     const ctx = stubContext();
     await saveConfigFromMessage(ctx, { config: { folders: "Inbox" }, silent: true });
     const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
-    assert.deepEqual(saved.fetchFolders, ["Inbox", "Sent Items"]);
+    assert.deepEqual(saved.folders, ["Inbox"]);
+    assert.equal(Object.prototype.hasOwnProperty.call(saved, "fetchFolders"), false);
   });
 
   it("saves classification threshold labels as levels", async () => {

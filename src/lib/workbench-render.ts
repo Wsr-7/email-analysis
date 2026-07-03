@@ -3,7 +3,7 @@ import { classificationFor, normalizeClassificationCache } from "./classificatio
 import { getLocaleFromConfig } from "./config-utils";
 import { getLabels, type DashboardLabels } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard, buildThreadLookup, compareTimelineMessagesForDisplay } from "./dashboard-state";
-import { escapeHtml, escapeAttr } from "./html-utils";
+import { escapeHtml, escapeAttr, toJsLiteral } from "./html-utils";
 import type { StoredMail } from "./mail-store";
 import type { SecurityGateDecisionResult } from "./security-types";
 import { emptyThreadStore, type ThreadStore } from "./thread-store";
@@ -408,7 +408,7 @@ function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, ex
 function showReader(id) {
   hideReaders();
   for (var r of document.querySelectorAll('.wb-reader')) {
-    if (r.getAttribute('data-id') === id) { r.classList.add('active'); document.getElementById('placeholder').hidden = true; document.getElementById('reader').scrollTop = 0; return; }
+    if (r.getAttribute('data-id') === id) { r.classList.add('active'); document.getElementById('placeholder').hidden = true; document.getElementById('reader').scrollTop = 0; post('focusSidebarItem', { mailId: id }); return; }
   }
 }
 
@@ -444,9 +444,22 @@ window.addEventListener('message', function(e) {
   }
   if (msg && msg.type === 'updateDraft' && msg.itemId) {
     var box = document.querySelector('.draft-box-editable[data-item-id="' + msg.itemId + '"]');
-    if (box) { var ta = box.querySelector('.draft-textarea'); if (ta) ta.value = msg.text || ''; }
+    if (box) { var ta = box.querySelector('.draft-textarea'); if (ta) ta.value = msg.text || ''; if (String(msg.text || '').trim()) showDraftActionButtons(box); }
   }
 });
+
+function showDraftActionButtons(box) {
+  var actions = box.querySelector('.draft-actions');
+  if (!actions) return;
+  actions.innerHTML = '<button class="wb-btn" data-action="polishDraft">' + ${toJsLiteral(labels.card.polish)} + '</button>'
+    + '<button class="wb-btn" data-action="refineDraft">' + ${toJsLiteral(labels.card.refine)} + '</button>'
+    + '<details class="draft-outlook-actions"><summary class="wb-btn">' + ${toJsLiteral(labels.card.outlookActions)} + ' <span class="outlook-chevron" aria-hidden="true"></span></summary>'
+    + '<div class="draft-outlook-menu">'
+    + '<button class="wb-btn" data-action="composeMail" data-mode="reply">' + ${toJsLiteral(labels.card.openReply)} + '</button>'
+    + '<button class="wb-btn" data-action="composeMail" data-mode="replyAll">' + ${toJsLiteral(labels.card.openReplyAll)} + '</button>'
+    + '<button class="wb-btn" data-action="composeMail" data-mode="forward">' + ${toJsLiteral(labels.card.openForward)} + '</button>'
+    + '</div></details>';
+}
 
 document.addEventListener('click', function(e) {
   var t = e.target && e.target.closest ? e.target.closest('button[data-action]') : null;

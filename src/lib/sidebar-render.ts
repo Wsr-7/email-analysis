@@ -367,6 +367,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   }
   .sb-row[hidden] { display: none; }
   .sb-row:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08)); }
+  .sb-row.active { background: var(--vscode-list-activeSelectionBackground, rgba(0,127,212,0.28)); color: var(--vscode-list-activeSelectionForeground, var(--vscode-sideBar-foreground, #cccccc)); }
   .sb-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 1.4; }
   .sb-line2 { display: flex; align-items: center; gap: 6px; margin-top: 1px; }
   .sb-line2-meta { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: 0.55; }
@@ -557,7 +558,7 @@ let currentQueue = prev.currentQueue || '${escapeAttr(defaultQueue)}';
 applyQueue(currentQueue, false);
 if (prev.settingsOpen) { document.getElementById('settingsPanel').hidden = false; }
 if (prev.batchSelect) { document.getElementById('batchSelect').value = prev.batchSelect; }
-normalizeFetchFoldersInput();
+if (prev.currentItemId) setActiveRow(prev.currentItemId);
 
 function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, extra || {})); }
 
@@ -570,6 +571,7 @@ function showQueue(queueId) {
 window.addEventListener('message', function(e) {
   var msg = e.data;
   if (msg && msg.type === 'focusQueue' && msg.queueId) showQueue(msg.queueId);
+  if (msg && msg.type === 'focusItem' && msg.id) setActiveRow(msg.id);
 });
 
 function applyQueue(queueId, smooth) {
@@ -586,7 +588,16 @@ function applyQueue(queueId, smooth) {
 }
 
 function openItem(id) {
+  setActiveRow(id);
   post('openInWorkbench', { mailId: id });
+}
+
+function setActiveRow(id) {
+  for (var row of document.querySelectorAll('.sb-row')) {
+    var match = row.getAttribute('data-mail-id') === id || row.getAttribute('data-thread-id') === id || row.getAttribute('data-meeting-id') === id;
+    row.classList.toggle('active', match);
+  }
+  vscode.setState(Object.assign({}, vscode.getState() || {}, { currentItemId: id }));
 }
 
 function toggleSettings() {
@@ -633,7 +644,6 @@ for (var i = 0; i < configControlIds.length; i++) {
 function saveConfig(keepSettingsOpen, silent) {
   var rangeMode = document.getElementById('rangeMode').value;
   var rangeValue = document.getElementById('rangeValue');
-  var folders = normalizeFetchFoldersInput();
   post('saveConfig', {
     silent: silent === true,
     config: {
@@ -641,32 +651,11 @@ function saveConfig(keepSettingsOpen, silent) {
       outputLanguage: '${escapeAttr(locale)}',
       recentHours: rangeMode === 'recentHours' ? rangeValue.value : undefined,
       maxItems: rangeMode === 'maxItems' ? rangeValue.value : undefined,
-      folders: folders,
+      folders: document.getElementById('folders').value,
       modelFamily: document.getElementById('modelFamily').value,
       autoAnalyzeMaxClassificationLevel: document.getElementById('autoAnalyzeMaxClassificationLevel').value
     }
   });
-}
-
-function normalizeFetchFoldersInput() {
-  var input = document.getElementById('folders');
-  if (!input) return 'Inbox;Sent Items';
-  var required = ['Inbox', 'Sent Items'];
-  var seen = {};
-  var merged = [];
-  function addFolder(value) {
-    var folder = String(value || '').trim();
-    if (!folder) return;
-    var key = folder.toLowerCase();
-    if (seen[key]) return;
-    seen[key] = true;
-    merged.push(folder);
-  }
-  for (var i = 0; i < required.length; i++) addFolder(required[i]);
-  var parts = String(input.value || '').split(';');
-  for (var j = 0; j < parts.length; j++) addFolder(parts[j]);
-  input.value = merged.join(';');
-  return input.value;
 }
 
 function confirmClear() {

@@ -918,12 +918,61 @@ Use this section to summarize completed task commits:
 - P1.4: `e0100de91495373f36243e2a2898c86267d34450`; stabilization follow-up `72970ebb038e3cf8aa64f52b622af6cb78ba760a`; remaining workflow follow-up `62f5097d2a19515d4790e6e020873391f4186300`
 - P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
 - User validation follow-up 3: `9f51ebfa22769394f84f3f2953ca723821ecc9fa` - fixes thread store disappearance after reload/re-analyze, fixed fetch folders setting, manual-confirm reason formatting/keyword detail, Outlook action chevron/focus best effort, and English-only draft fallback.
+- User validation follow-up 4: `PENDING_COMMIT_HASH` - restores registered `easyMail.folders`, rebuilds thread store directly from mail store on pull/load, keeps sidebar selection aligned after ignore, and switches generated draft controls immediately.
 - P2.1:
 - P2.2:
 
 ---
 
 ## 8. Handover Log
+
+#### Handover - 2026-07-03 - Codex (User validation follow-up 4 complete)
+
+Status: Complete for locally verifiable fixes
+
+Changed:
+- Restored VS Code setting key to registered `easyMail.folders`; removed `easyMail.fetchFolders` writes and removed the compatibility fallback path.
+- Reverted fixed-folder forcing. Defaults still include `Inbox` and `Sent Items`, but explicit user folder settings are no longer overwritten.
+- Rebuilt thread store directly from current mail store during both pull and load, instead of merging/pruning stale thread store state.
+- Removed the forced sidebar jump to `ignored` after ignore; workbench can move to the next item while sidebar remains in the same queue.
+- Added sidebar selected-row highlighting and workbench-to-sidebar selected item sync.
+- Fixed generated draft UI so a newly generated non-empty draft immediately shows Polish / Refine / Outlook Actions instead of keeping Generate Draft visible.
+- Regenerated `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- `npm test`: pass, 307 tests.
+- `npm run package:vsix`: pass, regenerated `releases/easy-mail-0.2.0.vsix`.
+
+Known issues:
+- Real Outlook pull count mismatch still needs manual data inspection. Likely variables include `recentHours` versus calendar-day expectation, `maxItems` cap, ignored folders, and Outlook account selection.
+- Thread category will still be zero if the pulled mail store contains no multi-message conversations; this build removes stale store/prune causes but cannot create threads from mails that were not pulled.
+- Manual-confirm category cannot be validated locally without a real gated mail.
+
+Last safe stopping point:
+- Local fixes and package output are ready to commit.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+- `package.json`
+- `releases/easy-mail-0.2.0.vsix`
+- `src/extension.ts`
+- `src/lib/config-utils.ts`
+- `src/lib/dashboard-labels.ts`
+- `src/lib/message-handler.ts`
+- `src/lib/sidebar-render.ts`
+- `src/lib/workbench-render.ts`
+- `src/test/config-utils.test.ts`
+- `src/test/message-handler.test.ts`
+- `src/test/sidebar-render.test.ts`
+- `src/test/workbench-render.test.ts`
+
+Commit:
+- Implementation/package commit: `PENDING_COMMIT_HASH`
+
+Next recommended step:
+- Install the regenerated VSIX and first validate: `easyMail.folders` no longer throws setting errors; pull mail creates nonzero thread rows when the pulled store has multi-message conversations; ignore keeps sidebar/workbench aligned; Generate Draft swaps buttons after text appears.
+
+---
 
 #### Handover - 2026-07-03 - Codex (User validation follow-up 3 complete)
 

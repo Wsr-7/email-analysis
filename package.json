@@ -80,7 +80,7 @@
           "minimum": 1,
           "description": "Maximum number of mails to pull."
         },
-        "easyMail.fetchFolders": {
+        "easyMail.folders": {
           "type": "array",
           "order": 4,
           "items": {

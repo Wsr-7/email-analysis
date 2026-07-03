@@ -35,14 +35,14 @@ describe("default folders", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
 
     assert.deepEqual(defaults.folders, ["Inbox", "Sent Items"]);
-    assert.deepEqual(manifest.contributes.configuration.properties["easyMail.fetchFolders"].default, ["Inbox", "Sent Items"]);
+    assert.deepEqual(manifest.contributes.configuration.properties["easyMail.folders"].default, ["Inbox", "Sent Items"]);
   });
 
-  it("always includes the fixed default Outlook folders", () => {
-    assert.deepEqual(normalizeMailFolders(["Inbox"], ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
-    assert.deepEqual(normalizeMailFolders("Inbox", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
-    assert.deepEqual(normalizeMailFolders("Archive", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items", "Archive"]);
-    assert.deepEqual(normalizeMailFolders("Inbox;Archive", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items", "Archive"]);
+  it("keeps explicit folder settings without forcing fixed folders", () => {
+    assert.deepEqual(normalizeMailFolders(["Inbox"], ["Inbox", "Sent Items"]), ["Inbox"]);
+    assert.deepEqual(normalizeMailFolders("Inbox", ["Inbox", "Sent Items"]), ["Inbox"]);
+    assert.deepEqual(normalizeMailFolders("Archive", ["Inbox", "Sent Items"]), ["Archive"]);
+    assert.deepEqual(normalizeMailFolders("", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
   });
 });
 

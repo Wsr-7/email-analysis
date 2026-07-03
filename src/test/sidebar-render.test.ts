@@ -220,8 +220,13 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("debounce"));
     assert.ok(html.includes("saveConfig"));
     assert.ok(html.includes("autoSave"));
-    assert.ok(html.includes("normalizeFetchFoldersInput"));
     assert.ok(html.includes("Fetch Folders"));
+  });
+
+  it("can highlight the selected sidebar row from extension messages", () => {
+    const html = renderSidebarHtml(stubInput());
+    assert.ok(html.includes("setActiveRow(msg.id)"));
+    assert.ok(html.includes(".sb-row.active"));
   });
 
   it("renders compact rows for ignored items without action buttons", () => {
