@@ -920,7 +920,7 @@ Use this section to summarize completed task commits:
 - User validation follow-up 3: `9f51ebfa22769394f84f3f2953ca723821ecc9fa` - fixes thread store disappearance after reload/re-analyze, fixed fetch folders setting, manual-confirm reason formatting/keyword detail, Outlook action chevron/focus best effort, and English-only draft fallback.
 - User validation follow-up 4: `f1a7466d904a05365a44c884d6d0390804905869` - restores registered `easyMail.folders`, rebuilds thread store directly from mail store on pull/load, keeps sidebar selection aligned after ignore, and switches generated draft controls immediately.
 - User validation follow-up 5: `886ed9005c1e8707b0706765e5cf81aef40a16f3` - improves Outlook quote trimming, Sent Items history paging, Inbox-only folder migration, and restore focus behavior.
-- User validation follow-up 6: `d118c035293e956e8b78109e12feebf7e0d3eb13`; explicit range-mode fix `5c43fb741e2afe86a69c0ef93ad8c42e8efaf4b6` - makes `recentHours` and `maxItems` independent pull modes, adds folder-level pull diagnostics, removes sidebar folder editing, and stabilizes sidebar range value switching.
+- User validation follow-up 6: `d118c035293e956e8b78109e12feebf7e0d3eb13`; explicit range-mode fix `5c43fb741e2afe86a69c0ef93ad8c42e8efaf4b6`; range input autosave fix `cc6e7bf19aad7bbb53b4a9fb9bad4e97b8286be5` - makes `recentHours` and `maxItems` independent pull modes, adds folder-level pull diagnostics, removes sidebar folder editing, and stabilizes sidebar range value switching.
 - P2.1:
 - P2.2:
 
@@ -947,6 +947,7 @@ Validated:
 - Manual VBS check: `--range-mode maxItems --max-items 5 --folders Inbox` emitted 5 mails, proving max-items mode still caps.
 - Implementation/package commit: `d118c035293e956e8b78109e12feebf7e0d3eb13`
 - Explicit `--range-mode` correction commit: `5c43fb741e2afe86a69c0ef93ad8c42e8efaf4b6`
+- Sidebar range input autosave correction commit: `cc6e7bf19aad7bbb53b4a9fb9bad4e97b8286be5`
 
 Known issues:
 - The other computer's count mismatch still needs validation with the new logs; inspect `process:close.stdout` for `FolderScan` and `DigestCap`.
