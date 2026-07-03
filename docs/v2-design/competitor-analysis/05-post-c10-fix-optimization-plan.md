@@ -919,12 +919,56 @@ Use this section to summarize completed task commits:
 - P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
 - User validation follow-up 3: `9f51ebfa22769394f84f3f2953ca723821ecc9fa` - fixes thread store disappearance after reload/re-analyze, fixed fetch folders setting, manual-confirm reason formatting/keyword detail, Outlook action chevron/focus best effort, and English-only draft fallback.
 - User validation follow-up 4: `f1a7466d904a05365a44c884d6d0390804905869` - restores registered `easyMail.folders`, rebuilds thread store directly from mail store on pull/load, keeps sidebar selection aligned after ignore, and switches generated draft controls immediately.
+- User validation follow-up 5: `PENDING_COMMIT_HASH` - improves Outlook quote trimming, Sent Items history paging, Inbox-only folder migration, and restore focus behavior.
 - P2.1:
 - P2.2:
 
 ---
 
 ## 8. Handover Log
+
+#### Handover - 2026-07-03 - Codex (User validation follow-up 5 complete)
+
+Status: Complete for locally verifiable fixes
+
+Changed:
+- Thread body delta now treats a direct Outlook header block starting with `From:` plus `Sent:` as quoted history even without an underline separator or `To`/`Subject`.
+- `collect-outlook-mails.vbs` now uses `SentOn` for `Sent Items` sorting, recent cutoff, and `More History` older-than filtering; other folders continue to use `ReceivedTime`.
+- Inbox-only saved folder settings are migrated back to the current default `Inbox;Sent Items` so older installs do not silently drop sent mail collection.
+- Restore/unignore now advances workbench focus the same way ignore does, so the ignored queue does not leave focus on a restored item.
+- Regenerated `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- `npm test`: pass, 307 tests.
+- `npm run package:vsix`: pass, regenerated `releases/easy-mail-0.2.0.vsix`.
+- `cscript //nologo scripts/collect-outlook-mails.vbs --help`: pass.
+
+Known issues:
+- Real Outlook pull count still needs user-side validation. This build fixes one concrete paging bug for `Sent Items`, but account selection, `recentHours`, `maxItems`, and folder scope can still explain count differences.
+- Quote trimming is still heuristic; if a real thread uses another quote header shape, add the minimal new pattern with a sample.
+
+Last safe stopping point:
+- Local fixes and package output are ready to commit.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+- `releases/easy-mail-0.2.0.vsix`
+- `scripts/collect-outlook-mails.vbs`
+- `src/lib/config-utils.ts`
+- `src/lib/thread-timeline.ts`
+- `src/lib/workbench-render.ts`
+- `src/test/config-utils.test.ts`
+- `src/test/message-handler.test.ts`
+- `src/test/thread-timeline.test.ts`
+- `src/test/workbench-render.test.ts`
+
+Commit:
+- Implementation/package commit: `PENDING_COMMIT_HASH`
+
+Next recommended step:
+- Install the regenerated VSIX and validate: thread timeline no longer repeats older mails after `From/Sent` header blocks; `More History` adds older Sent Items; saved Inbox-only folder setting displays `Inbox;Sent Items`; restore from ignored advances/highlights the next ignored item.
+
+---
 
 #### Handover - 2026-07-03 - Codex (User validation follow-up 4 complete)
 

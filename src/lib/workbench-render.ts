@@ -470,12 +470,12 @@ document.addEventListener('click', function(e) {
   if (a === 'composeMail') { var menu = t.closest('.draft-outlook-actions'); if (menu) menu.removeAttribute('open'); var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
   if (a === 'generateDraft') { var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var itemId3 = box3 ? box3.getAttribute('data-item-id') || '' : ''; post('generateDraft', { itemId: itemId3, sourceId: sourceId }); }
   if (a === 'ignore') { var reader = t.closest('.wb-reader'); var removedId = reader ? reader.getAttribute('data-id') || '' : t.getAttribute('data-mail-id') || ''; focusAfterRemoving(removedId); post('ignore', { mailId: t.getAttribute('data-mail-id') || '' }); }
-  if (a === 'unignore') post('unignore', { mailId: t.getAttribute('data-mail-id') || '' });
+  if (a === 'unignore') { var reader2 = t.closest('.wb-reader'); var restoredId = reader2 ? reader2.getAttribute('data-id') || '' : t.getAttribute('data-mail-id') || ''; focusAfterRemoving(restoredId); post('unignore', { mailId: t.getAttribute('data-mail-id') || '' }); }
   if (a === 'openInOutlook') post('openInOutlook', { mailId: t.getAttribute('data-mail-id') || '' });
   if (a === 'analyzeSelected') post('analyzeSelected', { mailIds: [t.getAttribute('data-mail-id') || ''] });
   if (a === 'analyzeThread') post('analyzeThread', { threadId: t.getAttribute('data-thread-id') || '' });
   if (a === 'ignoreThread') { var threadId = t.getAttribute('data-thread-id') || ''; focusAfterRemoving(threadId); post('ignoreThread', { threadId: threadId }); }
-  if (a === 'unignoreThread') post('unignoreThread', { threadId: t.getAttribute('data-thread-id') || '' });
+  if (a === 'unignoreThread') { var restoredThreadId = t.getAttribute('data-thread-id') || ''; focusAfterRemoving(restoredThreadId); post('unignoreThread', { threadId: restoredThreadId }); }
   if (a === 'openMeetingInOutlook') post('openMeetingInOutlook', { meetingId: t.getAttribute('data-meeting-id') || '' });
 });
 </script>

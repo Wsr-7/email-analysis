@@ -105,20 +105,23 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
     Fail "Outlook folder not found: " & folderPath
   End If
 
+  Dim timeProperty
+  timeProperty = FolderTimeProperty(folderPath)
+
   Dim items
   Set items = folder.Items
 
   If Trim(CStr(olderThan)) <> "" Then
     On Error Resume Next
     Dim restricted
-    Set restricted = items.Restrict("[ReceivedTime] < '" & FormatRestrictDate(ParseAnchorDate(olderThan)) & "'")
+    Set restricted = items.Restrict("[" & timeProperty & "] < '" & FormatRestrictDate(ParseAnchorDate(olderThan)) & "'")
     If Err.Number <> 0 Then
-      Fail "Unable to restrict Outlook folder by ReceivedTime: " & folderPath & ". " & Err.Description
+      Fail "Unable to restrict Outlook folder by " & timeProperty & ": " & folderPath & ". " & Err.Description
     End If
     On Error GoTo 0
     Set items = restricted
   End If
-  items.Sort "[ReceivedTime]", True
+  items.Sort "[" & timeProperty & "]", True
 
   Dim cutoffEnabled
   cutoffEnabled = (recentHours > 0)
@@ -142,7 +145,7 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
       On Error GoTo 0
       If Not item Is Nothing Then
         If TypeName(item) = "MailItem" Then
-          If (Not cutoffEnabled) Or item.ReceivedTime >= cutoff Then
+          If (Not cutoffEnabled) Or MailSortDate(item, folderPath) >= cutoff Then
             Dim record
             Set record = BuildMailRecord(item, folderPath, bodyChars, collectedCount + 1)
             AddRecordToArray collected, collectedCount, record
@@ -156,6 +159,14 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
     End If
   Next
 End Sub
+
+Function FolderTimeProperty(byVal folderPath)
+  If LCase(Trim(CStr(folderPath))) = "sent items" Then
+    FolderTimeProperty = "SentOn"
+  Else
+    FolderTimeProperty = "ReceivedTime"
+  End If
+End Function
 
 Function OlderThanForFolder(byVal mapText, byVal folderPath)
   OlderThanForFolder = ""
@@ -283,9 +294,9 @@ Function BuildMailRecord(byRef mail, byVal folderPath, byVal bodyChars, byVal re
   record.Add "subject", SafeString(mail.Subject)
   record.Add "senderName", SafeString(mail.SenderName)
   record.Add "senderEmail", SafeSenderEmail(mail)
-  record.Add "receivedTime", FormatDateValue(mail.ReceivedTime)
+  record.Add "receivedTime", FormatDateValue(MailSortDate(mail, folderPath))
   record.Add "sentTime", SafeDateValue(mail.SentOn)
-  record.Add "sortKey", Replace(FormatDateValue(mail.ReceivedTime), " ", "T")
+  record.Add "sortKey", Replace(FormatDateValue(MailSortDate(mail, folderPath)), " ", "T")
   record.Add "folderPath", folderPath
   record.Add "unread", LCase(CStr(CBool(mail.UnRead)))
   record.Add "importance", ImportanceLabel(mail.Importance)
@@ -297,6 +308,20 @@ Function BuildMailRecord(byRef mail, byVal folderPath, byVal bodyChars, byVal re
   record.Add "attachmentNames", SafeAttachmentNames(mail)
   record.Add "bodyExcerpt", TruncateText(SafeString(mail.Body), bodyChars)
   Set BuildMailRecord = record
+End Function
+
+Function MailSortDate(byRef mail, byVal folderPath)
+  On Error Resume Next
+  If FolderTimeProperty(folderPath) = "SentOn" Then
+    MailSortDate = mail.SentOn
+  Else
+    MailSortDate = mail.ReceivedTime
+  End If
+  If Err.Number <> 0 Then
+    Err.Clear
+    MailSortDate = mail.ReceivedTime
+  End If
+  On Error GoTo 0
 End Function
 
 Function SafeInternetMessageId(byRef mail)

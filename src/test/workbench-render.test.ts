@@ -282,6 +282,8 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("function focusAfterRemoving(id)"));
     assert.ok(html.includes("focusAfterRemoving(removedId); post('ignore'"));
     assert.ok(html.includes("focusAfterRemoving(threadId); post('ignoreThread'"));
+    assert.ok(html.includes("focusAfterRemoving(restoredId); post('unignore'"));
+    assert.ok(html.includes("focusAfterRemoving(restoredThreadId); post('unignoreThread'"));
   });
 
   it("switches generated draft controls from Generate to edit actions", () => {

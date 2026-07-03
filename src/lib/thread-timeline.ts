@@ -102,7 +102,7 @@ function startsOutlookHeaderBlock(lines: string[], startIndex: number): boolean 
     labels.add(label);
   }
 
-  return labels.has("sent") && (labels.has("to") || labels.has("subject"));
+  return labels.has("sent") || labels.has("to") || labels.has("subject");
 }
 
 function headerLabel(line: string): string {

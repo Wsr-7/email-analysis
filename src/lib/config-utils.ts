@@ -17,7 +17,8 @@ export function parseFolders(value: unknown, fallback: string[]): string[] {
 }
 
 export function normalizeMailFolders(value: unknown, fallback: string[]): string[] {
-  return parseFolders(value, fallback);
+  const folders = parseFolders(value, fallback);
+  return folders.length === 1 && folders[0]?.toLowerCase() === "inbox" ? fallback : folders;
 }
 
 export function mergeStringLists(a: string[], b: string[]): string[] {

@@ -193,7 +193,7 @@ describe("saveConfigFromMessage", () => {
     const ctx = stubContext();
     await saveConfigFromMessage(ctx, { config: { folders: "Inbox" }, silent: true });
     const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
-    assert.deepEqual(saved.folders, ["Inbox"]);
+    assert.deepEqual(saved.folders, ["Inbox", "Sent Items"]);
     assert.equal(Object.prototype.hasOwnProperty.call(saved, "fetchFolders"), false);
   });
 
