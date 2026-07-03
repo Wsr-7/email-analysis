@@ -871,6 +871,26 @@ Status:
 - Polish/Refine now show notification progress and completion messages.
 - Thread analysis prompts now explicitly require English translation for all natural-language JSON fields when `outputLanguage = en-US`.
 
+### Snapshot - 2026-07-03 - User validation follow-up 2
+
+Status:
+
+- Implemented local fixes for the latest user validation feedback.
+- Implementation commit: `59ae0e6f347a9e91be37440143f860a7f148ef72`.
+- Manual-confirm workbench rendering root cause was duplicate pending/blocked readers with the same `data-id`; pending now renders only auto-allowed mail.
+- Batch size selector now uses webview-local state and defaults to 5 instead of reading persisted VS Code `easyMail.analysisBatchSize`.
+- Timeline reply-chain extraction covers additional common separators (`On ... wrote:`, `在 ... 写道:`, underscore separators).
+- Outlook Actions now shows a dropdown chevron and closes after selecting Reply / Reply All / Forward.
+- Outlook open/compose scripts now attempt to bring Outlook to the foreground with `WScript.Shell.AppActivate`.
+- Thread analysis now performs an English translation fallback when an `en-US` result still contains CJK characters.
+- Category prompt boundaries for `mustHandleToday`, `waitingForMe`, and `followUp` were tightened.
+
+Known caution:
+
+- Outlook foreground behavior depends on Windows focus-stealing rules; `AppActivate` is best-effort and still needs manual confirmation.
+- Reply-chain trimming is pattern-based; if a real Outlook body uses another quote marker, add that marker to `extractReplyDelta`.
+- Multiple Outlook accounts causing cross-account collection remains P2 scope and is recorded as a todo.
+
 Current recommendation:
 
 1. Continue stabilization before any P2 work.
@@ -1017,6 +1037,46 @@ Needs manual confirmation:
 
 Next recommended step:
 - Stop coding until these manual checks are done. If any check fails, reopen only that specific failing path.
+
+#### Handover - 2026-07-03 - Codex (User validation follow-up 2 complete)
+
+Status: Complete for locally verifiable fixes
+
+Changed:
+- Fixed manual-confirm workbench display by rendering pending detail rows from `queue.allowed` only; blocked/manual-confirm rows no longer have a duplicate plain pending reader.
+- Sidebar pending queue/count now uses `queue.allowed`; blocked mail stays in blocked/manual-confirm.
+- Batch size selector now defaults to 5 and stores changes only in webview state, not global VS Code settings.
+- Added Outlook Actions chevron and closes the menu before posting compose actions.
+- Extended reply-chain trimming for common quoted-history separators.
+- Added best-effort Outlook foreground activation in `open-outlook-mail.vbs` and `compose-outlook-mail.vbs`.
+- Added thread-analysis translation fallback when `outputLanguage = en-US` but returned natural-language fields still contain CJK.
+- Tightened single-mail category prompt boundaries around `mustHandleToday`, `waitingForMe`, and `followUp`.
+- Rebuilt `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- `rtk npm run compile`
+- `rtk node --test out/test/app-analysis.test.js out/test/sidebar-render.test.js out/test/workbench-render.test.js out/test/thread-timeline.test.js out/test/thread-prompt-builder.test.js`
+- `rtk cscript.exe //nologo scripts/open-outlook-mail.vbs --help`
+- `rtk cscript.exe //nologo scripts/compose-outlook-mail.vbs --help`
+- `rtk npm test`
+- `rtk npm run package:vsix`
+
+Needs manual confirmation:
+- Real manual-confirm mail now shows reason and `Confirm and Analyze` in workbench.
+- Batch selector defaults to 5 after reinstall and selected value is respected immediately by Analyze.
+- Real thread bodies are trimmed enough for common Outlook quote markers; collect a sanitized body sample if not.
+- Outlook windows come to foreground reliably enough on this machine.
+- Follow-up / Waiting For Me / Must Handle Today categorization improves on the reported thread.
+- Chinese thread + English UI no longer produces mixed-language Thread Spotlight after fallback.
+
+P2 todo:
+- Multiple Outlook accounts can mix mail from a second account; handle this in P2 account scoping/account selector work.
+
+Commit:
+- Implementation: `59ae0e6f347a9e91be37440143f860a7f148ef72`
+
+Next recommended step:
+- Install the rebuilt VSIX and run the listed manual checks. Do not start P2 until these are confirmed or a single failing path is reopened.
 
 #### Handover - 2026-07-03 - Codex (P0.2 follow-up start)
 
