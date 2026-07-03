@@ -11,6 +11,7 @@ Set config = CreateObject("Scripting.Dictionary")
 config.CompareMode = 1
 config.Add "max-items", 50
 config.Add "recent-hours", 24
+config.Add "range-mode", "recentHours"
 config.Add "folders", "Inbox;Sent Items"
 config.Add "body-chars", 1500
 config.Add "output", ""
@@ -47,7 +48,7 @@ Sub ParseArgs(byVal cliArgs, byRef target)
     current = LCase(cliArgs(i))
 
     Select Case current
-      Case "--max-items", "--recent-hours", "--folders", "--body-chars", "--output", "--older-than-map"
+      Case "--max-items", "--recent-hours", "--range-mode", "--folders", "--body-chars", "--output", "--older-than-map"
         If i + 1 >= cliArgs.Count Then
           Fail "Missing value for argument: " & current
         End If
@@ -87,21 +88,21 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
     Dim folderPath
     folderPath = Trim(folderNames(idx))
     If folderPath <> "" Then
-      CollectFolderItems ns, folderPath, CLng(target("max-items")), CLng(target("recent-hours")), CLng(target("body-chars")), OlderThanForFolder(target("older-than-map"), folderPath), collected, collectedCount
+      CollectFolderItems ns, folderPath, CStr(target("range-mode")), CLng(target("max-items")), CLng(target("recent-hours")), CLng(target("body-chars")), OlderThanForFolder(target("older-than-map"), folderPath), collected, collectedCount
     End If
   Next
 
   Dim beforeGlobalCap
   beforeGlobalCap = collectedCount
   SortMailRecords collected, collectedCount
-  If CLng(target("recent-hours")) <= 0 And collectedCount > CLng(target("max-items")) Then
+  If IsMaxItemsMode(target("range-mode")) And collectedCount > CLng(target("max-items")) Then
     collectedCount = CLng(target("max-items"))
   End If
-  WScript.Echo "DigestCap: collected=" & beforeGlobalCap & "; emitted=" & collectedCount & "; maxItems=" & target("max-items")
+  WScript.Echo "DigestCap: mode=" & target("range-mode") & "; collected=" & beforeGlobalCap & "; emitted=" & collectedCount & "; maxItems=" & target("max-items")
   WriteDigest outputPath, target, collected, collectedCount
 End Sub
 
-Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentHours, byVal bodyChars, byVal olderThan, byRef collected, byRef collectedCount)
+Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxItems, byVal recentHours, byVal bodyChars, byVal olderThan, byRef collected, byRef collectedCount)
   Dim folder
   Set folder = ResolveFolder(ns, folderPath)
   If folder Is Nothing Then
@@ -131,7 +132,7 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
   items.Sort "[" & timeProperty & "]", True
 
   Dim cutoffEnabled
-  cutoffEnabled = (recentHours > 0)
+  cutoffEnabled = IsRecentHoursMode(rangeMode)
   Dim cutoff
   If cutoffEnabled Then
     cutoff = DateAdd("h", -recentHours, Now)
@@ -142,7 +143,7 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
   Dim addedInFolder
   addedInFolder = 0
   Dim capEnabled
-  capEnabled = (recentHours <= 0)
+  capEnabled = IsMaxItemsMode(rangeMode)
 
   Dim i
   For i = 1 To items.Count
@@ -170,8 +171,16 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
       End If
     End If
   Next
-  WScript.Echo "FolderScan: folder=" & folderPath & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; added=" & addedInFolder & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
+  WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; added=" & addedInFolder & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
 End Sub
+
+Function IsRecentHoursMode(byVal rangeMode)
+  IsRecentHoursMode = (LCase(Trim(CStr(rangeMode))) = "recenthours")
+End Function
+
+Function IsMaxItemsMode(byVal rangeMode)
+  IsMaxItemsMode = Not IsRecentHoursMode(rangeMode)
+End Function
 
 Function FolderTimeProperty(byVal folderPath)
   If LCase(Trim(CStr(folderPath))) = "sent items" Then
@@ -548,7 +557,7 @@ Sub WriteDigest(byVal outputPath, byRef target, byRef records, byVal recordCount
   Dim content
   content = "# Outlook Mail Digest" & vbCrLf & vbCrLf
   content = content & "GeneratedAt: " & FormatDateValue(Now) & vbCrLf
-  content = content & "RangeMode: RecentHours" & vbCrLf
+  content = content & "RangeMode: " & target("range-mode") & vbCrLf
   content = content & "RecentHours: " & target("recent-hours") & vbCrLf
   content = content & "MaxItems: " & target("max-items") & vbCrLf
   content = content & "Folders:" & vbCrLf
@@ -725,6 +734,7 @@ Sub PrintUsage()
   WScript.Echo "  cscript //nologo collect-outlook-mails.vbs [options]"
   WScript.Echo ""
   WScript.Echo "Options:"
+  WScript.Echo "  --range-mode <mode>  recentHours or maxItems."
   WScript.Echo "  --max-items <n>      Maximum mails to include."
   WScript.Echo "  --recent-hours <n>   Only include mails newer than n hours."
   WScript.Echo "  --folders <a;b;c>    Outlook folders to scan."
