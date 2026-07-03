@@ -918,7 +918,7 @@ Use this section to summarize completed task commits:
 - P1.4: `e0100de91495373f36243e2a2898c86267d34450`; stabilization follow-up `72970ebb038e3cf8aa64f52b622af6cb78ba760a`; remaining workflow follow-up `62f5097d2a19515d4790e6e020873391f4186300`
 - P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
 - User validation follow-up 3: `9f51ebfa22769394f84f3f2953ca723821ecc9fa` - fixes thread store disappearance after reload/re-analyze, fixed fetch folders setting, manual-confirm reason formatting/keyword detail, Outlook action chevron/focus best effort, and English-only draft fallback.
-- User validation follow-up 4: `PENDING_COMMIT_HASH` - restores registered `easyMail.folders`, rebuilds thread store directly from mail store on pull/load, keeps sidebar selection aligned after ignore, and switches generated draft controls immediately.
+- User validation follow-up 4: `f1a7466d904a05365a44c884d6d0390804905869` - restores registered `easyMail.folders`, rebuilds thread store directly from mail store on pull/load, keeps sidebar selection aligned after ignore, and switches generated draft controls immediately.
 - P2.1:
 - P2.2:
 
@@ -967,7 +967,7 @@ Uncommitted changes / dirty files:
 - `src/test/workbench-render.test.ts`
 
 Commit:
-- Implementation/package commit: `PENDING_COMMIT_HASH`
+- Implementation/package commit: `f1a7466d904a05365a44c884d6d0390804905869`
 
 Next recommended step:
 - Install the regenerated VSIX and first validate: `easyMail.folders` no longer throws setting errors; pull mail creates nonzero thread rows when the pulled store has multi-message conversations; ignore keeps sidebar/workbench aligned; Generate Draft swaps buttons after text appears.
