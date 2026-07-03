@@ -16,9 +16,10 @@ export function parseFolders(value: unknown, fallback: string[]): string[] {
   return parsed.length ? parsed : fallback;
 }
 
+export const REQUIRED_MAIL_FOLDERS = ["Inbox", "Sent Items"] as const;
+
 export function normalizeMailFolders(value: unknown, fallback: string[]): string[] {
-  const folders = parseFolders(value, fallback);
-  return folders.length === 1 && folders[0]?.toLowerCase() === "inbox" ? ["Inbox", "Sent Items"] : folders;
+  return mergeStringLists([...REQUIRED_MAIL_FOLDERS], parseFolders(value, fallback));
 }
 
 export function mergeStringLists(a: string[], b: string[]): string[] {

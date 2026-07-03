@@ -131,6 +131,75 @@ describe("analyzeBatchCore", () => {
     }
   });
 
+  it("translates generated draft replies to English when analysis returns Chinese draft fields", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [mail(1)]
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+
+      const provider = new MockProvider({
+        responses: [
+          JSON.stringify({
+            generatedAt: "",
+            overview: {},
+            items: [{
+              mailId: "mail-001",
+              category: "waitingForMe",
+              priority: "P1",
+              subject: "Subject 1",
+              sender: "sender1@example.com",
+              receivedTime: "2026-07-02 09:01:00",
+              summary: "Needs reply.",
+              reason: "Asked for confirmation.",
+              suggestedAction: "Reply.",
+              draftReply: "您好，我会确认。",
+              draftReplyParts: { GREETING: "您好", MAIN_MESSAGE: "我会确认。" },
+              confidence: 0.9,
+              needsOriginalMailCheck: false
+            }]
+          }),
+          JSON.stringify({
+            items: [{
+              mailId: "mail-001",
+              draftReply: "Hi, I will confirm.",
+              draftReplyParts: { GREETING: "Hi,", MAIN_MESSAGE: "I will confirm." }
+            }]
+          })
+        ]
+      });
+
+      await analyzeBatchCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({
+          analysisBatchSize: 5,
+          autoAnalyzeMaxClassificationLevel: 2,
+          modelFamily: "mock-model",
+          outputLanguage: "en-US"
+        }),
+        log: async () => {},
+        availableModelsCache: null
+      });
+
+      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
+      assert.equal(result.items[0].draftReply, "Hi, I will confirm.");
+      assert.equal(result.items[0].draftReplyParts?.MAIN_MESSAGE, "I will confirm.");
+      assert.equal(provider.prompts.length, 2);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
   it("translates English thread analysis fallback when model returns Chinese fields", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {

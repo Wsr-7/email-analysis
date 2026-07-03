@@ -557,6 +557,7 @@ let currentQueue = prev.currentQueue || '${escapeAttr(defaultQueue)}';
 applyQueue(currentQueue, false);
 if (prev.settingsOpen) { document.getElementById('settingsPanel').hidden = false; }
 if (prev.batchSelect) { document.getElementById('batchSelect').value = prev.batchSelect; }
+normalizeFetchFoldersInput();
 
 function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, extra || {})); }
 
@@ -632,6 +633,7 @@ for (var i = 0; i < configControlIds.length; i++) {
 function saveConfig(keepSettingsOpen, silent) {
   var rangeMode = document.getElementById('rangeMode').value;
   var rangeValue = document.getElementById('rangeValue');
+  var folders = normalizeFetchFoldersInput();
   post('saveConfig', {
     silent: silent === true,
     config: {
@@ -639,11 +641,32 @@ function saveConfig(keepSettingsOpen, silent) {
       outputLanguage: '${escapeAttr(locale)}',
       recentHours: rangeMode === 'recentHours' ? rangeValue.value : undefined,
       maxItems: rangeMode === 'maxItems' ? rangeValue.value : undefined,
-      folders: document.getElementById('folders').value,
+      folders: folders,
       modelFamily: document.getElementById('modelFamily').value,
       autoAnalyzeMaxClassificationLevel: document.getElementById('autoAnalyzeMaxClassificationLevel').value
     }
   });
+}
+
+function normalizeFetchFoldersInput() {
+  var input = document.getElementById('folders');
+  if (!input) return 'Inbox;Sent Items';
+  var required = ['Inbox', 'Sent Items'];
+  var seen = {};
+  var merged = [];
+  function addFolder(value) {
+    var folder = String(value || '').trim();
+    if (!folder) return;
+    var key = folder.toLowerCase();
+    if (seen[key]) return;
+    seen[key] = true;
+    merged.push(folder);
+  }
+  for (var i = 0; i < required.length; i++) addFolder(required[i]);
+  var parts = String(input.value || '').split(';');
+  for (var j = 0; j < parts.length; j++) addFolder(parts[j]);
+  input.value = merged.join(';');
+  return input.value;
 }
 
 function confirmClear() {

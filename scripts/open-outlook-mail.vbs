@@ -74,7 +74,17 @@ Sub OpenOutlookMail(byVal entryIdValue, byVal storeIdValue)
   End If
 
   item.Display
+  ActivateOutlookItem item
   BringOutlookToFront
+End Sub
+
+Sub ActivateOutlookItem(ByVal item)
+  On Error Resume Next
+  Dim inspector
+  Set inspector = item.GetInspector
+  inspector.Activate
+  item.Activate
+  On Error GoTo 0
 End Sub
 
 Sub BringOutlookToFront()

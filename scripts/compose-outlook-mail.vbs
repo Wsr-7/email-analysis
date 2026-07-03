@@ -155,7 +155,17 @@ Sub ComposeOutlookMail(ByVal entryIdValue, ByVal storeIdValue, ByVal composeMode
     On Error GoTo 0
   End If
 
+  ActivateOutlookItem compose
   BringOutlookToFront
+End Sub
+
+Sub ActivateOutlookItem(ByVal item)
+  On Error Resume Next
+  Dim inspector
+  Set inspector = item.GetInspector
+  inspector.Activate
+  item.Activate
+  On Error GoTo 0
 End Sub
 
 Sub BringOutlookToFront()

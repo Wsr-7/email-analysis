@@ -325,11 +325,14 @@ export async function saveConfigFromMessage(
 
   const current = await ctx.readConfig();
   const patch = message.config as Record<string, unknown>;
+  const folders = Object.prototype.hasOwnProperty.call(patch, "folders")
+    ? normalizeMailFolders(patch.folders, current.folders || ["Inbox", "Sent Items"])
+    : normalizeMailFolders(current.folders, ["Inbox", "Sent Items"]);
   const next = {
     rangeMode: Object.prototype.hasOwnProperty.call(patch, "rangeMode") ? (patch.rangeMode === "maxItems" ? "maxItems" : "recentHours") : current.rangeMode,
     recentHours: Object.prototype.hasOwnProperty.call(patch, "recentHours") ? positiveNumber(patch.recentHours, current.recentHours || 24) : current.recentHours,
     maxItems: Object.prototype.hasOwnProperty.call(patch, "maxItems") ? positiveNumber(patch.maxItems, current.maxItems || 50) : current.maxItems,
-    folders: Object.prototype.hasOwnProperty.call(patch, "folders") ? normalizeMailFolders(patch.folders, current.folders || ["Inbox", "Sent Items"]) : normalizeMailFolders(current.folders, ["Inbox", "Sent Items"]),
+    fetchFolders: folders,
     bodyExcerptChars: Object.prototype.hasOwnProperty.call(patch, "bodyExcerptChars") ? positiveNumber(patch.bodyExcerptChars, current.bodyExcerptChars || 1500) : current.bodyExcerptChars,
     outputLanguage: Object.prototype.hasOwnProperty.call(patch, "outputLanguage") ? (patch.outputLanguage === "zh-CN" ? "zh-CN" : "en-US") : current.outputLanguage,
     modelFamily: Object.prototype.hasOwnProperty.call(patch, "modelFamily") ? String(patch.modelFamily || current.modelFamily || "gpt-5.4").trim() : current.modelFamily,

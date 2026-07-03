@@ -917,12 +917,69 @@ Use this section to summarize completed task commits:
 - P1.3: `bcafc01`
 - P1.4: `e0100de91495373f36243e2a2898c86267d34450`; stabilization follow-up `72970ebb038e3cf8aa64f52b622af6cb78ba760a`; remaining workflow follow-up `62f5097d2a19515d4790e6e020873391f4186300`
 - P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
+- User validation follow-up 3: `b2ca90670a778d7536db6273e1ea50432d95a16a` - fixes thread store disappearance after reload/re-analyze, fixed fetch folders setting, manual-confirm reason formatting/keyword detail, Outlook action chevron/focus best effort, and English-only draft fallback.
 - P2.1:
 - P2.2:
 
 ---
 
 ## 8. Handover Log
+
+#### Handover - 2026-07-03 - Codex (User validation follow-up 3 complete)
+
+Status: Complete for locally verifiable fixes
+
+Changed:
+- Repaired thread visibility after reload/re-analyze by rebuilding/merging thread store from the current mail store in `loadState` and no longer destructively pruning thread store there.
+- Fixed fetch folder handling: `Inbox` and `Sent Items` are always included, sidebar save normalizes the input, VS Code setting key is now `easyMail.fetchFolders`, and old `easyMail.folders` is read only as a compatibility fallback.
+- Manual-confirm workbench reasons now render one reason per line; default keyword classification reasons now include the matched keyword and old `keyword match` cache entries are refreshed.
+- Outlook Actions chevron is now CSS-drawn instead of a tiny text glyph; Outlook open/compose scripts now activate the current inspector before best-effort `AppActivate`.
+- Added English-only draft fallback for batch analysis draft fields and for Generate/Polish/Refine draft flows when model output still contains CJK text.
+- Regenerated `releases/easy-mail-0.2.0.vsix`.
+
+Validated:
+- `npm test`: pass, 304 tests.
+- `npm run package:vsix`: pass, regenerated `releases/easy-mail-0.2.0.vsix`.
+- `cscript //nologo scripts/open-outlook-mail.vbs --help`: pass.
+- `cscript //nologo scripts/compose-outlook-mail.vbs --help`: pass.
+
+Known issues:
+- Windows/Outlook foreground activation remains best effort; Windows can still prevent a background script from stealing focus.
+- Manual user validation is still needed for real Outlook foreground behavior, real Thread Spotlight visibility after reinstall, and real English-only draft output from Copilot.
+- Existing user settings may still contain the old `easyMail.folders`; the extension now reads it as fallback but writes `easyMail.fetchFolders`.
+
+Last safe stopping point:
+- All local source changes and package output for this follow-up are ready to commit.
+
+Uncommitted changes / dirty files:
+- `docs/v2-design/competitor-analysis/05-post-c10-fix-optimization-plan.md`
+- `package.json`
+- `releases/easy-mail-0.2.0.vsix`
+- `scripts/compose-outlook-mail.vbs`
+- `scripts/open-outlook-mail.vbs`
+- `src/extension.ts`
+- `src/lib/app-analysis.ts`
+- `src/lib/classification.ts`
+- `src/lib/config-utils.ts`
+- `src/lib/dashboard-labels.ts`
+- `src/lib/dashboard-render.ts`
+- `src/lib/message-handler.ts`
+- `src/lib/sidebar-render.ts`
+- `src/lib/workbench-render.ts`
+- `src/test/app-analysis.test.ts`
+- `src/test/classification.test.ts`
+- `src/test/config-utils.test.ts`
+- `src/test/message-handler.test.ts`
+- `src/test/sidebar-render.test.ts`
+- `src/test/workbench-render.test.ts`
+
+Commit:
+- Implementation/package commit: `b2ca90670a778d7536db6273e1ea50432d95a16a`
+
+Next recommended step:
+- Install the regenerated VSIX and manually validate: thread count/Thread Spotlight after pull/analyze/reload; real manual-confirm workbench reason/button; Outlook foreground behavior; English-only draft and Thread Spotlight output.
+
+---
 
 #### Handover - 2026-07-03 - Codex (Stabilization follow-up complete)
 

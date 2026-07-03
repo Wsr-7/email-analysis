@@ -23,6 +23,11 @@ function confirmAnalyzeButton(mailId: string, decision: SecurityGateDecisionResu
   return `<button class="wb-btn" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.pending.confirmAnalyze)}</button>`;
 }
 
+function renderGateReasons(title: string, reasons: string[]): string {
+  const items = reasons.length ? reasons : ["-"];
+  return `<div class="wb-field wb-warn"><strong>${escapeHtml(title)}:</strong><div class="wb-gate-reasons">${items.map((reason) => `<div class="wb-gate-reason">${escapeHtml(reason)}</div>`).join("")}</div></div>`;
+}
+
 function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabels, extra: string, extraActions = "", classifications?: ReturnType<typeof normalizeClassificationCache>): string {
   const toHtml = item.to ? `<div class="wb-field"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(item.to)}</div>` : "";
   const ccHtml = item.cc ? `<div class="wb-field"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(item.cc)}</div>` : "";
@@ -244,7 +249,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     const gateDecision = securityDecisions.get(item.mailId);
     const gateTitle = gateDecision?.decision === "manual_confirm" ? labels.pending.blockedTitle : labels.pending.gateBlocked;
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>
-      <div class="wb-field wb-warn"><strong>${escapeHtml(gateTitle)}:</strong> ${escapeHtml(gateDecision?.reasons.join("; ") || "-")}</div>`;
+      ${renderGateReasons(gateTitle, gateDecision?.reasons || [])}`;
     detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="blocked">${renderMailDetail(item, "blocked", labels, extra, confirmAnalyzeButton(item.mailId, gateDecision, labels), classifications)}</div>`);
   }
 
@@ -302,6 +307,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-meta-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); margin-bottom: 12px; }
   .wb-field { font-size: 12px; line-height: 1.6; }
   .wb-warn { color: var(--vscode-errorForeground, #f48771); }
+  .wb-gate-reasons { display: grid; gap: 2px; margin-top: 2px; }
   .wb-section { margin-bottom: 12px; }
   .wb-section-body { font-size: 13px; line-height: 1.6; padding: 4px 0; opacity: 0.9; }
   .wb-body { font-size: 12px; line-height: 1.7; white-space: pre-wrap; padding: 12px 14px; margin: 8px 0; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; border-left: 3px solid var(--vscode-focusBorder, #007fd4); max-height: 400px; overflow-y: auto; }
@@ -369,7 +375,8 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .draft-outlook-actions { position: relative; }
   .draft-outlook-actions > summary { list-style: none; cursor: pointer; }
   .draft-outlook-actions > summary::-webkit-details-marker { display: none; }
-  .outlook-chevron { font-size: 11px; opacity: 0.8; }
+  .outlook-chevron { display: inline-block; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); margin: -3px 1px 0 2px; opacity: 0.9; }
+  .draft-outlook-actions[open] .outlook-chevron { transform: rotate(225deg); margin-top: 3px; }
   .draft-outlook-menu { position: absolute; z-index: 10; display: flex; flex-direction: column; gap: 4px; min-width: 150px; margin-top: 6px; padding: 6px; border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.25)); border-radius: 4px; background: var(--vscode-dropdown-background, var(--vscode-editor-background, #1e1e1e)); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
   .draft-outlook-actions:not([open]) .draft-outlook-menu { display: none; }
   .copy-icon-button { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; padding: 0; border-radius: 4px; background: var(--vscode-button-secondaryBackground, #3a3d41); color: var(--vscode-button-secondaryForeground, #fff); border: none; }

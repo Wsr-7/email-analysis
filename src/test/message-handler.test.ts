@@ -181,11 +181,11 @@ describe("saveConfigFromMessage", () => {
     assert.equal((ctx.showInfo as any).mock.callCount(), 0);
   });
 
-  it("migrates old Inbox-only folder settings when saving", async () => {
+  it("saves fetch folders with fixed default folders when saving", async () => {
     const ctx = stubContext();
     await saveConfigFromMessage(ctx, { config: { folders: "Inbox" }, silent: true });
     const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
-    assert.deepEqual(saved.folders, ["Inbox", "Sent Items"]);
+    assert.deepEqual(saved.fetchFolders, ["Inbox", "Sent Items"]);
   });
 
   it("saves classification threshold labels as levels", async () => {

@@ -135,8 +135,9 @@ export async function analyzeBatchCore(
     replyTemplate
   );
   normalized.language = getLocaleFromConfig(config);
+  const draftNormalized = await ensureEnglishDraftReplies(ctx, normalized, configuredModel);
   const merged = pruneAnalysisResult(
-    mergeAnalysisResults(currentAnalysis, normalized, allowedCategoryIds(promptConfig)),
+    mergeAnalysisResults(currentAnalysis, draftNormalized, allowedCategoryIds(promptConfig)),
     Number(config.analysisRetentionDays || 7),
     allowedCategoryIds(promptConfig)
   );
@@ -217,8 +218,67 @@ function emptyAnalysisResult(language: Locale) {
   };
 }
 
+async function ensureEnglishDraftReplies(
+  ctx: AnalysisContext,
+  analysis: ReturnType<typeof normalizeAnalysis>,
+  configuredModel: string
+): Promise<ReturnType<typeof normalizeAnalysis>> {
+  const items = (analysis.items || []).filter((item) => containsCjk(`${item.draftReply || ""}\n${JSON.stringify(item.draftReplyParts || {})}`));
+  if (!items.length) {
+    return analysis;
+  }
+  const prompt = [
+    "Translate only the reply draft fields to English.",
+    "Return strict JSON only in this shape: {\"items\":[{\"mailId\":\"...\",\"draftReply\":\"...\",\"draftReplyParts\":{\"GREETING\":\"...\",\"MAIN_MESSAGE\":\"...\",\"REQUESTED_ACTION\":\"...\",\"CLOSING\":\"...\"}}]}.",
+    "Do not change categories, summaries, reasons, suggested actions, subjects, senders, or mail ids.",
+    "The translated draftReply and draftReplyParts must contain English text only and must not contain Chinese characters.",
+    "",
+    JSON.stringify({
+      items: items.map((item) => ({
+        mailId: item.mailId,
+        draftReply: item.draftReply,
+        draftReplyParts: item.draftReplyParts || {}
+      }))
+    }, null, 2)
+  ].join("\n");
+  try {
+    const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "draftTranslate");
+    return applyDraftReplyTranslations(analysis, JSON.parse(stripCodeFence(raw.trim())));
+  } catch (error) {
+    await ctx.log("draftTranslate:failed", { error: error instanceof Error ? error.message : String(error), items: items.map((item) => item.mailId) });
+    return analysis;
+  }
+}
+
+function applyDraftReplyTranslations(analysis: ReturnType<typeof normalizeAnalysis>, translated: unknown): ReturnType<typeof normalizeAnalysis> {
+  if (!translated || typeof translated !== "object" || !Array.isArray((translated as { items?: unknown[] }).items)) {
+    return analysis;
+  }
+  const byId = new Map((translated as { items: Array<Record<string, unknown>> }).items.map((item) => [String(item.mailId || ""), item]));
+  return {
+    ...analysis,
+    items: analysis.items.map((item) => {
+      const translatedItem = byId.get(item.mailId);
+      if (!translatedItem) return item;
+      const draftReply = typeof translatedItem.draftReply === "string" && translatedItem.draftReply.trim()
+        ? translatedItem.draftReply.trim()
+        : item.draftReply;
+      const rawParts = translatedItem.draftReplyParts;
+      const draftReplyParts = rawParts && typeof rawParts === "object" ? {
+        ...item.draftReplyParts,
+        ...Object.fromEntries(Object.entries(rawParts as Record<string, unknown>).filter(([, value]) => typeof value === "string"))
+      } : item.draftReplyParts;
+      return { ...item, draftReply, draftReplyParts };
+    })
+  };
+}
+
+function containsCjk(value: string): boolean {
+  return /[\u3400-\u9fff]/.test(value);
+}
+
 function threadAnalysisContainsCjk(threads: ReturnType<typeof parseThreadAnalysisJson>): boolean {
-  return /[\u3400-\u9fff]/.test(JSON.stringify((threads.items || []).map((item) => ({
+  return containsCjk(JSON.stringify((threads.items || []).map((item) => ({
     oneLineSummary: item.oneLineSummary,
     currentStatus: item.currentStatus,
     keyDecisions: item.keyDecisions,

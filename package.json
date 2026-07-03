@@ -80,7 +80,7 @@
           "minimum": 1,
           "description": "Maximum number of mails to pull."
         },
-        "easyMail.folders": {
+        "easyMail.fetchFolders": {
           "type": "array",
           "order": 4,
           "items": {
@@ -90,7 +90,7 @@
             "Inbox",
             "Sent Items"
           ],
-          "description": "Outlook folders to scan."
+          "description": "Fetch folders to scan. Inbox and Sent Items are always included."
         },
         "easyMail.bodyExcerptChars": {
           "type": "number",

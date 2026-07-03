@@ -220,6 +220,8 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("debounce"));
     assert.ok(html.includes("saveConfig"));
     assert.ok(html.includes("autoSave"));
+    assert.ok(html.includes("normalizeFetchFoldersInput"));
+    assert.ok(html.includes("Fetch Folders"));
   });
 
   it("renders compact rows for ignored items without action buttons", () => {

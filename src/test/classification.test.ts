@@ -90,3 +90,23 @@ test("buildQueueState accepts classification level labels from settings", () => 
   assert.deepEqual(queue.allowed.map((item) => item.mailId).sort(), ["mail-1", "mail-3"]);
   assert.deepEqual(queue.blocked.map((item) => item.mailId), ["mail-2"]);
 });
+
+test("classification keyword reasons include the matched keyword", () => {
+  const cache = ensureClassifications(mails, normalizeClassificationCache({}));
+  assert.equal(cache.items.find((item) => item.mailId === "mail-2")?.reason, "keyword match: high registered");
+});
+
+test("ensureClassifications refreshes old default keyword reasons", () => {
+  const cache = ensureClassifications(mails, normalizeClassificationCache({
+    items: [{
+      mailId: "mail-2",
+      level: 3,
+      label: "HIGH REGISTERED",
+      source: "default",
+      reason: "keyword match",
+      updatedAt: ""
+    }]
+  }));
+
+  assert.equal(cache.items.find((item) => item.mailId === "mail-2")?.reason, "keyword match: high registered");
+});
