@@ -919,7 +919,7 @@ Use this section to summarize completed task commits:
 - P1.5: `605a75d`; follow-up `968f9acaa535c4d37a6ac6ad77a3e13caca88f17`
 - User validation follow-up 3: `9f51ebfa22769394f84f3f2953ca723821ecc9fa` - fixes thread store disappearance after reload/re-analyze, fixed fetch folders setting, manual-confirm reason formatting/keyword detail, Outlook action chevron/focus best effort, and English-only draft fallback.
 - User validation follow-up 4: `f1a7466d904a05365a44c884d6d0390804905869` - restores registered `easyMail.folders`, rebuilds thread store directly from mail store on pull/load, keeps sidebar selection aligned after ignore, and switches generated draft controls immediately.
-- User validation follow-up 5: `PENDING_COMMIT_HASH` - improves Outlook quote trimming, Sent Items history paging, Inbox-only folder migration, and restore focus behavior.
+- User validation follow-up 5: `886ed9005c1e8707b0706765e5cf81aef40a16f3` - improves Outlook quote trimming, Sent Items history paging, Inbox-only folder migration, and restore focus behavior.
 - P2.1:
 - P2.2:
 
@@ -963,7 +963,7 @@ Uncommitted changes / dirty files:
 - `src/test/workbench-render.test.ts`
 
 Commit:
-- Implementation/package commit: `PENDING_COMMIT_HASH`
+- Implementation/package commit: `886ed9005c1e8707b0706765e5cf81aef40a16f3`
 
 Next recommended step:
 - Install the regenerated VSIX and validate: thread timeline no longer repeats older mails after `From/Sent` header blocks; `More History` adds older Sent Items; saved Inbox-only folder setting displays `Inbox;Sent Items`; restore from ignored advances/highlights the next ignored item.
