@@ -186,7 +186,7 @@ export function renderRangeValueControl(config: Record<string, unknown>, labels:
   const rangeMode = config.rangeMode === "maxItems" ? "maxItems" : "recentHours";
   const label = rangeMode === "maxItems" ? labels.settings.maxItems : labels.settings.recentHours;
   const value = rangeMode === "maxItems" ? String(config.maxItems || 50) : String(config.recentHours || 24);
-  return `<label>${escapeHtml(label)}
+  return `<label><span id="rangeValueLabel">${escapeHtml(label)}</span>
         <input id="rangeValue" type="number" min="1" value="${escapeAttr(value)}" />
       </label>`;
 }

@@ -20,7 +20,7 @@ export function runProcess(
       }
       settled = true;
       child.kill();
-      onEvent?.("timeout", { command, elapsedMs: Date.now() - startedAt, stdoutLength: stdout.length, stderrLength: stderr.length });
+      onEvent?.("timeout", processEvent(command, startedAt, stdout, stderr));
       reject(new Error(`${command} timed out after ${String(timeoutMs)}ms. ${stderr || stdout}`.trim()));
     }, timeoutMs);
     child.stdout.on("data", (chunk: Buffer) => {
@@ -35,7 +35,7 @@ export function runProcess(
       }
       settled = true;
       clearTimeout(timeout);
-      onEvent?.("error", { command, elapsedMs: Date.now() - startedAt, error: formatError(error), stdoutLength: stdout.length, stderrLength: stderr.length });
+      onEvent?.("error", { ...processEvent(command, startedAt, stdout, stderr), error: formatError(error) });
       reject(error);
     });
     child.on("close", (code) => {
@@ -44,7 +44,7 @@ export function runProcess(
       }
       settled = true;
       clearTimeout(timeout);
-      onEvent?.("close", { command, code, elapsedMs: Date.now() - startedAt, stdoutLength: stdout.length, stderrLength: stderr.length });
+      onEvent?.("close", { ...processEvent(command, startedAt, stdout, stderr), code });
       if (code === 0) {
         resolve();
       } else {
@@ -52,6 +52,30 @@ export function runProcess(
       }
     });
   });
+}
+
+function processEvent(command: string, startedAt: number, stdout: string, stderr: string): Record<string, unknown> {
+  return {
+    command,
+    elapsedMs: Date.now() - startedAt,
+    stdoutLength: stdout.length,
+    stderrLength: stderr.length,
+    ...snippetField("stdout", stdout),
+    ...snippetField("stderr", stderr)
+  };
+}
+
+function snippetField(name: string, value: string): Record<string, string> {
+  const snippet = summarizeProcessOutput(value);
+  return snippet ? { [name]: snippet } : {};
+}
+
+function summarizeProcessOutput(value: string): string {
+  const normalized = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!normalized) {
+    return "";
+  }
+  return normalized.length > 2000 ? `${normalized.slice(0, 2000)}...` : normalized;
 }
 
 export function formatElapsedSeconds(elapsedMs: number): string {

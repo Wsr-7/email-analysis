@@ -532,9 +532,6 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
           </select>
         </label>
         ${renderRangeValueControl(config, labels)}
-        <label>${escapeHtml(labels.settings.folders)}
-          <input id="folders" value="${escapeAttr(Array.isArray(config.folders) ? config.folders.join(";") : "Inbox;Sent Items")}" />
-        </label>
         <label><span>${escapeHtml(labels.settings.modelFamily)} <button class="sb-bottom-btn" onclick="post('loadModels')" style="display:inline;padding:1px 6px;">${escapeHtml(labels.toolbar.loadModels)}</button></span>
           <select id="modelFamily">${modelOptions}</select>
         </label>
@@ -632,7 +629,15 @@ document.getElementById('batchSelect').addEventListener('change', function(e) {
   vscode.setState(Object.assign({}, vscode.getState() || {}, { batchSelect: e.target.value }));
 });
 
-var configControlIds = ['rangeMode', 'rangeValue', 'folders', 'modelFamily', 'autoAnalyzeMaxClassificationLevel'];
+var rangeValues = {
+  recentHours: '${escapeAttr(String(config.recentHours || 24))}',
+  maxItems: '${escapeAttr(String(config.maxItems || 50))}'
+};
+var rangeLabels = {
+  recentHours: '${escapeAttr(labels.settings.recentHours)}',
+  maxItems: '${escapeAttr(labels.settings.maxItems)}'
+};
+var configControlIds = ['rangeMode', 'rangeValue', 'modelFamily', 'autoAnalyzeMaxClassificationLevel'];
 var autoSave = debounce(function() { saveConfig(true, false); }, 450);
 for (var i = 0; i < configControlIds.length; i++) {
   var el = document.getElementById(configControlIds[i]);
@@ -640,10 +645,16 @@ for (var i = 0; i < configControlIds.length; i++) {
   el.addEventListener('change', autoSave);
   if (el.tagName === 'INPUT') el.addEventListener('input', autoSave);
 }
+document.getElementById('rangeMode').addEventListener('change', function(e) {
+  var mode = e.target.value === 'maxItems' ? 'maxItems' : 'recentHours';
+  document.getElementById('rangeValueLabel').textContent = rangeLabels[mode];
+  document.getElementById('rangeValue').value = rangeValues[mode];
+});
 
 function saveConfig(keepSettingsOpen, silent) {
   var rangeMode = document.getElementById('rangeMode').value;
   var rangeValue = document.getElementById('rangeValue');
+  rangeValues[rangeMode] = rangeValue.value;
   post('saveConfig', {
     silent: silent === true,
     config: {
@@ -651,7 +662,6 @@ function saveConfig(keepSettingsOpen, silent) {
       outputLanguage: '${escapeAttr(locale)}',
       recentHours: rangeMode === 'recentHours' ? rangeValue.value : undefined,
       maxItems: rangeMode === 'maxItems' ? rangeValue.value : undefined,
-      folders: document.getElementById('folders').value,
       modelFamily: document.getElementById('modelFamily').value,
       autoAnalyzeMaxClassificationLevel: document.getElementById('autoAnalyzeMaxClassificationLevel').value
     }

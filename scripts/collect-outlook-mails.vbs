@@ -91,10 +91,13 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
     End If
   Next
 
+  Dim beforeGlobalCap
+  beforeGlobalCap = collectedCount
   SortMailRecords collected, collectedCount
-  If collectedCount > CLng(target("max-items")) Then
+  If CLng(target("recent-hours")) <= 0 And collectedCount > CLng(target("max-items")) Then
     collectedCount = CLng(target("max-items"))
   End If
+  WScript.Echo "DigestCap: collected=" & beforeGlobalCap & "; emitted=" & collectedCount & "; maxItems=" & target("max-items")
   WriteDigest outputPath, target, collected, collectedCount
 End Sub
 
@@ -110,6 +113,8 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
 
   Dim items
   Set items = folder.Items
+  Dim totalItems
+  totalItems = SafeItemsCount(items)
 
   If Trim(CStr(olderThan)) <> "" Then
     On Error Resume Next
@@ -121,6 +126,8 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
     On Error GoTo 0
     Set items = restricted
   End If
+  Dim candidateItems
+  candidateItems = SafeItemsCount(items)
   items.Sort "[" & timeProperty & "]", True
 
   Dim cutoffEnabled
@@ -132,6 +139,10 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
 
   Dim scanned
   scanned = 0
+  Dim addedInFolder
+  addedInFolder = 0
+  Dim capEnabled
+  capEnabled = (recentHours <= 0)
 
   Dim i
   For i = 1 To items.Count
@@ -150,7 +161,8 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
             Set record = BuildMailRecord(item, folderPath, bodyChars, collectedCount + 1)
             AddRecordToArray collected, collectedCount, record
             scanned = scanned + 1
-            If scanned >= maxItems Then
+            addedInFolder = addedInFolder + 1
+            If capEnabled And scanned >= maxItems Then
               Exit For
             End If
           End If
@@ -158,6 +170,7 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal maxItems, byVal recentH
       End If
     End If
   Next
+  WScript.Echo "FolderScan: folder=" & folderPath & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; added=" & addedInFolder & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
 End Sub
 
 Function FolderTimeProperty(byVal folderPath)
@@ -165,6 +178,24 @@ Function FolderTimeProperty(byVal folderPath)
     FolderTimeProperty = "SentOn"
   Else
     FolderTimeProperty = "ReceivedTime"
+  End If
+End Function
+
+Function SafeItemsCount(byRef items)
+  On Error Resume Next
+  SafeItemsCount = CLng(items.Count)
+  If Err.Number <> 0 Then
+    Err.Clear
+    SafeItemsCount = -1
+  End If
+  On Error GoTo 0
+End Function
+
+Function ValueOrDash(byVal value)
+  If Trim(CStr(value)) = "" Then
+    ValueOrDash = "-"
+  Else
+    ValueOrDash = CStr(value)
   End If
 End Function
 

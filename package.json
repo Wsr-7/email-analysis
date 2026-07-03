@@ -90,7 +90,7 @@
             "Inbox",
             "Sent Items"
           ],
-          "description": "Fetch folders to scan. Inbox and Sent Items are always included."
+          "description": "Outlook folders to scan. Use folder names or paths such as Inbox, Sent Items, Inbox/Project, or Mailbox Name/Inbox. Separate items in this array; Inbox-only legacy values are expanded to Inbox and Sent Items."
         },
         "easyMail.bodyExcerptChars": {
           "type": "number",

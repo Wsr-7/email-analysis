@@ -220,7 +220,9 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("debounce"));
     assert.ok(html.includes("saveConfig"));
     assert.ok(html.includes("autoSave"));
-    assert.ok(html.includes("Fetch Folders"));
+    assert.ok(html.includes("rangeValueLabel"));
+    assert.ok(html.includes("rangeValues"));
+    assert.ok(!html.includes('id="folders"'));
   });
 
   it("can highlight the selected sidebar row from extension messages", () => {
