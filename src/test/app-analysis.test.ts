@@ -53,7 +53,6 @@ describe("analyzeBatchCore", () => {
         llmProvider: provider,
         extensionPath: process.cwd(),
         readConfig: async () => ({
-          analysisBatchSize: 5,
           autoAnalyzeEnabled: true,
           autoAnalyzeMaxClassificationLevel: 2,
           modelFamily: "mock-model",
@@ -113,7 +112,6 @@ describe("analyzeBatchCore", () => {
         llmProvider: provider,
         extensionPath: process.cwd(),
         readConfig: async () => ({
-          analysisBatchSize: 5,
           autoAnalyzeMaxClassificationLevel: 2,
           modelFamily: "mock-model",
           outputLanguage: "en-US"
@@ -182,7 +180,6 @@ describe("analyzeBatchCore", () => {
         llmProvider: provider,
         extensionPath: process.cwd(),
         readConfig: async () => ({
-          analysisBatchSize: 5,
           autoAnalyzeMaxClassificationLevel: 2,
           modelFamily: "mock-model",
           outputLanguage: "en-US"

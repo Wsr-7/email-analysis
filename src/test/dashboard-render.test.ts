@@ -139,9 +139,9 @@ describe("formatPriority", () => {
 });
 
 describe("formatAnalyzeNextLabel", () => {
-  it("includes batch size from config", () => {
-    const result = formatAnalyzeNextLabel(enLabels, { analysisBatchSize: 10 });
-    assert.ok(result.includes("10"));
+  it("does not read the removed analysis batch size setting", () => {
+    const result = formatAnalyzeNextLabel(enLabels, {});
+    assert.equal(result, enLabels.toolbar.analyze);
   });
 });
 

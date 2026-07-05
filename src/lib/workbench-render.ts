@@ -448,6 +448,15 @@ window.addEventListener('message', function(e) {
   }
 });
 
+document.addEventListener('input', function(e) {
+  var target = e.target;
+  if (!target || !target.classList || !target.classList.contains('draft-textarea')) return;
+  var box = target.closest('.draft-box-editable');
+  if (!box) return;
+  if (String(target.value || '').trim()) showDraftActionButtons(box);
+  else showGenerateDraftButton(box);
+});
+
 function showDraftActionButtons(box) {
   var actions = box.querySelector('.draft-actions');
   if (!actions) return;
@@ -459,6 +468,12 @@ function showDraftActionButtons(box) {
     + '<button class="wb-btn" data-action="composeMail" data-mode="replyAll">' + ${toJsLiteral(labels.card.openReplyAll)} + '</button>'
     + '<button class="wb-btn" data-action="composeMail" data-mode="forward">' + ${toJsLiteral(labels.card.openForward)} + '</button>'
     + '</div></details>';
+}
+
+function showGenerateDraftButton(box) {
+  var actions = box.querySelector('.draft-actions');
+  if (!actions) return;
+  actions.innerHTML = '<button class="wb-btn" data-action="generateDraft">' + ${toJsLiteral(labels.card.generateDraft)} + '</button>';
 }
 
 document.addEventListener('click', function(e) {

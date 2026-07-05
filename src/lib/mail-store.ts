@@ -113,6 +113,10 @@ export function mergeDigestIntoStore(store: MailStore, digest: DigestData, known
   const pulledAt = digest.metadata.generatedAt || new Date().toISOString();
 
   for (const digestItem of digest.items) {
+    if (!isAcceptableMailDate(String(digestItem.receivedTime || digestItem.sentTime || ""))) {
+      skipped += 1;
+      continue;
+    }
     const mail = digestItemToStoredMail(digestItem, pulledAt);
     if (existing.has(mail.mailId)) {
       skipped += 1;
@@ -139,6 +143,9 @@ export function mergeDigestIntoIndex(index: MailIndex, digest: DigestData): Mail
   const byId = new Map(index.items.map((item) => [item.mailId, item]));
   const seenAt = digest.metadata.generatedAt || new Date().toISOString();
   for (const digestItem of digest.items) {
+    if (!isAcceptableMailDate(String(digestItem.receivedTime || digestItem.sentTime || ""))) {
+      continue;
+    }
     const mail = digestItemToStoredMail(digestItem, seenAt);
     byId.set(mail.mailId, {
       mailId: mail.mailId,
@@ -157,6 +164,11 @@ export function mergeDigestIntoIndex(index: MailIndex, digest: DigestData): Mail
     folderAnchors: buildFolderAnchors([...byId.values()], index.folderAnchors, seenAt),
     items: [...byId.values()].sort(compareMailIndexItems)
   };
+}
+
+export function isAcceptableMailDate(value: string): boolean {
+  const year = Number(String(value || "").slice(0, 4));
+  return Number.isFinite(year) && year >= 1990 && year <= 2100;
 }
 
 export function digestItemToStoredMail(item: DigestItem, pulledAt: string): StoredMail {

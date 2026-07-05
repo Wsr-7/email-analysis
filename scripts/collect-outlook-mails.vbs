@@ -157,7 +157,9 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
       On Error GoTo 0
       If Not item Is Nothing Then
         If TypeName(item) = "MailItem" Then
-          If (Not cutoffEnabled) Or MailSortDate(item, folderPath) >= cutoff Then
+          Dim sortDate
+          sortDate = MailSortDate(item, folderPath)
+          If IsAcceptableMailDate(sortDate) And ((Not cutoffEnabled) Or sortDate >= cutoff) Then
             Dim record
             Set record = BuildMailRecord(item, folderPath, bodyChars, collectedCount + 1)
             AddRecordToArray collected, collectedCount, record
@@ -188,6 +190,12 @@ Function FolderTimeProperty(byVal folderPath)
   Else
     FolderTimeProperty = "ReceivedTime"
   End If
+End Function
+
+Function IsAcceptableMailDate(byVal value)
+  Dim yearPart
+  yearPart = Year(value)
+  IsAcceptableMailDate = (yearPart >= 1990 And yearPart <= 2100)
 End Function
 
 Function SafeItemsCount(byRef items)

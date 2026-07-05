@@ -83,7 +83,7 @@ export async function analyzeBatchCore(
     true,
     config.autoAnalyzeMaxClassificationLevel
   );
-  const batchSize = typeof selection === "number" ? Math.max(1, Math.floor(selection)) : Number(config.analysisBatchSize || 5);
+  const batchSize = typeof selection === "number" ? Math.max(1, Math.floor(selection)) : 5;
   const requestedBatch = Array.isArray(selection)
     ? store.items.filter((item) => selection.includes(item.mailId) && !ignoredIds.includes(item.mailId))
     : selection === "allAllowed"

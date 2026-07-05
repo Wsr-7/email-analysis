@@ -930,7 +930,6 @@ class EasyMailApp {
       sampleMode: settings.get("sampleMode", defaults.sampleMode),
       modelFamily: settings.get("modelFamily", defaults.modelFamily),
       outputLanguage: settings.get("outputLanguage", defaults.outputLanguage || "en-US"),
-      analysisBatchSize: settings.get("analysisBatchSize", defaults.analysisBatchSize),
       autoAnalyzeMaxClassificationLevel: settings.get("autoAnalyzeMaxClassificationLevel", defaults.autoAnalyzeMaxClassificationLevel),
       mailStoreRetentionDays: settings.get("mailStoreRetentionDays", defaults.mailStoreRetentionDays),
       mailIndexRetentionDays: settings.get("mailIndexRetentionDays", defaults.mailIndexRetentionDays),

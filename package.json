@@ -145,13 +145,6 @@
           "default": "en-US",
           "description": "Dashboard and analysis output language."
         },
-        "easyMail.analysisBatchSize": {
-          "type": "number",
-          "order": 9,
-          "default": 5,
-          "minimum": 1,
-          "description": "Maximum mails analyzed by Analyze Next Batch."
-        },
         "easyMail.autoAnalyzeMaxClassificationLevel": {
           "type": "number",
           "order": 10,

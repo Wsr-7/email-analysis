@@ -178,8 +178,7 @@ export function renderModelOptions(
 }
 
 export function formatAnalyzeNextLabel(labels: DashboardLabels, config: Record<string, unknown>): string {
-  const batchSize = positiveNumber(config.analysisBatchSize, 5);
-  return `${labels.toolbar.analyze} (${String(batchSize)})`;
+  return labels.toolbar.analyze;
 }
 
 export function renderRangeValueControl(config: Record<string, unknown>, labels: DashboardLabels): string {

@@ -52,6 +52,43 @@ test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () 
   assert.deepEqual(second.store.items[0].attachmentNames, ["contract.pdf", "budget.xlsx"]);
 });
 
+test("mergeDigestIntoStore skips mail with impossible Outlook dates", () => {
+  const digest = {
+    metadata: { generatedAt: "2026-06-16 10:00:00", rangeMode: "recentHours", recentHours: 24, maxItems: 2, folders: ["Inbox"] },
+    items: [{
+      mailId: "mail-001",
+      internetMessageId: "<mail-001@example.com>",
+      entryId: "entry-001",
+      storeId: "",
+      conversationId: "",
+      conversationIndex: "",
+      subject: "Microsoft Outlook test message",
+      from: "Microsoft Outlook <test@example.com>",
+      senderName: "Microsoft Outlook",
+      senderEmail: "test@example.com",
+      receivedTime: "4501-01-01 00:00:00",
+      sentTime: "",
+      folder: "Inbox",
+      unread: "false",
+      importance: "normal",
+      toMe: "true",
+      ccMe: "false",
+      to: "Me <me@example.com>",
+      cc: "",
+      attachmentCount: 0,
+      attachmentNames: [],
+      bodyExcerpt: "Test"
+    }]
+  };
+
+  const merge = mergeDigestIntoStore(emptyMailStore(), digest);
+  const index = mergeDigestIntoIndex(emptyMailIndex(), digest);
+  assert.equal(merge.added, 0);
+  assert.equal(merge.skipped, 1);
+  assert.equal(merge.store.items.length, 0);
+  assert.equal(index.items.length, 0);
+});
+
 test("normalizeMailStore fills thread fields for old store json", () => {
   const store = normalizeMailStore({
     generatedAt: "2026-06-16T10:00:00.000Z",

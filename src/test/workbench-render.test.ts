@@ -289,6 +289,8 @@ describe("renderWorkbenchHtml", () => {
   it("switches generated draft controls from Generate to edit actions", () => {
     const html = renderWorkbenchHtml(stubInput());
     assert.ok(html.includes("showDraftActionButtons(box)"));
+    assert.ok(html.includes("showGenerateDraftButton(box)"));
+    assert.ok(html.includes("classList.contains('draft-textarea')"));
     assert.ok(html.includes("data-action=\"polishDraft\""));
     assert.ok(html.includes("data-action=\"composeMail\""));
   });

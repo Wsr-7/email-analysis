@@ -263,13 +263,11 @@ describe("renderSidebarHtml", () => {
   it("posts selected batch size directly when analyzing", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes("post('analyze', { batchSize: Number(sel) })"));
-    assert.ok(!html.includes("analysisBatchSize: sel"));
     assert.ok(html.includes("batchSelect: sel"));
   });
 
   it("uses local webview state for batch size instead of persisted settings", () => {
-    const input = stubInput({ state: stubState({ analysisBatchSize: 10 }) });
-    const html = renderSidebarHtml(input);
+    const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes('<option value="5" selected'));
     assert.ok(html.includes("prev.batchSelect"));
   });
