@@ -921,7 +921,7 @@ Use this section to summarize completed task commits:
 - User validation follow-up 4: `f1a7466d904a05365a44c884d6d0390804905869` - restores registered `easyMail.folders`, rebuilds thread store directly from mail store on pull/load, keeps sidebar selection aligned after ignore, and switches generated draft controls immediately.
 - User validation follow-up 5: `886ed9005c1e8707b0706765e5cf81aef40a16f3` - improves Outlook quote trimming, Sent Items history paging, Inbox-only folder migration, and restore focus behavior.
 - User validation follow-up 6: `d118c035293e956e8b78109e12feebf7e0d3eb13`; explicit range-mode fix `5c43fb741e2afe86a69c0ef93ad8c42e8efaf4b6`; range input autosave fix `cc6e7bf19aad7bbb53b4a9fb9bad4e97b8286be5` - makes `recentHours` and `maxItems` independent pull modes, adds folder-level pull diagnostics, removes sidebar folder editing, and stabilizes sidebar range value switching.
-- User validation follow-up 7: pending commit - removes obsolete `Analysis Batch Size` setting, toggles draft controls back to Generate Draft when draft text is manually cleared, and filters impossible Outlook mail dates such as year 4501.
+- User validation follow-up 7: `7aa4af1619b28de4e9b02ade7c2acbb24b071dda`; ignored-thread follow-up pending commit - removes obsolete `Analysis Batch Size` setting, toggles draft controls back to Generate Draft when draft text is manually cleared, filters impossible Outlook mail dates such as year 4501, and renders fully ignored threads in the existing Ignored queue with a thread marker.
 - P2.1:
 - P2.2:
 
@@ -931,28 +931,28 @@ Use this section to summarize completed task commits:
 
 #### Handover - 2026-07-06 - Codex (User validation follow-up 7 in progress)
 
-Status: In progress - first small fixes implemented, broader design items recorded
+Status: Complete for locally verifiable fixes in this slice; broader design items recorded
 
 User confirmations:
 - Confirmed fixed: original items 1-6, 8-12, 14-18, 20-21, 25-27, 29, 31-34, 37.
-- Partially confirmed / needs design: manual-confirm keyword rationale/customization, no-draft-generation explanations, ignored thread queue behavior, thread body quote trimming, output language consistency, category/thread dedupe, folder picker, More History semantics, advanced timeline.
+- Partially confirmed / needs design: manual-confirm keyword rationale/customization, no-draft-generation explanations, thread body quote trimming, output language consistency, category/thread dedupe, folder picker, More History semantics, advanced timeline.
 - Deferred: multiple Outlook account behavior remains P2.
 
 Changed in this slice:
 - Removed obsolete `easyMail.analysisBatchSize` from VS Code settings, default config, config reads/writes, and tests. Analyze batch size now lives only in the sidebar selector; command/default fallback remains 5.
 - Workbench draft controls now react to manual textarea edits: clearing a non-empty draft switches actions back to `Generate Draft`; typing content switches back to Polish/Refine/Outlook Actions.
 - Added defensive filtering for impossible Outlook mail dates in both collector and mail-store merge/index paths. Example filtered: `4501-01-01 00:00:00`.
+- Fully ignored threads now render in the existing Ignored sidebar queue with a `Thread` marker, while their workbench reader is tagged as `data-queue="ignored"` so restore/focus behavior matches ignored single mails.
 - Regenerated `releases/easy-mail-0.2.0.vsix`.
 
 Validated:
 - `rg "analysisBatchSize|easyMail.analysisBatchSize" package.json default-config.json src/lib src/test`: no source/config hits after cleanup.
-- `npm test`: pass, 308 tests.
+- `npm test`: pass, 310 tests.
 - `npm run package:vsix`: pass.
 
 Known design TODOs recorded from latest feedback:
 - Manual-confirm keyword matching: define configurable keywords, user-facing explanation, and which keywords belong in hard block vs manual confirmation.
 - Generate Draft empty result: explain whether no draft means "not needed" versus "generation failed"; likely needs structured generation result/reason.
-- Thread ignored queue: decide simplest UI for ignored threads, likely render ignored threads in the existing Ignored queue with a thread marker rather than adding subcategories.
 - Thread body trimming: current marker heuristics still fail on real bilingual Outlook headers; needs a more deliberate quote-boundary design with collected raw samples.
 - Language consistency: current prompt/fallback fixes are insufficient; needs a single locale contract for analysis fields, thread fields, and reply drafts.
 - Category duplication: same thread can appear via multiple inbound mails; need thread-level de-dupe/category policy before more prompt tuning.
@@ -963,7 +963,7 @@ Known design TODOs recorded from latest feedback:
 - Single-mail body box should flex to workbench bottom before scrolling.
 
 Next recommended step:
-- Commit this slice, then choose one design-heavy issue to investigate with data: thread body trimming, language consistency, or meeting collection. Do not mix all three in one patch.
+- Commit this slice, then choose one design-heavy issue to investigate with data: thread body trimming, language consistency, or meeting collection. Do not mix all three in one patch. Also keep the new single-mail "jump to thread" request and body-box flex sizing as bounded UI follow-ups.
 
 ---
 

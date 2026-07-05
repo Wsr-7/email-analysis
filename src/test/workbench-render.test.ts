@@ -430,4 +430,23 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes('data-action="unignoreThread"'), "ignored thread should have restore action");
     assert.ok(!html.includes('data-action="ignoreThread"'), "ignored thread should not have ignore action");
   });
+
+  it("marks fully ignored thread readers as ignored queue items", () => {
+    const input = stubInput({
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "",
+        items: [{
+          threadId: "t1", conversationId: "c1", normalizedSubject: "thread",
+          subject: "Thread Subject", participants: ["alice@test.com"],
+          folders: ["Inbox"], startTime: "2024-01-01", lastTime: "2024-01-02",
+          messageCount: 2, unreadCount: 0, hasAttachments: false,
+          sourceMailIds: ["m1", "m2"], timeline: [],
+          contentStatus: "available"
+        }]
+      },
+      ignoredIds: new Set(["m1", "m2"])
+    });
+    const html = renderWorkbenchHtml(input);
+    assert.ok(html.includes('data-id="t1" data-queue="ignored"'));
+  });
 });

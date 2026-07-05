@@ -23,6 +23,10 @@ function confirmAnalyzeButton(mailId: string, decision: SecurityGateDecisionResu
   return `<button class="wb-btn" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.pending.confirmAnalyze)}</button>`;
 }
 
+function isThreadIgnored(thread: ThreadStore["items"][number], ignoredIds?: Set<string>): boolean {
+  return !!ignoredIds && thread.sourceMailIds.length > 0 && thread.sourceMailIds.every((id) => ignoredIds.has(id));
+}
+
 function renderGateReasons(title: string, reasons: string[]): string {
   const items = reasons.length ? reasons : ["-"];
   return `<div class="wb-field wb-warn"><strong>${escapeHtml(title)}:</strong><div class="wb-gate-reasons">${items.map((reason) => `<div class="wb-gate-reason">${escapeHtml(reason)}</div>`).join("")}</div></div>`;
@@ -273,7 +277,8 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
 
   const sortedThreads = [...(visibleThreadStore.items || [])].sort((a, b) => String(b.lastTime || "").localeCompare(String(a.lastTime || "")));
   for (const thread of sortedThreads) {
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}" data-queue="threads">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, input.ignoredIds)}</div>`);
+    const threadQueue = isThreadIgnored(thread, input.ignoredIds) ? "ignored" : "threads";
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}" data-queue="${escapeAttr(threadQueue)}">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, input.ignoredIds)}</div>`);
   }
 
   return `<!doctype html>

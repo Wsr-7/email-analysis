@@ -170,6 +170,28 @@ describe("renderSidebarHtml", () => {
     assert.ok(!html.includes("sb-detail"), "compact rows should not have detail sections");
   });
 
+  it("renders fully ignored threads in the ignored queue", () => {
+    const input = stubInput({
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "",
+        items: [{
+          threadId: "t1", conversationId: "c1", normalizedSubject: "thread subject",
+          subject: "Thread Subject",
+          participants: ["alice@test.com", "bob@test.com"],
+          folders: ["Inbox"], startTime: "2024-01-01", lastTime: "2024-01-02",
+          messageCount: 2, unreadCount: 0, hasAttachments: false,
+          sourceMailIds: ["m1", "m2"], timeline: [],
+          contentStatus: "available"
+        }]
+      },
+      ignoredIds: new Set(["m1", "m2"])
+    });
+    const html = renderSidebarHtml(input);
+    assert.ok(html.includes('data-queue="ignored" data-thread-id="t1"'));
+    assert.ok(html.includes(">Thread</span>"), "ignored thread row should identify itself as a thread");
+    assert.ok(!html.includes('data-queue="threads" data-thread-id="t1"'));
+  });
+
   it("renders bottom bar with reports and settings", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes("post('generateReports')"));

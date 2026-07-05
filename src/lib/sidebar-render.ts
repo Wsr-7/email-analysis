@@ -92,12 +92,16 @@ function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: 
   </div>`;
 }
 
-function renderCompactThreadRow(thread: ThreadStore["items"][number]): string {
+function isThreadIgnored(thread: ThreadStore["items"][number], ignoredIds?: Set<string>): boolean {
+  return !!ignoredIds && thread.sourceMailIds.length > 0 && thread.sourceMailIds.every((id) => ignoredIds.has(id));
+}
+
+function renderCompactThreadRow(thread: ThreadStore["items"][number], queue: string, labels: DashboardLabels): string {
   const time = shortTime(thread.lastTime || "");
   const meta = [thread.participants.slice(0, 2).join(", "), time].filter(Boolean).join(" · ");
-  return `<div class="sb-row" data-queue="threads" data-thread-id="${escapeAttr(thread.threadId)}" onclick="openItem('${escapeAttr(thread.threadId)}')">
+  return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-thread-id="${escapeAttr(thread.threadId)}" onclick="openItem('${escapeAttr(thread.threadId)}')">
     <div class="sb-subject" title="${escapeAttr(thread.subject || thread.threadId)}">${escapeHtml(thread.subject || thread.threadId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span><span class="sb-badge">${escapeHtml(String(thread.messageCount))}</span></div>
+    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span><span class="sb-badge">${escapeHtml(labels.card.thread)}</span><span class="sb-badge">${escapeHtml(String(thread.messageCount))}</span></div>
   </div>`;
 }
 
@@ -142,6 +146,8 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   const categoryLabels = buildCategoryLabels(labels, promptConfig, locale);
   const threadStore = input.threadStore || emptyThreadStore();
   const visibleThreadStore = filterVisibleThreadsForDashboard(threadStore);
+  const activeThreads = (visibleThreadStore.items || []).filter((thread) => !isThreadIgnored(thread, input.ignoredIds));
+  const ignoredThreads = (visibleThreadStore.items || []).filter((thread) => isThreadIgnored(thread, input.ignoredIds));
   const queue = input.queue || { pending: [], blocked: [], analysed: [], allowed: [], ignoredPending: [] };
   const configuredModel = String(config.modelFamily || "");
   const canAnalyze = !!selectConfiguredModel(availableModels, configuredModel);
@@ -168,8 +174,8 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   queueCounts["nextActions"] = nextActionsItems.length;
   queueCounts["pending"] = queue.allowed.length;
   queueCounts["blocked"] = queue.blocked.length;
-  queueCounts["threads"] = visibleThreadStore.items.length;
-  queueCounts["ignored"] = (queueCounts["ignored"] || 0) + (queue.ignoredPending?.length || 0);
+  queueCounts["threads"] = activeThreads.length;
+  queueCounts["ignored"] = (queueCounts["ignored"] || 0) + (queue.ignoredPending?.length || 0) + ignoredThreads.length;
 
   const activeQueues = QUEUE_ORDER.filter((q) => (queueCounts[q] || 0) > 0);
   const defaultQueue = activeQueues[0] || "pending";
@@ -194,9 +200,12 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     cat.items.map((item) => renderCompactAnalysisRow(item, cat.id, labels, classifications)).join("")
   ).join("");
   const ignoredPendingRows = (queue.ignoredPending || []).map((item) => renderCompactMailRow(item, "ignored", classifications)).join("");
-  const threadRows = [...(visibleThreadStore.items || [])].sort((a, b) =>
+  const ignoredThreadRows = [...ignoredThreads].sort((a, b) =>
     String(b.lastTime || "").localeCompare(String(a.lastTime || ""))
-  ).map((thread) => renderCompactThreadRow(thread)).join("");
+  ).map((thread) => renderCompactThreadRow(thread, "ignored", labels)).join("");
+  const threadRows = [...activeThreads].sort((a, b) =>
+    String(b.lastTime || "").localeCompare(String(a.lastTime || ""))
+  ).map((thread) => renderCompactThreadRow(thread, "threads", labels)).join("");
   const nextActionRows = nextActionsItems.map((a) => renderCompactNextActionRow(a, labels)).join("");
   const meetingRows = sortedMeetings.map((m) => renderCompactMeetingRow(m, labels)).join("");
 
@@ -505,6 +514,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
       ${blockedRows}
       ${analysisRows}
       ${ignoredPendingRows}
+      ${ignoredThreadRows}
       ${threadRows}
       <div class="sb-empty" id="emptyState">${escapeHtml(labels.card.noItems)}</div>
     </div>
