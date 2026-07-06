@@ -939,6 +939,12 @@ User confirmations:
 - Partially confirmed / needs design: manual-confirm keyword rationale/customization, no-draft-generation explanations, thread body quote trimming, output language consistency, category/thread dedupe, folder picker, More History semantics, advanced timeline.
 - Deferred: multiple Outlook account behavior remains P2.
 
+Re-validation item map:
+- Original item 3: remove obsolete VS Code setting `Analysis Batch Size`.
+- Original item 19: ignored thread mail appears in the existing Ignored category with a thread marker.
+- Latest new issue 1: manually clearing a non-empty draft switches actions back to `Generate Draft`.
+- Latest new issue 3: filter impossible Outlook test-message dates such as `4501-01-01 00:00:00`.
+
 Changed in this slice:
 - Removed obsolete `easyMail.analysisBatchSize` from VS Code settings, default config, config reads/writes, and tests. Analyze batch size now lives only in the sidebar selector; command/default fallback remains 5.
 - Workbench draft controls now react to manual textarea edits: clearing a non-empty draft switches actions back to `Generate Draft`; typing content switches back to Polish/Refine/Outlook Actions.
