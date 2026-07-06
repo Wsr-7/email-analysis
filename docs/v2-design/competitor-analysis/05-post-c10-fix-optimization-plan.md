@@ -958,6 +958,7 @@ Known design TODOs recorded from latest feedback:
 - Category duplication: same thread can appear via multiple inbound mails; need thread-level de-dupe/category policy before more prompt tuning.
 - Folder selection: explore collector-based Outlook folder listing for a dropdown instead of manual folder strings.
 - More History: currently page-based (`maxItems` + older-than anchors); either keep and expose this clearly in UI, or redesign to follow current range mode.
+- Fetch New incremental optimization (not a final design): current `recentHours` fetch safely re-scans the full time window and dedupes existing mail. Candidate future design is to record per-folder newest anchors, then use `max(now - recentHours, newestAnchor - overlap)` for `recentHours` fetches; keep a 5-10 minute overlap, reset to full-range fetch when anchors are missing/stale, folders change, or `recentHours` expands, and keep `More History` on separate oldest-anchor paging.
 - Meetings: inspect why meeting invitations/calendar items are not collected into Meeting queue.
 - Next Actions: inspect whether extraction/sync is broken or simply not produced by current thread analysis.
 - Single-mail body box should flex to workbench bottom before scrolling.
