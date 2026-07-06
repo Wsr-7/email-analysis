@@ -935,6 +935,7 @@ Status: Complete for locally verifiable fixes in this slice; broader design item
 
 User confirmations:
 - Confirmed fixed: original items 1-6, 8-12, 14-18, 20-21, 25-27, 29, 31-34, 37.
+- User re-validation confirmed fixed: original item 3, original item 19, latest new issue 1, latest new issue 3.
 - Partially confirmed / needs design: manual-confirm keyword rationale/customization, no-draft-generation explanations, thread body quote trimming, output language consistency, category/thread dedupe, folder picker, More History semantics, advanced timeline.
 - Deferred: multiple Outlook account behavior remains P2.
 
