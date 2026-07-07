@@ -147,7 +147,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: 未新增测试——`positiveNumber` 的"非法值回落默认"行为已由 `config-utils.test.ts` 现有的 `describe("positiveNumber")` 覆盖；`extension.ts` 的 `pullMailCore`/`collectMeetings` 本身无 node:test 覆盖（需要 VS Code 扩展宿主环境，仓库现状如此，不在本 step 范围内新增）。`npm run compile` 零错误；`npm test` 全绿 319/319（与 R1.6 后持平，无回归）；额外用 `node -e` 校验 `package.json`/`default-config.json` 仍是合法 JSON。
   - Manual validation: 不适用（配置项默认行为不变，只有大邮箱/慢启动场景下用户手调该值才会体现差异，无法在当前环境用真实 Outlook 验证超时改善效果）。
   - Known issues: 无。
-  - Commit: `PENDING`
+  - Commit: `34198ab`
 
 ---
 
