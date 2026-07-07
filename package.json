@@ -193,6 +193,13 @@
           "minimum": 1,
           "description": "Collect meetings within the next N days from Outlook calendar."
         },
+        "easyMail.collectorTimeoutSeconds": {
+          "type": "number",
+          "order": 19,
+          "default": 120,
+          "minimum": 10,
+          "description": "Timeout in seconds for the Outlook mail/meeting collector scripts. Increase for large mailboxes or slow Outlook cold starts."
+        },
         "easyMail.importantSenders": {
           "type": "array",
           "order": 12,

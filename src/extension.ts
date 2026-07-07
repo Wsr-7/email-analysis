@@ -17,7 +17,7 @@ import { buildThreadReport } from "./lib/report-thread";
 import { CopilotProvider } from "./lib/copilot-provider";
 import { type AvailableModel, type LlmProvider } from "./lib/llm-provider";
 import { renderEasyMailGuideHtml } from "./lib/guide-webview";
-import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders } from "./lib/config-utils";
+import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, positiveNumber } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
@@ -500,8 +500,9 @@ class EasyMailApp {
       args.push("--sample");
     }
 
-    await this.log("pullMail:start", { forceSample, loadMore, maxItems, recentHours, rangeMode, folders });
-    await runProcess("cscript.exe", args, 30000, (event, data) => void this.log(`process:${event}`, data));
+    const collectorTimeoutMs = positiveNumber(config.collectorTimeoutSeconds, 120) * 1000;
+    await this.log("pullMail:start", { forceSample, loadMore, maxItems, recentHours, rangeMode, folders, collectorTimeoutMs });
+    await runProcess("cscript.exe", args, collectorTimeoutMs, (event, data) => void this.log(`process:${event}`, data));
     const digest = parseDigest(await fs.promises.readFile(this.data.getDigestPath(), "utf8"));
     const merge = mergeDigestIntoStore(await this.data.readMailStore(), digest, currentIndex.items.map((item) => item.mailId));
     const nextIndex = pruneMailIndex(mergeDigestIntoIndex(currentIndex, digest), Number(config.mailIndexRetentionDays || 7));
@@ -530,7 +531,8 @@ class EasyMailApp {
       const daysAhead = Number(config.meetingDaysAhead || 2);
       const meetingArgs = ["//nologo", meetingScript, "--days-ahead", String(daysAhead), "--body-chars", "500", "--output", this.data.getMeetingDigestPath()];
       if (forceSample || config.sampleMode) meetingArgs.push("--sample");
-      await runProcess("cscript.exe", meetingArgs, 30000, (event, data) => void this.log(`meeting:${event}`, data));
+      const collectorTimeoutMs = positiveNumber(config.collectorTimeoutSeconds, 120) * 1000;
+      await runProcess("cscript.exe", meetingArgs, collectorTimeoutMs, (event, data) => void this.log(`meeting:${event}`, data));
       const meetingDigest = parseMeetingDigest(await fs.promises.readFile(this.data.getMeetingDigestPath(), "utf8"));
       const meetingStore = pruneMeetingStore(mergeMeetingDigestIntoStore(await this.data.readMeetingStore(), meetingDigest));
       await this.data.writeMeetingStore(meetingStore);
@@ -934,6 +936,7 @@ class EasyMailApp {
       mailStoreRetentionDays: settings.get("mailStoreRetentionDays", defaults.mailStoreRetentionDays),
       mailIndexRetentionDays: settings.get("mailIndexRetentionDays", defaults.mailIndexRetentionDays),
       analysisRetentionDays: settings.get("analysisRetentionDays", defaults.analysisRetentionDays),
+      collectorTimeoutSeconds: settings.get("collectorTimeoutSeconds", defaults.collectorTimeoutSeconds),
       importantSenders: settings.get("importantSenders", defaults.importantSenders)
     };
   }

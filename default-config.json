@@ -15,5 +15,6 @@
   "mailIndexRetentionDays": 7,
   "analysisRetentionDays": 7,
   "importantSenders": [],
-  "meetingDaysAhead": 2
+  "meetingDaysAhead": 2,
+  "collectorTimeoutSeconds": 120
 }

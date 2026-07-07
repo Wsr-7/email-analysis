@@ -134,12 +134,20 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 这只是止血（`vscode.setState()`/`webview.html` 整页重建仍会导致滚动位置、展开状态丢失与可见闪烁），完整方案是 04 文档建议的增量渲染改造，属 R3，本 step 明确不做。
   - Commit: `ef494ad`
 
-### [ ] R1.7 采集超时可配置（C-4）
+### [x] R1.7 采集超时可配置（C-4）
 
 - **改动点**：`src/extension.ts` `pullMailCore`（`runProcess("cscript.exe", args, 30000, ...)`）及会议拉取的同款调用；`package.json` contributes；`default-config.json`。
 - **做法**：新增 `easyMail.collectorTimeoutSeconds`（默认 120），经 `config-utils.positiveNumber` 解析；两处 `runProcess` 超时改读该配置；超时报错消息附上已捕获的 `FolderScan` 诊断行（若 `process-runner` 已缓存部分 stdout）。
 - **验收**：`npm run compile` 通过；config-utils 解析路径有测试覆盖（非法值回落默认）；package.json 与 default-config.json 默认值一致。
 - Completion Notes:
+  - 改动文件：`default-config.json`（新增 `collectorTimeoutSeconds: 120`）、`package.json`（新增 `easyMail.collectorTimeoutSeconds` schema，`default: 120`，`minimum: 10`，`order: 19`）、`src/extension.ts`（`readConfig()` 新增该字段读取；`pullMailCore`/`collectMeetings` 两处 `runProcess` 调用改用 `positiveNumber(config.collectorTimeoutSeconds, 120) * 1000` 替换硬编码 `30000`）。
+  - `runProcess("cscript.exe", ...)` 实际共 5 处调用；另外 3 处（`openMailInOutlook`、`composeOutlookMail`、`openMeetingInOutlook`）是单条目 Outlook 打开/撰写操作，不做文件夹全扫描，不受大邮箱超时问题影响，计划原文明确只点名 pullMailCore + 会议拉取，本 step 未改这 3 处，维持硬编码 30000。
+  - "超时报错附带已捕获诊断行"：核查 `process-runner.ts:24` 发现该行为已经存在（`reject(new Error(\`...timed out...${stderr || stdout}\`))`，`stdout` 里已含逐行累积的 `FolderScan`/`DigestCap` echo），本 step 不需要改 `process-runner.ts`。
+  - 未改 `message-handler.ts`/`sidebar-render.ts`——`collectorTimeoutSeconds` 与 `mailStoreRetentionDays` 等同属"仅 VS Code Settings 可编辑、Dashboard 设置面板不展示"的字段（grep 确认 sidebar-render.ts 未展示 `mailStoreRetentionDays`），保持与既有同类字段一致的处理方式，不新增未被要求的 UI。
+  - Tests: 未新增测试——`positiveNumber` 的"非法值回落默认"行为已由 `config-utils.test.ts` 现有的 `describe("positiveNumber")` 覆盖；`extension.ts` 的 `pullMailCore`/`collectMeetings` 本身无 node:test 覆盖（需要 VS Code 扩展宿主环境，仓库现状如此，不在本 step 范围内新增）。`npm run compile` 零错误；`npm test` 全绿 319/319（与 R1.6 后持平，无回归）；额外用 `node -e` 校验 `package.json`/`default-config.json` 仍是合法 JSON。
+  - Manual validation: 不适用（配置项默认行为不变，只有大邮箱/慢启动场景下用户手调该值才会体现差异，无法在当前环境用真实 Outlook 验证超时改善效果）。
+  - Known issues: 无。
+  - Commit: `PENDING`
 
 ---
 
@@ -213,7 +221,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 ## 6. Current Snapshot
 
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
-- 2026-07-08 · R1.1、R1.2、R1.3、R1.4、R1.5、R1.6 完成并提交。R1.2/R1.3 需真实 Outlook 验证；R1.6 需用户手动验证草稿保留场景（见各自 Completion Notes）。R1.7 未开始。
+- 2026-07-08 · **Milestone R1 全部 7 个 step 完成并提交**（R1.1-R1.7）。R1.2/R1.3 需真实 Outlook 验证；R1.6 需用户手动验证草稿保留场景（见各自 Completion Notes）。下一步：R2（效率与语言，前置 R1 已满足）或用户先做真机验证。R3/R4 需用户确认设计后才能 claim，worker 不得自行展开。
 
 ---
 
@@ -278,3 +286,12 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - **needs user validation**：手动场景——编辑草稿时触发后台刷新，刷新后草稿应仍在文本框。这是止血非根治，完整方案（增量渲染）属 R3，未在本 step 范围内。
   - Last safe stopping point: R1.6 完成并提交。
   - Next: claim R1.7（采集超时可配置），R1 最后一个 step。
+
+- **2026-07-08 · Claude Code（R1.7 pre-work checkpoint）**：读 05 矩阵 C-4 行、01 文档 C-4 小节（`extension.ts:504,533` 硬编码 `runProcess(..., 30000, ...)`，冷启动 Outlook 本身吃 5-15 秒，叠加大邮箱全扫描，30 秒对大邮箱毫无余量；建议超时提为配置项默认 120s，超时报错带上已捕获的 FolderScan 诊断行）。`git status --short` 干净，HEAD `4cee1f8`。grep 重新定位：`runProcess("cscript.exe", ...)` 实际有 5 处调用（504/533/786/814/853 行，快照记录的"504,533"仍准确），另外 3 处（786 `openMailInOutlook`、814 `composeOutlookMail`、853 `openMeetingInOutlook`）是单条目 Outlook 打开/撰写操作，不做文件夹全扫描，不受 C-1 大邮箱扫描拖累，计划原文只点名"pullMailCore 及会议拉取的同款调用"——本 step 只改这 2 处（504 mail pull、533 collectMeetings），其余 3 处维持硬编码 30000 不动。核查 `process-runner.ts:24` 的超时错误消息已经把 `stdout`（含 `FolderScan` 诊断行）拼进 `reject(new Error(...))`——"超时报错附带已捕获诊断行"这条验收在现有实现里已经成立，不需要额外改动 `process-runner.ts`。`positiveNumber` 在 `config-utils.test.ts` 已有"非法值回落默认"通用测试覆盖，本 step 是纯配置读取路径接线（`extension.ts` 无 node:test 覆盖），不新增测试，验收标准里"config-utils 解析路径有测试覆盖"由既有测试满足。Claim R1.7。
+
+- **2026-07-08 · Claude Code（R1.7 完成 —— Milestone R1 全部完成）**：
+  - Changed: `default-config.json`/`package.json` 新增 `collectorTimeoutSeconds`（默认 120s）；`extension.ts` 的 `readConfig()` 读取该字段，`pullMailCore`/`collectMeetings` 两处 `runProcess` 超时改为可配置。未改另外 3 处单条目 Outlook 操作的硬编码超时（超出计划范围）。
+  - Validated: `npm run compile` 零错误；`npm test` 319/319 全绿，无回归；`package.json`/`default-config.json` JSON 语法校验通过。
+  - Known issues: 无。
+  - Last safe stopping point: R1.7 完成并提交，**Milestone R1（正确性止血）7 个 step 全部完成**。
+  - Next: 建议顺序——(1) 用户对 R1.2/R1.3/R1.6 做真机验证；(2) 之后可以开始 Milestone R2（效率与语言，前置条件 R1，尤其 R1.1/R1.5 已满足）。R3/R4 仍需用户先确认设计，worker 不得自行 claim。
