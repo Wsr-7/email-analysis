@@ -41,7 +41,7 @@ export async function sendPromptToModel(
   if (!selectedModel) {
     throw new Error("Load GitHub Copilot models first, then select a model before analyzing.");
   }
-  const response = await ctx.llmProvider.sendPrompt(prompt, { modelFamily: configuredModel });
+  const response = await ctx.llmProvider.sendPrompt(prompt, { modelFamily: configuredModel, model: selectedModel });
 
   await ctx.data.writeModelInfo({
     requestedFamily: configuredModel || "auto",
@@ -153,6 +153,8 @@ export async function analyzeThreadCore(
   threadId: string
 ): Promise<{ subject: string }> {
   const config = await ctx.readConfig();
+  const promptConfig = await ctx.data.readPromptConfig();
+  const categoryIds = allowedCategoryIds(promptConfig);
   const threadStore = await ctx.data.readThreadStore();
   const thread = threadStore.items.find((item) => item.threadId === threadId);
   if (!thread) {
@@ -182,7 +184,7 @@ export async function analyzeThreadCore(
   const configuredModel = typeof config.modelFamily === "string" ? config.modelFamily.trim() : "gpt-5.4";
   await ctx.log("threadAnalyze:start", { threadId, configuredModel, partialContext: gate.partialContext });
   const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "threadAnalyze");
-  let parsed = parseThreadAnalysisJson(raw, allowedCategoryIds(await ctx.data.readPromptConfig()));
+  let parsed = parseThreadAnalysisJson(raw, categoryIds);
   parsed.language = getLocaleFromConfig(config);
   if (parsed.language === "en-US" && threadAnalysisContainsCjk(parsed)) {
     try {
@@ -197,13 +199,13 @@ export async function analyzeThreadCore(
         threads: parsed,
         translated: JSON.parse(stripCodeFence(translatedRaw.raw.trim())),
         targetLanguage: "en-US"
-      }).threads, allowedCategoryIds(await ctx.data.readPromptConfig()));
+      }).threads, categoryIds);
     } catch (error) {
       await ctx.log("threadAnalyze:translateFallbackFailed", { threadId, error: error instanceof Error ? error.message : String(error) });
     }
   }
   const current = await ctx.data.readThreadAnalysisResult();
-  const merged = mergeThreadAnalysisResults(current, parsed, allowedCategoryIds(await ctx.data.readPromptConfig()));
+  const merged = mergeThreadAnalysisResults(current, parsed, categoryIds);
   await ctx.data.writeThreadAnalysisResult(merged);
   await ctx.log("threadAnalyze:done", { threadId, mergedItems: merged.items.length });
   return { subject: thread.subject || thread.threadId };

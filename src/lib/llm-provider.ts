@@ -7,6 +7,7 @@ export interface AvailableModel {
 
 export interface LlmRequestOptions {
   modelFamily: string;
+  model?: AvailableModel;
 }
 
 export interface LlmResponse {

@@ -155,11 +155,17 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 > 前置：R1 全部完成。R2.1 最小可先做；R2.2-R2.4 有依赖顺序：**chunk 化 → 语言契约 → 取消/退避**（并行分析不在本 milestone，见 06 文档 Q3，属 R3+）。
 
-### [ ] R2.1 微效率修复打包（L-8a/b/c）
+### [x] R2.1 微效率修复打包（L-8a/b/c）
 
 - **做法**：① `analyzeThreadCore` 开头一次性读 promptConfig，函数内复用（当前读 3 次）；② `sendPromptToModel` 把已选 model 对象传给 provider，`copilot-provider.ts` 不再二次 `selectChatModels`；③ 为 R2.2 预留：prompt 模板文件在循环外读一次。
 - **验收**：行为不变，`npm test` 全绿；MockProvider 路径不受影响。
 - Completion Notes:
+  - 改动文件：`src/lib/app-analysis.ts`（`sendPromptToModel` 将已选 `AvailableModel` 传给 provider；`analyzeThreadCore` 函数开头只读一次 `promptConfig` 并复用 `categoryIds`）、`src/lib/llm-provider.ts`（`LlmRequestOptions` 增加可选 `model`）、`src/lib/copilot-provider.ts`（`listModels()` 缓存 VS Code 原生模型与标准化模型；`sendPrompt()` 优先用传入模型匹配缓存，匹配不到时回退到原 `modelFamily` 选择，避免磁盘模型缓存过期造成行为回归）、`src/test/app-analysis.test.ts`（新增最小测试确认 `sendPromptToModel` 把已选模型传给 provider）。
+  - L-8c 处理：当前尚未进入 R2.2 chunk 化，现有代码没有 chunk 循环；本 step 未提前引入模板缓存抽象。R2.2 实施 chunk 循环时应复用本 step 的现有 prompt 读取位置，确保模板文件在循环外读取。
+  - Tests: `npm run compile` 零错误；`npm test` 全绿 320/320（新增 1 个测试：`passes the selected model to the provider`）。
+  - Manual validation: 不适用（纯 TS/Provider 接线，无 Outlook 交互）。
+  - Known issues: 无。`CopilotProvider` 的真实 VS Code 原生模型缓存路径未在单元测试中直接 mock VS Code API；通过类型检查和 `sendPromptToModel` 单元测试覆盖接口契约，实际 Copilot 枚举仍需在扩展宿主中自然验证。
+  - Commit: `pending`
 
 ### [ ] R2.2 批量分析 chunk 化 + token 预算（L-3）
 
@@ -295,3 +301,12 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Known issues: 无。
   - Last safe stopping point: R1.7 完成并提交，**Milestone R1（正确性止血）7 个 step 全部完成**。
   - Next: 建议顺序——(1) 用户对 R1.2/R1.3/R1.6 做真机验证；(2) 之后可以开始 Milestone R2（效率与语言，前置条件 R1，尤其 R1.1/R1.5 已满足）。R3/R4 仍需用户先确认设计，worker 不得自行 claim。
+
+- **2026-07-08 · Codex（R2.1 pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净（branch `v3...origin/v3`），`git log --oneline -5` 最新为 `3d92653 docs add session handoff`、`c9445b1 docs sync AGENTS.md with current v3 state`、`c78260a docs record R1.7 commit hash, Milestone R1 complete`、`34198ab feat make Outlook collector timeout configurable`、`4cee1f8 docs record R1.6 commit hash`；无 dirty tracked files，无 untracked files。R1.1-R1.7 均为 `[x]` 且有 commit hash；当前基线 `npm run compile` 零错误，`npm test` 319/319 全绿。读 05 矩阵 L-8a/b/c 行与 02 文档 L-8 小节（`analyzeThreadCore` 重复 `readPromptConfig`、`sendPromptToModel` 选中模型后 provider 二次枚举、prompt 文件循环内重读需在 R2.2 避免）。grep 重新定位锚点：`app-analysis.ts:29-45 sendPromptToModel`、`app-analysis.ts:151-207 analyzeThreadCore`、`copilot-provider.ts:17-40 sendPrompt`、`llm-provider.ts:20`、`mock-provider.ts:31`。Claim R2.1；本 step 只做小型效率接线，不引入依赖，不开始 R2.2 chunk 化。
+
+- **2026-07-08 · Codex（R2.1 完成）**：
+  - Changed: `sendPromptToModel` 传递已选模型；`CopilotProvider` 复用 `listModels()` 缓存的原生模型，避免同一次分析再次 `selectChatModels`，并保留 stale cache 时按 `modelFamily` 回退；`analyzeThreadCore` 复用一次读取的 `promptConfig`/`categoryIds`；新增 1 个接口契约测试。
+  - Validated: `npm run compile` 零错误；`npm test` 320/320 全绿。MockProvider 既有测试通过，路径不受影响。
+  - Known issues: 无。真实 VS Code Copilot provider 的缓存复用路径未做扩展宿主手动验证；该 step 不涉及 Outlook。
+  - Last safe stopping point: R2.1 完成，等待提交并回填 commit hash。
+  - Next: claim R2.2（批量分析 chunk 化 + token 预算）。不得跳到 R2.3/R2.4；R3/R4 仍不得自行 claim。

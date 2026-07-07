@@ -4,9 +4,10 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AppDataStore } from "../lib/app-data";
-import { analyzeBatchCore, analyzeThreadCore } from "../lib/app-analysis";
+import { analyzeBatchCore, analyzeThreadCore, sendPromptToModel } from "../lib/app-analysis";
 import { emptyMailIndex, type StoredMail } from "../lib/mail-store";
 import { MockProvider } from "../lib/mock-provider";
+import type { LlmProvider, LlmRequestOptions } from "../lib/llm-provider";
 
 function mail(index: number): StoredMail {
   const id = `mail-${String(index).padStart(3, "0")}`;
@@ -29,6 +30,32 @@ function mail(index: number): StoredMail {
 }
 
 describe("analyzeBatchCore", () => {
+  it("passes the selected model to the provider", async () => {
+    const selectedModel = { vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" };
+    let capturedOptions: LlmRequestOptions | undefined;
+    const provider: LlmProvider = {
+      listModels: async () => [selectedModel],
+      sendPrompt: async (_prompt, options) => {
+        capturedOptions = options;
+        return { rawText: "{}", model: selectedModel, usedFallback: false };
+      }
+    };
+
+    await sendPromptToModel({
+      data: {
+        readCachedAvailableModels: async () => [selectedModel],
+        writeModelInfo: async () => {}
+      } as unknown as AppDataStore,
+      llmProvider: provider,
+      extensionPath: process.cwd(),
+      readConfig: async () => ({}),
+      log: async () => {},
+      availableModelsCache: null
+    }, "prompt", "mock-model", "test");
+
+    assert.deepEqual(capturedOptions?.model, selectedModel);
+  });
+
   it("uses explicit batch size instead of saved config batch size", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {

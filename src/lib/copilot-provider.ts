@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import {
   normalizeAvailableModel,
+  modelKey,
   selectConfiguredModelIndex,
   type AvailableModel,
   type LlmProvider,
@@ -9,17 +10,26 @@ import {
 } from "./llm-provider";
 
 export class CopilotProvider implements LlmProvider {
+  private nativeModels: vscode.LanguageModelChat[] = [];
+  private availableModels: AvailableModel[] = [];
+
   public async listModels(): Promise<AvailableModel[]> {
     const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
-    return models.map(normalizeAvailableModel);
+    this.nativeModels = models;
+    this.availableModels = models.map(normalizeAvailableModel);
+    return this.availableModels.map((model) => ({ ...model }));
   }
 
   public async sendPrompt(prompt: string, options: LlmRequestOptions): Promise<LlmResponse> {
-    const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
-    const availableModels = models.map(normalizeAvailableModel);
-    const selectedModelIndex = selectConfiguredModelIndex(availableModels, options.modelFamily);
-    const selectedModel = selectedModelIndex >= 0 ? models[selectedModelIndex] : undefined;
-    const selectedAvailableModel = selectedModelIndex >= 0 ? availableModels[selectedModelIndex] : undefined;
+    if (!this.nativeModels.length) {
+      await this.listModels();
+    }
+    const modelIndex = options.model
+      ? this.availableModels.findIndex((model) => modelKey(model) === modelKey(options.model as AvailableModel))
+      : selectConfiguredModelIndex(this.availableModels, options.modelFamily);
+    const selectedModelIndex = modelIndex >= 0 ? modelIndex : selectConfiguredModelIndex(this.availableModels, options.modelFamily);
+    const selectedModel = selectedModelIndex >= 0 ? this.nativeModels[selectedModelIndex] : undefined;
+    const selectedAvailableModel = selectedModelIndex >= 0 ? this.availableModels[selectedModelIndex] : undefined;
     if (!selectedModel || !selectedAvailableModel) {
       throw new Error("Select an available GitHub Copilot model before analyzing.");
     }
