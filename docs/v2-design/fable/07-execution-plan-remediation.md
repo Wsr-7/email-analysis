@@ -73,7 +73,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 无语法错误；`--sample` 生成的 digest 与改动前（`git stash` 切回 HEAD 版本对照跑）逐行 diff，仅时间戳字段不同（`Now()` 波动），字段结构/顺序/`ToMe`/`CcMe` 均完全一致——`--sample` 走 `WriteSampleDigest`，不经过 `CollectFromOutlook`/`ResolveCurrentUser`/`IsRecipientTypeMatch`，本就不受本次改动影响，此对比主要确认改动未意外破坏其余共享代码路径（如 `WriteDigest`）。`npm test`（TS 侧）312/312 全绿，无回归（VBS-only 改动，预期不影响 TS 测试）。
   - Manual validation: **needs user validation on real Outlook**——需在真实 Outlook/Exchange 账户上验证：(a) 一封仅在 CC、不在 To 里的邮件应 `ToMe: false`、`CcMe: true`；(b) 一封 To 里包含当前用户的邮件应 `ToMe: true`；(c) 检查 stdout 中 `CurrentUser: resolved=true; smtp=...` 一行确认身份解析成功且 SMTP 非空（若 `resolved=false` 说明该环境下 Exchange 身份解析失败，toMe/ccMe 会退化回旧的恒真行为，需要进一步排查环境差异，如非 Exchange/IMAP 账户的 `GetExchangeUser` 行为）。
   - Known issues: 未做 IMAP/POP 账户（无 `GetExchangeUser`）下 `AddressEntry.Address` 回落路径的真机验证；理论上应生效（标准 Outlook 对象模型行为），但未连真实非 Exchange 账户复核。
-  - Commit: `PENDING`
+  - Commit: `15c147c`
 
 ### [ ] R1.3 修复会议采集迭代（C-6）
 
