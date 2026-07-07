@@ -132,7 +132,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: RED 先行——新增测试断言 `restoreDraftState`/`draftState`/合并写入片段，实现前 1 个测试失败（`function restoreDraftState()` 不存在）；实现后 `npm run compile` 零错误，`npm test` 全绿 319/319（318+1），无回归。
   - Manual validation: 手动验证场景（未做，需用户在真实 VS Code 中操作）——打开 workbench，选中一封邮件，在草稿框输入文字但不提交，触发一次后台刷新（如点击 Fetch New 或等待自动刷新导致 `webview.html` 重建），预期刷新后 workbench 重新打开该邮件时草稿文字仍在文本框中（而非被服务端下发的空/旧草稿覆盖）。
   - Known issues: 这只是止血（`vscode.setState()`/`webview.html` 整页重建仍会导致滚动位置、展开状态丢失与可见闪烁），完整方案是 04 文档建议的增量渲染改造，属 R3，本 step 明确不做。
-  - Commit: `PENDING`
+  - Commit: `ef494ad`
 
 ### [ ] R1.7 采集超时可配置（C-4）
 
