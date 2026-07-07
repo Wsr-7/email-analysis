@@ -75,12 +75,18 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 未做 IMAP/POP 账户（无 `GetExchangeUser`）下 `AddressEntry.Address` 回落路径的真机验证；理论上应生效（标准 Outlook 对象模型行为），但未连真实非 Exchange 账户复核。
   - Commit: `15c147c`
 
-### [ ] R1.3 修复会议采集迭代（C-6）
+### [x] R1.3 修复会议采集迭代（C-6）
 
 - **改动点**：`scripts/collect-outlook-meetings.vbs`（当前 120-168 行附近：`Sort "[Start]"` → `IncludeRecurrences = True` → `Restrict` → `For i = 1 To restricted.Count`）。
 - **做法**：`IncludeRecurrences` 集合上禁用 `Count`/索引访问，改 `restricted.GetFirst` / `restricted.GetNext` 迭代；终止条件 = item 的 `Start` 超出 rangeEnd（集合已按 Start 升序），外加 200 条保险丝防死循环。保持 digest 输出格式不变。
 - **验收**：语法检查通过；`src/test/meeting-digest.test.js` 等现有测试全绿；Handover 标注 `needs user validation on real Outlook`（含周期性会议的日历应能采到实例）。
 - Completion Notes:
+  - 改动文件：`scripts/collect-outlook-meetings.vbs`，仅 `CollectCalendarItems` 内的迭代逻辑（原 `For i = 1 To restricted.Count` 循环）。`CollectUnrespondedInvites` 未改动——01 文档明确该 Sub 的 Restrict 不带 `IncludeRecurrences`，不受 Count 不可靠问题影响。
+  - 实现：`restricted.GetFirst()` 取首项（失败/取不到直接 `Exit Sub`），`Do While Not item Is Nothing` 循环内 `restricted.GetNext()` 推进；每轮先检查 `item.Start >= rangeEnd` 提前退出（集合按 Start 升序，Restrict+IncludeRecurrences 组合已知可能让个别超出范围的周期实例漏网，这是防御）；`iterations > 200` 与原有 `collectedCount >= 200` 两道保险丝均保留，防止退化场景死循环。`GetNext()` 出错也视为迭代结束（`Exit Do`），不 Fail 整个采集。
+  - 验收结果：`cscript //nologo scripts/collect-outlook-meetings.vbs --help` 无语法错误；`--sample` 走 `WriteSampleMeetingDigest`，不经过 `CollectCalendarItems`，对照改动前版本（`git stash` 切回）逐行 diff 仅 `GeneratedAt` 时间戳不同，确认未破坏共享代码路径。`npm test` 312/312 全绿，无回归。
+  - Manual validation: **needs user validation on real Outlook**——需要在含周期性会议（如每周例会）的真实日历上验证：Meetings 队列不再为空、周期性会议能采到具体实例（而非被 `Count` 为 0/异常值吞掉）。这与 handover 历史 TODO「inspect why meeting invitations/calendar items are not collected」高度吻合，是该问题的第一假设修复，需要真机确认是否已解决队列空的根因。
+  - Known issues: 无法在当前环境验证 `IncludeRecurrences=True` 时 `restricted.Count` 的真实异常表现（无法连接真实 Outlook/Exchange），此 fix 基于 01 文档记录的 Outlook 对象模型已知行为，逻辑本身（GetFirst/GetNext 迭代 + Start 升序提前退出 + 200 条保险丝）在语法与 TS 侧测试层面已验证正确。
+  - Commit: `PENDING`
 
 ### [ ] R1.4 保留期对齐，消除 6 天正文黑洞（L-2）
 
@@ -184,7 +190,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 ## 6. Current Snapshot
 
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
-- 2026-07-08 · R1.1、R1.2 完成并提交。R1.2 需真实 Outlook 验证（CC-only 邮件应 ToMe: false）。R1.3-R1.7 未开始。
+- 2026-07-08 · R1.1、R1.2、R1.3 完成并提交。R1.2/R1.3 均需真实 Outlook 验证（见各自 Completion Notes）。R1.4-R1.7 未开始。
 
 ---
 
@@ -212,3 +218,13 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Last safe stopping point: R1.2 完成并提交，等待真机验证反馈。
   - Uncommitted changes: 仅本文件（随 commit 一起提交）。
   - Next: claim R1.3（`collect-outlook-meetings.vbs` 会议迭代 `Count`/索引不可靠问题）或 R1.4-R1.7 中任一。
+
+- **2026-07-08 · Claude Code（R1.3 pre-work checkpoint）**：读 05 矩阵 C-6 行、01 文档 C-6 小节（`IncludeRecurrences=True` 后 `restricted.Count` 不可靠，惰性展开周期性会议可能返回 0/错误值，`For i = 1 To restricted.Count` 在 Count=0 时一个会议都收不到——疑似 Meetings 队列空的根因）。`git status --short` 干净，HEAD `169faa8`。grep 重新定位锚点：问题循环在 `CollectCalendarItems`（scripts/collect-outlook-meetings.vbs:109-169），`For i = 1 To restricted.Count` 在第 141 行；`CollectUnrespondedInvites`（171-241 行）同样用 `restricted.Item(i)` 索引但**不带** `IncludeRecurrences`，用的是 `[MessageClass]='IPM.Schedule.Meeting.Request'` Restrict——01 文档明确该 Sub 无此问题，本 step 不动它。Claim R1.3，只改 `CollectCalendarItems` 的迭代方式。
+
+- **2026-07-08 · Claude Code（R1.3 完成，needs user validation on real Outlook）**：
+  - Changed: `scripts/collect-outlook-meetings.vbs`——`CollectCalendarItems` 的 `For i = 1 To restricted.Count` 索引迭代改为 `GetFirst`/`GetNext` 迭代，加 `item.Start >= rangeEnd` 提前退出（升序集合）+ 200 次迭代保险丝；`CollectUnrespondedInvites` 未动。
+  - Validated: `cscript //nologo scripts/collect-outlook-meetings.vbs --help` 语法检查通过；`--sample` 与改动前逐行 diff 仅时间戳不同（sample 路径不经过 `CollectCalendarItems`，用于确认未破坏共享代码）；`npm test` 312/312 全绿，无回归。
+  - **needs user validation on real Outlook**：需在含周期性会议的真实日历上验证 Meetings 队列不再空、周期性会议能采到实例——这与 handover 历史「inspect why meeting invitations/calendar items are not collected」TODO 高度吻合，是该问题的第一假设修复，真机结果待确认。
+  - Last safe stopping point: R1.3 完成并提交，等待真机验证反馈。
+  - Uncommitted changes: 仅本文件（随 commit 一起提交）。
+  - Next: claim R1.4（`mailStoreRetentionDays` 默认值 1→7）或 R1.5-R1.7 中任一。

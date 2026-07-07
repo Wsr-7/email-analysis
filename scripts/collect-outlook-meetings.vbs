@@ -137,35 +137,64 @@ Sub CollectCalendarItems(byRef ns, byVal rangeStart, byVal rangeEnd, byVal bodyC
   End If
   On Error GoTo 0
 
-  Dim i
-  For i = 1 To restricted.Count
+  ' items.IncludeRecurrences = True makes restricted.Count unreliable (lazy expansion of
+  ' recurring instances can report 0 or a bogus value), so index-based iteration silently
+  ' misses every meeting. Walk the collection with GetFirst/GetNext instead. The collection
+  ' is sorted ascending by Start, so once an instance's Start reaches rangeEnd we can stop
+  ' (also guards against IncludeRecurrences + Restrict occasionally letting instances outside
+  ' the filtered range slip through). A 200-item fuse still guards against runaway iteration.
+  On Error Resume Next
+  Dim item
+  Set item = restricted.GetFirst()
+  Dim gotFirst
+  gotFirst = (Err.Number = 0)
+  Err.Clear
+  On Error GoTo 0
+  If Not gotFirst Then Exit Sub
+
+  Dim iterations
+  iterations = 0
+  Do While Not item Is Nothing
+    iterations = iterations + 1
+    If iterations > 200 Then Exit Do
+
     On Error Resume Next
-    Dim item
-    Set item = restricted.Item(i)
-    If Err.Number <> 0 Then
-      Err.Clear
-      On Error GoTo 0
-    Else
-      On Error GoTo 0
-      If Not item Is Nothing Then
-        If TypeName(item) = "AppointmentItem" Then
-          Dim respStatus
-          respStatus = SafeResponseStatus(item)
-          If respStatus <> 4 Then
-            Dim eid
-            eid = SafeString(item.EntryID)
-            If eid <> "" And Not seenEntryIds.Exists(eid) Then
-              seenEntryIds.Add eid, True
-              Dim record
-              Set record = BuildMeetingRecord(item, "calendar", bodyChars, collectedCount + 1)
-              AddRecordToArray collected, collectedCount, record
-            End If
-          End If
+    Dim itemStart
+    itemStart = item.Start
+    Dim gotStart
+    gotStart = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+    If gotStart Then
+      If itemStart >= rangeEnd Then Exit Do
+    End If
+
+    If TypeName(item) = "AppointmentItem" Then
+      Dim respStatus
+      respStatus = SafeResponseStatus(item)
+      If respStatus <> 4 Then
+        Dim eid
+        eid = SafeString(item.EntryID)
+        If eid <> "" And Not seenEntryIds.Exists(eid) Then
+          seenEntryIds.Add eid, True
+          Dim record
+          Set record = BuildMeetingRecord(item, "calendar", bodyChars, collectedCount + 1)
+          AddRecordToArray collected, collectedCount, record
         End If
       End If
     End If
-    If collectedCount >= 200 Then Exit For
-  Next
+
+    If collectedCount >= 200 Then Exit Do
+
+    On Error Resume Next
+    Set item = restricted.GetNext()
+    If Err.Number <> 0 Then
+      Err.Clear
+      On Error GoTo 0
+      Exit Do
+    End If
+    On Error GoTo 0
+  Loop
 End Sub
 
 Sub CollectUnrespondedInvites(byRef ns, byVal todayStart, byVal bodyChars, byRef collected, byRef collectedCount, byRef seenEntryIds)
