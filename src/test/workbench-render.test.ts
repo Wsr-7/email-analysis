@@ -295,6 +295,15 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("data-action=\"composeMail\""));
   });
 
+  it("persists in-progress draft text to webview state and restores it after a rebuild", () => {
+    const html = renderWorkbenchHtml(stubInput());
+    assert.ok(html.includes("function restoreDraftState()"));
+    assert.ok(html.includes("draftState"));
+    assert.ok(html.includes("draftState.itemId !== currentId"));
+    assert.ok(html.includes("ta.value !== draftState.draft"));
+    assert.ok(html.includes("itemId: itemId, draft: target.value"));
+  });
+
   it("does not include filterQueue or selectItem (no list column)", () => {
     const html = renderWorkbenchHtml(stubInput());
     assert.ok(!html.includes("filterQueue"));

@@ -405,10 +405,14 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
 var vscode = acquireVsCodeApi();
 var prev = vscode.getState() || {};
 var currentId = prev.currentId || '';
+var draftState = prev.draftState || null;
 
 if (currentId) showReader(currentId);
+restoreDraftState();
 
 function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, extra || {})); }
+
+function setPersistedState(patch) { vscode.setState(Object.assign({}, vscode.getState() || {}, patch)); }
 
 function showReader(id) {
   hideReaders();
@@ -419,19 +423,19 @@ function showReader(id) {
 
 function focusAfterRemoving(id) {
   var current = document.querySelector('.wb-reader[data-id="' + id + '"]');
-  if (!current) { currentId = ''; vscode.setState({ currentId: currentId }); hideReaders(); return; }
+  if (!current) { currentId = ''; setPersistedState({ currentId: currentId }); hideReaders(); return; }
   var queue = current.getAttribute('data-queue') || '';
   var peers = Array.prototype.slice.call(document.querySelectorAll('.wb-reader[data-queue="' + queue + '"]')).filter(function(r) {
     return r.getAttribute('data-id') !== id;
   });
   if (peers.length) {
     currentId = peers[0].getAttribute('data-id') || '';
-    vscode.setState({ currentId: currentId });
+    setPersistedState({ currentId: currentId });
     showReader(currentId);
     return;
   }
   currentId = '';
-  vscode.setState({ currentId: currentId });
+  setPersistedState({ currentId: currentId });
   hideReaders();
 }
 
@@ -440,12 +444,25 @@ function hideReaders() {
   document.getElementById('placeholder').hidden = false;
 }
 
+function restoreDraftState() {
+  if (!draftState || !draftState.itemId || draftState.itemId !== currentId) return;
+  var box = document.querySelector('.draft-box-editable[data-item-id="' + draftState.itemId + '"]');
+  if (!box) return;
+  var ta = box.querySelector('.draft-textarea');
+  if (!ta) return;
+  if (ta.value !== draftState.draft) {
+    ta.value = draftState.draft;
+    if (String(draftState.draft || '').trim()) showDraftActionButtons(box);
+    else showGenerateDraftButton(box);
+  }
+}
+
 window.addEventListener('message', function(e) {
   var msg = e.data;
   if (msg && msg.type === 'focusItem' && msg.id) {
     currentId = msg.id;
     showReader(currentId);
-    vscode.setState({ currentId: currentId });
+    setPersistedState({ currentId: currentId });
   }
   if (msg && msg.type === 'updateDraft' && msg.itemId) {
     var box = document.querySelector('.draft-box-editable[data-item-id="' + msg.itemId + '"]');
@@ -460,6 +477,11 @@ document.addEventListener('input', function(e) {
   if (!box) return;
   if (String(target.value || '').trim()) showDraftActionButtons(box);
   else showGenerateDraftButton(box);
+  var itemId = box.getAttribute('data-item-id') || '';
+  if (itemId) {
+    draftState = { itemId: itemId, draft: target.value };
+    setPersistedState({ draftState: draftState });
+  }
 });
 
 function showDraftActionButtons(box) {

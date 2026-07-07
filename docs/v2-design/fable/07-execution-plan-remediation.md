@@ -118,13 +118,21 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 无。
   - Commit: `2e6aace`
 
-### [ ] R1.6 草稿丢失止血（U-1 短期方案）
+### [x] R1.6 草稿丢失止血（U-1 短期方案）
 
 - **改动点**：workbench webview 的草稿 textarea 脚本（`workbench-render.ts` 内嵌 JS）与 webview state。
 - **做法**：textarea `input` 事件把 `{ mailId, draft }` 写入 `vscode.setState()`（与现有 getState/setState 用法保持一致，先 grep 现有先例）；HTML 重建后的初始化脚本从 `getState()` 读取，**仅当 state 中 mailId 与当前渲染的 mailId 相同且草稿与服务端下发值不同**时回填 textarea。用户切换到另一封邮件时清除或忽略旧 state。
 - **验收**：`npm test` 全绿；`workbench-render` 相关测试断言输出 HTML 包含回填脚本片段；Completion Notes 写清手动验证场景：正在编辑草稿时触发一次后台刷新（如 Fetch New 完成），草稿仍在。
 - **边界**：这是止血，不做增量渲染（R3）。sidebar 若无自由文本输入框则不动。
 - Completion Notes:
+  - 改动文件：`src/lib/workbench-render.ts`（内嵌 client JS）、`src/test/workbench-render.test.ts`（新增 1 个测试）。sidebar 侧确认无自由文本输入框（`sidebar-render.ts` 无 `draft-textarea` class），按边界未改动。
+  - 实现：新增 `draftState`（脚本级变量，`{itemId, draft}` 或 `null`，脚本加载时从 `vscode.getState().draftState` 初始化）与 `setPersistedState(patch)` helper（`Object.assign({}, vscode.getState() || {}, patch)`，merge 写入而非整体覆盖）。`draft-textarea` 的 `input` 事件里追加：取 `data-item-id`，写入 `draftState = {itemId, draft: target.value}` 并 `setPersistedState({draftState})`。新增 `restoreDraftState()`：仅当 `draftState.itemId === currentId`（当前渲染项与保存项一致）且 `ta.value !== draftState.draft`（与服务端下发值不同）才回填 textarea 并刷新按钮状态；脚本加载时（`if (currentId) showReader(currentId)` 之后）调用一次。
+  - 把原有 4 处 `vscode.setState({ currentId: currentId })`（整体覆盖写法）全部改为 `setPersistedState({ currentId: currentId })`（merge 写法）——这是必须的连带改动，不是范围蔓延：若只在新增的 draft 写入点用 merge、旧的 4 处仍整体覆盖，用户切换邮件触发的 `currentId` 写入会把刚保存的 `draftState` 静默冲掉，止血本身失效。`setPersistedState` 复用的 merge 模式与 `sidebar-render.ts` 现有 5 处 `vscode.setState(Object.assign({}, vscode.getState() || {}, {...}))` 先例一致，保持仓库惯例统一。
+  - "用户切换到另一封邮件时清除或忽略旧 state"：采用"忽略"而非显式清除——`restoreDraftState()` 的 `itemId !== currentId` 守卫已经让切换后的旧 draftState 不会被回填到任何界面，无需额外清除逻辑（旧 draftState 仍留在 storage 里，下次切回同一封邮件且服务端值未变时可能被回填，这是"忽略"策略的预期行为，止血目标已达成）。
+  - Tests: RED 先行——新增测试断言 `restoreDraftState`/`draftState`/合并写入片段，实现前 1 个测试失败（`function restoreDraftState()` 不存在）；实现后 `npm run compile` 零错误，`npm test` 全绿 319/319（318+1），无回归。
+  - Manual validation: 手动验证场景（未做，需用户在真实 VS Code 中操作）——打开 workbench，选中一封邮件，在草稿框输入文字但不提交，触发一次后台刷新（如点击 Fetch New 或等待自动刷新导致 `webview.html` 重建），预期刷新后 workbench 重新打开该邮件时草稿文字仍在文本框中（而非被服务端下发的空/旧草稿覆盖）。
+  - Known issues: 这只是止血（`vscode.setState()`/`webview.html` 整页重建仍会导致滚动位置、展开状态丢失与可见闪烁），完整方案是 04 文档建议的增量渲染改造，属 R3，本 step 明确不做。
+  - Commit: `PENDING`
 
 ### [ ] R1.7 采集超时可配置（C-4）
 
@@ -205,7 +213,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 ## 6. Current Snapshot
 
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
-- 2026-07-08 · R1.1、R1.2、R1.3、R1.4、R1.5 完成并提交。R1.2/R1.3 需真实 Outlook 验证（见各自 Completion Notes）。R1.6、R1.7 未开始。
+- 2026-07-08 · R1.1、R1.2、R1.3、R1.4、R1.5、R1.6 完成并提交。R1.2/R1.3 需真实 Outlook 验证；R1.6 需用户手动验证草稿保留场景（见各自 Completion Notes）。R1.7 未开始。
 
 ---
 
@@ -261,3 +269,12 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Known issues: 无。
   - Last safe stopping point: R1.5 完成并提交。
   - Next: claim R1.6（草稿丢失止血）或 R1.7（采集超时可配置）。
+
+- **2026-07-08 · Claude Code（R1.6 pre-work checkpoint）**：读 05 矩阵 U-1 行、04 文档 U-1 小节（`dashboard-provider.ts`/`extension.ts` 每次 `update()` 直接整页重建，草稿 textarea 只活在 DOM 里，任何后台刷新到达即丢失未保存草稿——数据丢失级 UX 风险；建议短期止血：刷新前把 textarea 收进 `vscode.setState()`，重建后回填）。`git status --short` 干净，HEAD `6ddcd57`。grep 定位现有先例：`workbench-render.ts:405-454` 已有 `acquireVsCodeApi()`/`vscode.getState()`/`vscode.setState()` 用于持久化 `currentId`（当前选中的阅读项），`input` 事件监听在 456-463 行（只处理按钮状态切换，未写 state）。sidebar 侧 grep 确认无自由文本输入框（`sidebar-render.ts` 无 `draft-textarea` class），按计划边界"sidebar 若无自由文本输入框则不动"，本 step 只改 `workbench-render.ts`。设计：`vscode.setState()` 会整体覆盖 state（非 merge），需要一个 `saveState()` helper 同时带上 `currentId` 与新增的 `draftState`，避免相互覆盖丢失；`draftState` 存单个 `{itemId, draft}`（workbench 一次只有一个可见阅读项/草稿框，不需要 map）。Claim R1.6。
+
+- **2026-07-08 · Claude Code（R1.6 完成，needs user validation：手动草稿保留场景）**：
+  - Changed: `workbench-render.ts` 内嵌 JS——新增 `draftState`/`setPersistedState`/`restoreDraftState`；`draft-textarea` 的 `input` 事件追加写入 `draftState`；原 4 处整体覆盖式 `vscode.setState({currentId})` 改为 merge 式 `setPersistedState({currentId})`（否则切换邮件会冲掉刚保存的草稿，止血失效）。1 个新测试。
+  - Validated: RED 先行（1 处断言先失败）；`npm run compile` 零错误；`npm test` 319/319 全绿，无回归。
+  - **needs user validation**：手动场景——编辑草稿时触发后台刷新，刷新后草稿应仍在文本框。这是止血非根治，完整方案（增量渲染）属 R3，未在本 step 范围内。
+  - Last safe stopping point: R1.6 完成并提交。
+  - Next: claim R1.7（采集超时可配置），R1 最后一个 step。
