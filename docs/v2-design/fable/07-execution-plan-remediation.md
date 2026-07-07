@@ -100,7 +100,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: `npm run compile` 零错误；`npm test` 全绿 312/312，无回归（纯配置默认值改动，无逻辑变化）。
   - Manual validation: 不适用（配置默认值改动，无 Outlook 交互；效果需长期使用观察——新装用户 6 天后不应再看到 P1.2 症状"analyzed mail body 为空"复现）。
   - Known issues: 无。存储体积影响：1500 字符 × 每天几百封 × 7 天，JSON 体积仍在可接受范围（02 文档已评估）。
-  - Commit: `PENDING`
+  - Commit: `e4d99ce`
 
 ### [ ] R1.5 prompt 注入当前日期（B-2a）
 
