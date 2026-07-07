@@ -165,7 +165,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: `npm run compile` 零错误；`npm test` 全绿 320/320（新增 1 个测试：`passes the selected model to the provider`）。
   - Manual validation: 不适用（纯 TS/Provider 接线，无 Outlook 交互）。
   - Known issues: 无。`CopilotProvider` 的真实 VS Code 原生模型缓存路径未在单元测试中直接 mock VS Code API；通过类型检查和 `sendPromptToModel` 单元测试覆盖接口契约，实际 Copilot 枚举仍需在扩展宿主中自然验证。
-  - Commit: `pending`
+  - Commit: `2417b2a`
 
 ### [ ] R2.2 批量分析 chunk 化 + token 预算（L-3）
 
@@ -308,5 +308,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Changed: `sendPromptToModel` 传递已选模型；`CopilotProvider` 复用 `listModels()` 缓存的原生模型，避免同一次分析再次 `selectChatModels`，并保留 stale cache 时按 `modelFamily` 回退；`analyzeThreadCore` 复用一次读取的 `promptConfig`/`categoryIds`；新增 1 个接口契约测试。
   - Validated: `npm run compile` 零错误；`npm test` 320/320 全绿。MockProvider 既有测试通过，路径不受影响。
   - Known issues: 无。真实 VS Code Copilot provider 的缓存复用路径未做扩展宿主手动验证；该 step 不涉及 Outlook。
-  - Last safe stopping point: R2.1 完成，等待提交并回填 commit hash。
+  - Last safe stopping point: R2.1 完成并提交，commit `2417b2a`。
   - Next: claim R2.2（批量分析 chunk 化 + token 预算）。不得跳到 R2.3/R2.4；R3/R4 仍不得自行 claim。
