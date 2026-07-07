@@ -19,6 +19,11 @@ config.Add "older-than-map", ""
 config.Add "sample", False
 config.Add "help", False
 
+Dim g_currentUserSmtp, g_currentUserName, g_recipientParseFailures
+g_currentUserSmtp = ""
+g_currentUserName = ""
+g_recipientParseFailures = 0
+
 ParseArgs args, config
 
 If config("help") Then
@@ -75,6 +80,7 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
 
   Dim ns
   Set ns = outlook.GetNamespace("MAPI")
+  ResolveCurrentUser ns
 
   Dim folderNames
   folderNames = Split(CStr(target("folders")), ";")
@@ -99,6 +105,9 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
     collectedCount = CLng(target("max-items"))
   End If
   WScript.Echo "DigestCap: mode=" & target("range-mode") & "; collected=" & beforeGlobalCap & "; emitted=" & collectedCount & "; maxItems=" & target("max-items")
+  If g_recipientParseFailures > 0 Then
+    WScript.Echo "RecipientResolution: parseFailures=" & g_recipientParseFailures & "; toMe/ccMe fell back to true for those mails"
+  End If
   WriteDigest outputPath, target, collected, collectedCount
 End Sub
 
@@ -492,15 +501,142 @@ Function SafeAttachmentNames(byRef mail)
 End Function
 
 Function IsDirectRecipient(byRef mail)
-  Dim lcTo
-  lcTo = LCase(SafeTo(mail))
-  IsDirectRecipient = (Len(lcTo) > 0)
+  IsDirectRecipient = IsRecipientTypeMatch(mail, 1) ' olTo
 End Function
 
 Function IsCcRecipient(byRef mail)
-  Dim lcCc
-  lcCc = LCase(SafeCc(mail))
-  IsCcRecipient = (Len(lcCc) > 0)
+  IsCcRecipient = IsRecipientTypeMatch(mail, 2) ' olCC
+End Function
+
+Sub ResolveCurrentUser(byRef ns)
+  On Error Resume Next
+  Dim currentUser
+  Set currentUser = ns.CurrentUser
+  Dim gotUser
+  gotUser = (Err.Number = 0) And Not (currentUser Is Nothing)
+  Err.Clear
+  On Error GoTo 0
+
+  If Not gotUser Then
+    WScript.Echo "CurrentUser: resolved=false; reason=ns.CurrentUser unavailable; toMe/ccMe will fallback to true"
+    Exit Sub
+  End If
+
+  On Error Resume Next
+  g_currentUserName = SafeString(currentUser.Name)
+  Err.Clear
+  On Error GoTo 0
+
+  On Error Resume Next
+  Dim addressEntry
+  Set addressEntry = currentUser.AddressEntry
+  If Err.Number = 0 And Not addressEntry Is Nothing Then
+    Dim exchUser
+    Set exchUser = addressEntry.GetExchangeUser()
+    If Err.Number = 0 And Not exchUser Is Nothing Then
+      g_currentUserSmtp = LCase(SafeString(exchUser.PrimarySmtpAddress))
+    End If
+    Err.Clear
+    If g_currentUserSmtp = "" Then
+      g_currentUserSmtp = LCase(SafeString(addressEntry.Address))
+      Err.Clear
+    End If
+  End If
+  On Error GoTo 0
+
+  If g_currentUserSmtp = "" And g_currentUserName = "" Then
+    WScript.Echo "CurrentUser: resolved=false; reason=smtp and name both empty; toMe/ccMe will fallback to true"
+  Else
+    WScript.Echo "CurrentUser: resolved=true; smtp=" & ValueOrDash(g_currentUserSmtp) & "; name=" & ValueOrDash(g_currentUserName)
+  End If
+End Sub
+
+Function IsRecipientTypeMatch(byRef mail, byVal recipientType)
+  ' 身份未解析成功：兜底维持 true，与恒真现状语义一致，宁可误报不漏报
+  If g_currentUserSmtp = "" And g_currentUserName = "" Then
+    IsRecipientTypeMatch = True
+    Exit Function
+  End If
+
+  On Error Resume Next
+  Dim recipients
+  Set recipients = mail.Recipients
+  Dim recipientsOk
+  recipientsOk = (Err.Number = 0) And Not (recipients Is Nothing)
+  Err.Clear
+  On Error GoTo 0
+
+  If Not recipientsOk Then
+    g_recipientParseFailures = g_recipientParseFailures + 1
+    IsRecipientTypeMatch = True
+    Exit Function
+  End If
+
+  Dim matched
+  matched = False
+
+  Dim i
+  For i = 1 To recipients.Count
+    On Error Resume Next
+    Dim recipient
+    Set recipient = recipients.Item(i)
+    Dim recipientTypeValue
+    recipientTypeValue = recipient.Type
+    Dim itemOk
+    itemOk = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+
+    If itemOk Then
+      If recipientTypeValue = recipientType Then
+        If IsCurrentUserRecipient(recipient) Then
+          matched = True
+        End If
+      End If
+    End If
+  Next
+
+  IsRecipientTypeMatch = matched
+End Function
+
+Function IsCurrentUserRecipient(byRef recipient)
+  IsCurrentUserRecipient = False
+
+  Dim recipientSmtp
+  recipientSmtp = ""
+
+  On Error Resume Next
+  Dim addressEntry
+  Set addressEntry = recipient.AddressEntry
+  If Err.Number = 0 And Not addressEntry Is Nothing Then
+    Dim exchUser
+    Set exchUser = addressEntry.GetExchangeUser()
+    If Err.Number = 0 And Not exchUser Is Nothing Then
+      recipientSmtp = LCase(SafeString(exchUser.PrimarySmtpAddress))
+    End If
+    Err.Clear
+    If recipientSmtp = "" Then
+      recipientSmtp = LCase(SafeString(addressEntry.Address))
+      Err.Clear
+    End If
+  End If
+  On Error GoTo 0
+
+  If recipientSmtp <> "" And g_currentUserSmtp <> "" Then
+    IsCurrentUserRecipient = (recipientSmtp = g_currentUserSmtp)
+    If IsCurrentUserRecipient Then Exit Function
+  End If
+
+  Dim recipientName
+  recipientName = ""
+  On Error Resume Next
+  recipientName = LCase(SafeString(recipient.Name))
+  Err.Clear
+  On Error GoTo 0
+
+  If recipientName <> "" And g_currentUserName <> "" Then
+    IsCurrentUserRecipient = (recipientName = LCase(g_currentUserName))
+  End If
 End Function
 
 Function ImportanceLabel(byVal value)

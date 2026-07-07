@@ -58,7 +58,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 无。
   - Commit: `e60001c`
 
-### [ ] R1.2 修复 toMe/ccMe 恒真（C-2）
+### [x] R1.2 修复 toMe/ccMe 恒真（C-2）
 
 - **改动点**：`scripts/collect-outlook-mails.vbs`，`IsDirectRecipient` / 对应 CC 判定（当前实现只判 To/CC 字段非空）。
 - **做法**：
@@ -67,6 +67,13 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   3. 每步包 `On Error Resume Next`；身份或收件人解析完全失败时**兜底维持 true**（与现状语义一致，宁可误报不漏报），并输出一行诊断（沿用现有 FolderScan 风格）。
 - **验收**：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 无语法错误；`--sample` 输出格式不变；digest 中 `ToMe`/`CcMe` 字段仍存在。Handover 标注 `needs user validation on real Outlook`（真实邮箱验证：一封仅在 CC 的邮件应 ToMe: false）。
 - Completion Notes:
+  - 改动文件：`scripts/collect-outlook-mails.vbs`。新增脚本级全局变量 `g_currentUserSmtp`/`g_currentUserName`/`g_recipientParseFailures`；新增 `ResolveCurrentUser`（`CollectFromOutlook` 内 `Set ns = outlook.GetNamespace("MAPI")` 之后调用一次，取 `ns.CurrentUser.Name` + `AddressEntry.GetExchangeUser.PrimarySmtpAddress`，取不到 SMTP 时回落 `AddressEntry.Address`）、`IsRecipientTypeMatch(mail, recipientType)`（遍历 `mail.Recipients`，按 `.Type` 过滤 olTo=1/olCC=2，逐个用 `IsCurrentUserRecipient` 比对）、`IsCurrentUserRecipient(recipient)`（先比 SMTP 归一化地址，再比显示名，均不区分大小写）三个新函数；`IsDirectRecipient`/`IsCcRecipient` 改为薄封装调用 `IsRecipientTypeMatch(mail, 1)` / `IsRecipientTypeMatch(mail, 2)`。`SafeTo`/`SafeCc`（供 `to`/`cc` 字段用）未改动。
+  - 兜底策略：身份完全无法解析（`g_currentUserSmtp` 与 `g_currentUserName` 均为空）时 `IsRecipientTypeMatch` 直接短路返回 `true`，不触碰 `mail.Recipients`；`mail.Recipients` 访问失败（罕见）时计入 `g_recipientParseFailures` 并同样返回 `true`；两种情况都符合"宁可误报不漏报"（与旧实现恒真语义兼容，不会让本来能触达的 waitingForMe 信号消失）。
+  - 诊断行：`ResolveCurrentUser` 结束时输出一行 `CurrentUser: resolved=...`（成功/失败原因/SMTP+姓名，成功与失败都会输出，不只失败时）；`CollectFromOutlook` 末尾若 `g_recipientParseFailures > 0` 才输出一行 `RecipientResolution: parseFailures=N; ...` 汇总（不逐邮件输出，避免刷屏，风格与既有 `FolderScan`/`DigestCap` 一致）。两行诊断均走 `WScript.Echo`（stdout），不写入 digest 文件，不影响 digest 格式。
+  - 验收结果：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 无语法错误；`--sample` 生成的 digest 与改动前（`git stash` 切回 HEAD 版本对照跑）逐行 diff，仅时间戳字段不同（`Now()` 波动），字段结构/顺序/`ToMe`/`CcMe` 均完全一致——`--sample` 走 `WriteSampleDigest`，不经过 `CollectFromOutlook`/`ResolveCurrentUser`/`IsRecipientTypeMatch`，本就不受本次改动影响，此对比主要确认改动未意外破坏其余共享代码路径（如 `WriteDigest`）。`npm test`（TS 侧）312/312 全绿，无回归（VBS-only 改动，预期不影响 TS 测试）。
+  - Manual validation: **needs user validation on real Outlook**——需在真实 Outlook/Exchange 账户上验证：(a) 一封仅在 CC、不在 To 里的邮件应 `ToMe: false`、`CcMe: true`；(b) 一封 To 里包含当前用户的邮件应 `ToMe: true`；(c) 检查 stdout 中 `CurrentUser: resolved=true; smtp=...` 一行确认身份解析成功且 SMTP 非空（若 `resolved=false` 说明该环境下 Exchange 身份解析失败，toMe/ccMe 会退化回旧的恒真行为，需要进一步排查环境差异，如非 Exchange/IMAP 账户的 `GetExchangeUser` 行为）。
+  - Known issues: 未做 IMAP/POP 账户（无 `GetExchangeUser`）下 `AddressEntry.Address` 回落路径的真机验证；理论上应生效（标准 Outlook 对象模型行为），但未连真实非 Exchange 账户复核。
+  - Commit: `PENDING`
 
 ### [ ] R1.3 修复会议采集迭代（C-6）
 
@@ -177,7 +184,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 ## 6. Current Snapshot
 
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
-- 2026-07-08 · R1.1 完成并提交。R1.2-R1.7 未开始。
+- 2026-07-08 · R1.1、R1.2 完成并提交。R1.2 需真实 Outlook 验证（CC-only 邮件应 ToMe: false）。R1.3-R1.7 未开始。
 
 ---
 
@@ -195,3 +202,13 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Last safe stopping point: R1.1 完成并提交。
   - Uncommitted changes: 仅本文件（随 commit 一起提交）。
   - Next: claim R1.2（`scripts/collect-outlook-mails.vbs` 的 `toMe`/`ccMe` 恒真修复，VBS 改动需在 Handover 标注 `needs user validation on real Outlook`）或 R1.3-R1.7 中任一，7 个 step 互相独立。
+
+- **2026-07-08 · Claude Code（R1.2 pre-work checkpoint）**：读 05 矩阵 C-2 行、01 文档 C-2 小节（`collect-outlook-mails.vbs:494-504`，`IsDirectRecipient`/`IsCcRecipient` 只判 To/CC 字段非空，恒真）。`git status --short` 干净，HEAD `511af92`。grep 重新定位锚点：`IsDirectRecipient`/`IsCcRecipient` 仍在 494-504 行（未漂移），`BuildMailRecord`（332-359 行）351/352 行调用两者，`SafeTo`/`SafeCc`（439-457 行）保持不变原样返回。VBS 无测试框架，本 step 验收 = 语法检查 + digest 格式不变 + Handover 标注 `needs user validation on real Outlook`。Claim R1.2，开始实现。
+
+- **2026-07-08 · Claude Code（R1.2 完成，needs user validation on real Outlook）**：
+  - Changed: `scripts/collect-outlook-mails.vbs`——新增 `ResolveCurrentUser`/`IsRecipientTypeMatch`/`IsCurrentUserRecipient` 三个函数与三个脚本级全局变量；`IsDirectRecipient`/`IsCcRecipient` 改为遍历 `mail.Recipients` 按 `Type` 比对当前用户（SMTP 优先，显示名兜底），替换原来"字段非空即真"的恒真判定；新增两行诊断 echo（身份解析结果 + 收件人解析失败汇总），不影响 digest 文件格式。
+  - Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 语法检查通过；`--sample` 输出与改动前逐行 diff 仅时间戳不同（sample 路径本就不经过本次改动的函数，用于确认未意外破坏共享代码）；`npm test` 312/312 全绿（VBS-only 改动，TS 侧无回归，符合预期）。
+  - **needs user validation on real Outlook**：真实邮箱验证——(a) CC-only 邮件应 `ToMe: false`/`CcMe: true`；(b) To 含当前用户应 `ToMe: true`；(c) 核对 stdout `CurrentUser: resolved=true; smtp=...` 确认身份解析成功（`resolved=false` 说明该账户类型下 toMe/ccMe 会退化回旧恒真行为，需要进一步排查）。IMAP/POP 账户（无 `GetExchangeUser`）的 `AddressEntry.Address` 回落路径同样未连真机复核。
+  - Last safe stopping point: R1.2 完成并提交，等待真机验证反馈。
+  - Uncommitted changes: 仅本文件（随 commit 一起提交）。
+  - Next: claim R1.3（`collect-outlook-meetings.vbs` 会议迭代 `Count`/索引不可靠问题）或 R1.4-R1.7 中任一。
