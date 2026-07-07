@@ -24,3 +24,17 @@ test("composeAnalysisPrompt includes custom categories and language instruction"
   assert.match(prompt, /{{GREETING}}/);
   assert.match(prompt, /Simplified Chinese/);
 });
+
+test("composeAnalysisPrompt injects today's date in the local timezone", () => {
+  const config = normalizePromptConfig({});
+  const prompt = composeAnalysisPrompt({
+    basePrompt: "Base",
+    outputSchemaPrompt: "Schema",
+    digestText: "Digest",
+    outputLanguage: "en-US",
+    promptConfig: config,
+    now: new Date(2026, 6, 8, 23, 30, 0)
+  });
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  assert.match(prompt, new RegExp(`Today is 2026-07-08 \\(${timeZone.replace(/\//g, "\\/")}\\)\\.`));
+});

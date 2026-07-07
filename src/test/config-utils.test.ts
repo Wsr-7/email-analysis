@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy } from "../lib/config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
 
 describe("positiveNumber", () => {
   it("returns parsed number when positive", () => {
@@ -111,5 +111,19 @@ describe("buildDefaultRedactionPolicy", () => {
     assert.equal(policy.redactEmail, true);
     assert.equal(policy.redactPhone, true);
     assert.deepEqual(policy.customPatterns, []);
+  });
+});
+
+describe("formatTodayLine", () => {
+  it("formats using local date parts and the local IANA timezone, not UTC", () => {
+    const date = new Date(2026, 6, 8, 23, 30, 0);
+    const line = formatTodayLine(date);
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    assert.equal(line, `Today is 2026-07-08 (${timeZone}).`);
+  });
+
+  it("defaults to the current date when no argument is passed", () => {
+    const line = formatTodayLine();
+    assert.match(line, /^Today is \d{4}-\d{2}-\d{2} \(.+\)\.$/);
   });
 });

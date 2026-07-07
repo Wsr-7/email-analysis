@@ -51,6 +51,19 @@ test("buildThreadAnalysisPrompt instructs English translation for natural-langua
   assert.match(prompt, /Translate Chinese source content into English/);
 });
 
+test("buildThreadAnalysisPrompt injects today's date in the local timezone", () => {
+  const prompt = buildThreadAnalysisPrompt({
+    basePrompt: "Base rules",
+    analysisPrompt: "Analyze thread",
+    outputSchemaPrompt: "Return JSON",
+    outputLanguage: "en-US",
+    thread: thread(),
+    now: new Date(2026, 6, 8, 23, 30, 0)
+  });
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  assert.match(prompt, new RegExp(`Today is 2026-07-08 \\(${timeZone.replace(/\//g, "\\/")}\\)\\.`));
+});
+
 function thread(): ThreadRecord {
   return {
     threadId: "conversation:conv-1",

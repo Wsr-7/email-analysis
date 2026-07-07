@@ -71,6 +71,47 @@ describe("analyzeBatchCore", () => {
     }
   });
 
+  it("injects today's date into the sent prompt", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [mail(1)]
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+
+      const provider = new MockProvider({
+        responses: [JSON.stringify({ generatedAt: "", overview: {}, items: [] })]
+      });
+
+      await analyzeBatchCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({
+          autoAnalyzeEnabled: true,
+          autoAnalyzeMaxClassificationLevel: 2,
+          modelFamily: "mock-model",
+          outputLanguage: "en-US"
+        }),
+        log: async () => {},
+        availableModelsCache: null
+      });
+
+      const today = new Date();
+      const expectedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      assert.match(provider.prompts[0], new RegExp(`Today is ${expectedDate} \\(.+\\)\\.`));
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
   it("keeps analyzed mails in the mail store for body, draft, and thread context", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
@@ -306,6 +347,104 @@ describe("analyzeBatchCore", () => {
       assert.equal(result.items[0].currentStatus, "Waiting for confirmation.");
       assert.equal(result.items[0].openQuestions[0], "Can it be approved?");
       assert.equal(provider.prompts.length, 2);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("injects today's date into the sent thread analysis prompt", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [mail(1)]
+      });
+      await data.writeThreadStore({
+        generatedAt: "",
+        lastBuiltAt: "",
+        items: [{
+          threadId: "thread-1",
+          conversationId: "thread-1",
+          normalizedSubject: "contract",
+          subject: "Contract",
+          participants: ["Alice <alice@example.com>"],
+          folders: ["Inbox"],
+          startTime: "2026-07-02 09:00:00",
+          lastTime: "2026-07-02 09:00:00",
+          messageCount: 1,
+          unreadCount: 1,
+          hasAttachments: false,
+          sourceMailIds: ["mail-001"],
+          contentStatus: "available",
+          timeline: [{
+            mailId: "mail-001",
+            internetMessageId: "",
+            entryId: "mail-001",
+            conversationId: "thread-1",
+            conversationIndex: "",
+            subject: "Contract",
+            from: "Alice <alice@example.com>",
+            senderName: "Alice",
+            senderEmail: "alice@example.com",
+            receivedTime: "2026-07-02 09:00:00",
+            sentTime: "",
+            folder: "Inbox",
+            bodyPreview: "Please confirm the contract.",
+            bodyClean: "Please confirm the contract.",
+            bodyDelta: "Please confirm the contract.",
+            bodyHash: "",
+            isDuplicateBody: false,
+            contentAvailable: true,
+            attachmentCount: 0,
+            attachmentNames: []
+          }],
+          security: { totalMessages: 1, allowedMessages: 1, manualConfirmMessages: 0, blockedMessages: 0, highestClassificationLevel: 1, partialContext: false, reasons: [] }
+        }]
+      });
+      await data.writeClassificationCache({ generatedAt: "", items: [{ mailId: "mail-001", level: 1, label: "INTERNAL", source: "test", reason: "", updatedAt: "" }] });
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+
+      const provider = new MockProvider({
+        responses: [JSON.stringify({
+          generatedAt: "",
+          overview: {},
+          items: [{
+            threadId: "thread-1",
+            category: "waitingForMe",
+            priority: "P1",
+            subject: "Contract",
+            oneLineSummary: "Confirmation needed.",
+            currentStatus: "Waiting.",
+            keyDecisions: [],
+            openQuestions: [],
+            actionItems: [],
+            waitingOn: [],
+            risks: [],
+            needMyReply: true,
+            suggestedAction: "Reply.",
+            draftReply: "",
+            confidence: 0.9,
+            partialContext: false
+          }]
+        })]
+      });
+
+      await analyzeThreadCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({ modelFamily: "mock-model", outputLanguage: "en-US", autoAnalyzeMaxClassificationLevel: 2 }),
+        log: async () => {},
+        availableModelsCache: null
+      }, "thread-1");
+
+      const today = new Date();
+      const expectedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      assert.match(provider.prompts[0], new RegExp(`Today is ${expectedDate} \\(.+\\)\\.`));
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

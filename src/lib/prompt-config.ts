@@ -1,3 +1,5 @@
+import { formatTodayLine } from "./config-utils";
+
 export interface PromptCategory {
   id: string;
   labelZh: string;
@@ -99,12 +101,14 @@ export function composeAnalysisPrompt(input: {
   digestText: string;
   outputLanguage: string;
   promptConfig: PromptConfig;
+  now?: Date;
 }): string {
   const languageInstruction = input.outputLanguage === "en-US"
     ? "Write summary, reason, and suggestedAction in English. Keep draftReply in English."
     : "Write summary, reason, and suggestedAction in Simplified Chinese. Keep original mail excerpts and draftReply in English.";
   return [
     input.basePrompt.trim(),
+    formatTodayLine(input.now),
     "Allowed categories:",
     renderCategories(input.promptConfig.categories),
     "Important sender/group rules:",

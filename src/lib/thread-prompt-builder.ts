@@ -1,3 +1,4 @@
+import { formatTodayLine } from "./config-utils";
 import type { ThreadRecord } from "./thread-schema";
 
 export interface ThreadPromptParts {
@@ -6,12 +7,14 @@ export interface ThreadPromptParts {
   analysisPrompt: string;
   thread: ThreadRecord;
   outputLanguage: string;
+  now?: Date;
 }
 
 export function buildThreadAnalysisPrompt(parts: ThreadPromptParts): string {
   const payload = buildThreadPromptPayload(parts.thread);
   return [
     parts.basePrompt.trim(),
+    formatTodayLine(parts.now),
     "",
     parts.analysisPrompt.trim(),
     "",

@@ -102,13 +102,21 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 无。存储体积影响：1500 字符 × 每天几百封 × 7 天，JSON 体积仍在可接受范围（02 文档已评估）。
   - Commit: `e4d99ce`
 
-### [ ] R1.5 prompt 注入当前日期（B-2a）
+### [x] R1.5 prompt 注入当前日期（B-2a）
 
 - **改动点**：prompt 组装点——先 grep `prompts/analysis-prompt.md` 的读取/拼接位置（`prompt-config.ts` 的 compose 函数与 `app-analysis.ts` 的 `analyzeBatchCore` / `analyzeThreadCore`），单邮件与线程两条路径都要覆盖。
 - **做法**：在 system/user prompt 组装时注入一行 `Today is YYYY-MM-DD (<本地 IANA 时区，如 Asia/Shanghai>)`，日期取 `new Date()` 本地时区格式化（不要 UTC，用户在东八区，UTC 会在晚间差一天）。
 - **验收**：新增/扩展测试：用 `MockProvider` 捕获实际发送的 prompt，断言包含 `Today is` 行且日期为今天；两条路径（batch / thread）各一断言。
 - **边界**：只注入日期，不做 `dueDate` 结构化输出（那是 B-2b，属 R3 讨论范围）。
 - Completion Notes:
+  - 改动文件：`src/lib/config-utils.ts`（新增 `formatTodayLine(now: Date = new Date()): string`，本地 `getFullYear/getMonth/getDate` + `Intl.DateTimeFormat().resolvedOptions().timeZone`，格式 `Today is YYYY-MM-DD (IANA timezone).`）、`src/lib/prompt-config.ts`（`composeAnalysisPrompt` 的 `input` 新增可选 `now?: Date`，在 `basePrompt` 之后插入 `formatTodayLine(input.now)`）、`src/lib/thread-prompt-builder.ts`（`ThreadPromptParts` 同样新增可选 `now?: Date`，`buildThreadAnalysisPrompt` 在 `basePrompt` 之后插入）。
+  - 未改 `AnalysisContext`/`analyzeBatchCore`/`analyzeThreadCore` 的函数签名——两个 compose 函数各自默认 `new Date()`，日期由组装点自己决定，调用链不需要额外透传参数，符合"只接线，不做多余打通"的最小改动原则。
+  - `now?: Date` 可选参数遵循仓库既有惯例（`thread-store.ts` 的 `pruneThreadStore(store, retentionDays, now: Date = new Date())`），保证两个 compose 函数本身可用固定日期做确定性单测。
+  - 未改 `analysis-translation.ts` 的 `buildAnalysisTranslationPrompt`（翻译已有分析结果的第三条 prompt 路径）——计划明确只要求覆盖"单邮件与线程两条路径"，翻译路径不在验收范围内。
+  - Tests: RED 先行——新增测试后 `npm run compile` 报 3 处类型错误（`formatTodayLine` 未导出、`now` 不是 `composeAnalysisPrompt`/`ThreadPromptParts` 已知属性），证实测试先于实现；实现后 `npm run compile` 零错误。新增 6 个测试：`config-utils.test.ts` 2 个（本地日期/时区格式化、默认 `new Date()`）、`prompt-config.test.ts` 1 个（`composeAnalysisPrompt` 注入日期）、`thread-prompt-builder.test.ts` 1 个（`buildThreadAnalysisPrompt` 注入日期）、`app-analysis.test.ts` 2 个（`analyzeBatchCore`/`analyzeThreadCore` 通过 `MockProvider` 捕获实际发送 prompt，断言含 `Today is <今天日期>`）。`npm test` 全绿 318/318（312+6），无回归。
+  - Manual validation: 不适用（纯 TS 逻辑，无 Outlook 交互；时区正确性依赖运行 VS Code 扩展主机的操作系统本地时区设置，这是标准 `Intl` 行为，未做跨时区真机复核）。
+  - Known issues: 无。
+  - Commit: `PENDING`
 
 ### [ ] R1.6 草稿丢失止血（U-1 短期方案）
 
@@ -197,7 +205,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 ## 6. Current Snapshot
 
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
-- 2026-07-08 · R1.1、R1.2、R1.3、R1.4 完成并提交。R1.2/R1.3 需真实 Outlook 验证（见各自 Completion Notes）。R1.5-R1.7 未开始。
+- 2026-07-08 · R1.1、R1.2、R1.3、R1.4、R1.5 完成并提交。R1.2/R1.3 需真实 Outlook 验证（见各自 Completion Notes）。R1.6、R1.7 未开始。
 
 ---
 
@@ -244,3 +252,12 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Known issues: 无。
   - Last safe stopping point: R1.4 完成并提交。
   - Next: claim R1.5（prompt 注入当前日期）或 R1.6/R1.7。
+
+- **2026-07-08 · Claude Code（R1.5 pre-work checkpoint）**：读 05 矩阵 B-2a 行、03 文档 B-2 小节（`analysis-prompt.md` 全文无日期注入，模型只能从 digest 头 `GeneratedAt` 猜"是否今天到期"；建议 compose 时注入 `Today is 2026-07-06 (Asia/Shanghai)` 一行，本 step 只做日期注入，dueDate 结构化输出是 B-2b，属 R3）。`git status --short` 干净，HEAD `c864d2c`。grep 定位两条组装路径：单邮件/批量走 `prompt-config.ts:composeAnalysisPrompt`（被 `app-analysis.ts:analyzeBatchCore` 第 120 行调用）；线程走 `thread-prompt-builder.ts:buildThreadAnalysisPrompt`（被 `analyzeThreadCore` 第 175 行调用）。两者都是纯函数，无 Date 相关参数。决定：新增 `config-utils.ts` 的 `formatTodayLine(now: Date = new Date())`（复用仓库已有的 `now: Date = new Date()` 默认参数惯例，见 `thread-store.ts pruneThreadStore`），分别在两个 compose 函数的 `input`/`ThreadPromptParts` 上加可选 `now?: Date` 透传，不改 `AnalysisContext`/`analyzeBatchCore`/`analyzeThreadCore` 签名（组装点内部各自默认 `new Date()`，验收标准里"两条路径各一断言"通过 MockProvider 捕获 `analyzeBatchCore`/`analyzeThreadCore` 实际发出的 prompt 完成，不需要额外打通调用链）。用 `Intl.DateTimeFormat().resolvedOptions().timeZone` 取本地 IANA 时区名；日期用 `getFullYear/getMonth/getDate`（本地 getter，不用 `toISOString`/UTC getter）。Claim R1.5。
+
+- **2026-07-08 · Claude Code（R1.5 完成）**：
+  - Changed: 新增 `config-utils.ts:formatTodayLine`；`prompt-config.ts:composeAnalysisPrompt`、`thread-prompt-builder.ts:buildThreadAnalysisPrompt` 各接一行日期注入；6 个新测试覆盖单元级（config-utils/prompt-config/thread-prompt-builder）与集成级（app-analysis 用 MockProvider 捕获实际 prompt，两条路径各一）。
+  - Validated: RED 先行（3 处类型错误证实 gap）；`npm run compile` 零错误；`npm test` 318/318 全绿（312+6），无回归。
+  - Known issues: 无。
+  - Last safe stopping point: R1.5 完成并提交。
+  - Next: claim R1.6（草稿丢失止血）或 R1.7（采集超时可配置）。
