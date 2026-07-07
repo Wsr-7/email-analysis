@@ -11,7 +11,7 @@
   "modelFamily": "gpt-5.4",
   "outputLanguage": "en-US",
   "autoAnalyzeMaxClassificationLevel": 2,
-  "mailStoreRetentionDays": 1,
+  "mailStoreRetentionDays": 7,
   "mailIndexRetentionDays": 7,
   "analysisRetentionDays": 7,
   "importantSenders": [],

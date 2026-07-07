@@ -168,7 +168,7 @@
         "easyMail.mailStoreRetentionDays": {
           "type": "number",
           "order": 15,
-          "default": 1,
+          "default": 7,
           "minimum": 1,
           "description": "Raw local mail queue retention days."
         },

@@ -151,7 +151,7 @@ AI 分析默认优先请求 `gpt-5.4`。如果当前 VS Code / Copilot 运行时
 
 高于这个值的邮件不会自动送给 Copilot，只能由用户手动勾选确认后分析。
 
-`mailStoreRetentionDays` 表示本地 `mail-store.json` 原文缓存保留多少天，默认 1 天。
+`mailStoreRetentionDays` 表示本地 `mail-store.json` 原文缓存保留多少天，默认 7 天，与去重索引/分析结果保留期对齐。
 
 `mailIndexRetentionDays` 表示 `mail-index.json` 去重锚点保留多少天，默认 7 天。
 

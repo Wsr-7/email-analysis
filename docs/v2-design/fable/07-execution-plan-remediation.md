@@ -88,12 +88,19 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 无法在当前环境验证 `IncludeRecurrences=True` 时 `restricted.Count` 的真实异常表现（无法连接真实 Outlook/Exchange），此 fix 基于 01 文档记录的 Outlook 对象模型已知行为，逻辑本身（GetFirst/GetNext 迭代 + Start 升序提前退出 + 200 条保险丝）在语法与 TS 侧测试层面已验证正确。
   - Commit: `9d1a469`
 
-### [ ] R1.4 保留期对齐，消除 6 天正文黑洞（L-2）
+### [x] R1.4 保留期对齐，消除 6 天正文黑洞（L-2）
 
 - **改动点**：`default-config.json` 的 `mailStoreRetentionDays: 1`；同步检查 `package.json` contributes 里 `easyMail.mailStoreRetentionDays` 的 default（若有）与相关 README/文档描述。
 - **做法**：默认 1 → 7，与 `mailIndexRetentionDays: 7`、`analysisRetentionDays: 7` 对齐。**不改** merge 去重逻辑（`mail-store.ts` `mergeDigestIntoStore`）——那是 05 矩阵中的备选方案，改默认值是更小的正确修复。
 - **验收**：现有 `mail-store` 测试全绿；若测试硬编码了默认 1 天需同步；在 Completion Notes 注明"用户已自定义该设置的不受影响"。
 - Completion Notes:
+  - 改动文件：`default-config.json`（`mailStoreRetentionDays: 1 → 7`）、`package.json`（`easyMail.mailStoreRetentionDays` schema `default: 1 → 7`，`minimum: 1` 不变）、`user guide.md`（"默认 1 天"改为"默认 7 天，与去重索引/分析结果保留期对齐"）。未改 `mail-store.ts` 的 `mergeDigestIntoStore`/`pruneMailStore` 逻辑本身。
+  - 用户已自定义该设置的不受影响：`readConfig()`（`extension.ts:918-939`）用 `settings.get("mailStoreRetentionDays", defaults.mailStoreRetentionDays)`，VS Code 用户显式设置过的值优先于 `defaults`，本次改动只影响从未设置过该项的新用户/全新安装。
+  - grep 确认 `src/test/mail-store.test.ts` 的 `pruneMailStore` 测试全部显式传参保留天数（30、1），不依赖 config 默认值，无需同步。`extension.ts:508`/`message-handler.ts:345` 的 `|| 1` 防御性兜底字面量未改动——按计划边界排除（这两处只在 `config.mailStoreRetentionDays` 为 0/undefined 时才触发，正常路径下 `readConfig()` 保证该字段来自 `defaults`，属不可达兜底，非"默认值"本体）。
+  - Tests: `npm run compile` 零错误；`npm test` 全绿 312/312，无回归（纯配置默认值改动，无逻辑变化）。
+  - Manual validation: 不适用（配置默认值改动，无 Outlook 交互；效果需长期使用观察——新装用户 6 天后不应再看到 P1.2 症状"analyzed mail body 为空"复现）。
+  - Known issues: 无。存储体积影响：1500 字符 × 每天几百封 × 7 天，JSON 体积仍在可接受范围（02 文档已评估）。
+  - Commit: `PENDING`
 
 ### [ ] R1.5 prompt 注入当前日期（B-2a）
 
@@ -190,7 +197,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 ## 6. Current Snapshot
 
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
-- 2026-07-08 · R1.1、R1.2、R1.3 完成并提交。R1.2/R1.3 均需真实 Outlook 验证（见各自 Completion Notes）。R1.4-R1.7 未开始。
+- 2026-07-08 · R1.1、R1.2、R1.3、R1.4 完成并提交。R1.2/R1.3 需真实 Outlook 验证（见各自 Completion Notes）。R1.5-R1.7 未开始。
 
 ---
 
@@ -227,4 +234,13 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - **needs user validation on real Outlook**：需在含周期性会议的真实日历上验证 Meetings 队列不再空、周期性会议能采到实例——这与 handover 历史「inspect why meeting invitations/calendar items are not collected」TODO 高度吻合，是该问题的第一假设修复，真机结果待确认。
   - Last safe stopping point: R1.3 完成并提交，等待真机验证反馈。
   - Uncommitted changes: 仅本文件（随 commit 一起提交）。
-  - Next: claim R1.4（`mailStoreRetentionDays` 默认值 1→7）或 R1.5-R1.7 中任一。
+  - Next: claim R1.5-R1.7 中任一（R1.4 已完成）。
+
+- **2026-07-08 · Claude Code（R1.4 pre-work checkpoint）**：读 05 矩阵 L-2 行、02 文档 L-2 小节（`mailStoreRetentionDays:1` vs `mailIndexRetentionDays:7` 不对称 → 昨天拉的邮件正文今天被裁、今天重拉又被 7 天 index 拦下 skipped，6 天内无法恢复正文；连锁到 P1.2 已知症状"analyzed mail body 为空"）。`git status --short` 干净，HEAD `159c55f`。grep 定位：`default-config.json:14`、`package.json:168-174`（`easyMail.mailStoreRetentionDays` schema default）、`user guide.md:154`（文档写"默认 1 天"需同步）。额外 grep 了 `extension.ts:508`/`message-handler.ts:345` 的 `|| 1` 防御性兜底字面量与 `src/test/mail-store.test.ts` 的 `pruneMailStore` 测试——均不依赖这个默认值（测试显式传参 30/1，兜底字面量只在 config 字段缺失/为 0 时才触发，正常路径不可达），按计划边界只改默认值来源（default-config.json + package.json + 文档），不碰这些防御性代码，避免超出"更小的正确修复"范围。Claim R1.4。
+
+- **2026-07-08 · Claude Code（R1.4 完成）**：
+  - Changed: `default-config.json`/`package.json` 的 `mailStoreRetentionDays` 默认值 1→7；`user guide.md` 同步文档描述。未改 merge 去重逻辑。
+  - Validated: `npm run compile` 零错误；`npm test` 312/312 全绿，无回归。
+  - Known issues: 无。
+  - Last safe stopping point: R1.4 完成并提交。
+  - Next: claim R1.5（prompt 注入当前日期）或 R1.6/R1.7。
