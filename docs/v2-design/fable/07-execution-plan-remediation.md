@@ -116,7 +116,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: RED 先行——新增测试后 `npm run compile` 报 3 处类型错误（`formatTodayLine` 未导出、`now` 不是 `composeAnalysisPrompt`/`ThreadPromptParts` 已知属性），证实测试先于实现；实现后 `npm run compile` 零错误。新增 6 个测试：`config-utils.test.ts` 2 个（本地日期/时区格式化、默认 `new Date()`）、`prompt-config.test.ts` 1 个（`composeAnalysisPrompt` 注入日期）、`thread-prompt-builder.test.ts` 1 个（`buildThreadAnalysisPrompt` 注入日期）、`app-analysis.test.ts` 2 个（`analyzeBatchCore`/`analyzeThreadCore` 通过 `MockProvider` 捕获实际发送 prompt，断言含 `Today is <今天日期>`）。`npm test` 全绿 318/318（312+6），无回归。
   - Manual validation: 不适用（纯 TS 逻辑，无 Outlook 交互；时区正确性依赖运行 VS Code 扩展主机的操作系统本地时区设置，这是标准 `Intl` 行为，未做跨时区真机复核）。
   - Known issues: 无。
-  - Commit: `PENDING`
+  - Commit: `2e6aace`
 
 ### [ ] R1.6 草稿丢失止血（U-1 短期方案）
 
