@@ -23,14 +23,14 @@ Run a single test after compiling:
 node --test out/test/digest.test.js
 ```
 
-Tests use Node.js built-in `node:test` and `node:assert/strict` — no external test framework. Each test file lives at `src/test/<module>.test.ts` mirroring `src/lib/<module>.ts`. Currently 32 test files, 258+ tests.
+Tests use Node.js built-in `node:test` and `node:assert/strict` — no external test framework. Each test file lives at `src/test/<module>.test.ts` mirroring `src/lib/<module>.ts`. Currently 33 test files, 319+ tests.
 
 ## Project Structure
 
 ```
 easy-mail/
 ├── src/
-│   ├── extension.ts              # Entry point: activate/deactivate + EasyMailApp coordinator (~1020 lines)
+│   ├── extension.ts              # Entry point: activate/deactivate + EasyMailApp coordinator (~1190 lines)
 │   ├── lib/                      # All business logic modules (40 files)
 │   │   ├── app-data.ts           #   Data persistence layer (AppDataStore)
 │   │   ├── app-analysis.ts       #   LLM analysis pipeline
@@ -70,7 +70,7 @@ easy-mail/
 │   │   ├── config-utils.ts       #   Config parsing utilities
 │   │   ├── process-runner.ts     #   Child process execution
 │   │   └── summary.ts            #   Analysis summary markdown builder
-│   └── test/                     # 32 test files mirroring lib/ (258+ tests)
+│   └── test/                     # 33 test files mirroring lib/ (319+ tests)
 ├── prompts/                      # LLM prompt templates (markdown + JSON)
 ├── scripts/                      # VBScript COM automation for Outlook
 │   ├── collect-outlook-mails.vbs
@@ -91,7 +91,7 @@ easy-mail/
 ┌─────────────────────────────────────────────────────────────────┐
 │                        VS Code Extension                        │
 │  ┌───────────┐                                                  │
-│  │ extension  │─── EasyMailApp (coordinator, ~1020 lines)       │
+│  │ extension  │─── EasyMailApp (coordinator, ~1190 lines)       │
 │  │   .ts      │    ├─ registers commands (easyMail.*)           │
 │  │            │    ├─ manages busy state + webview lifecycle     │
 │  │            │    └─ delegates to modules below                 │
@@ -151,12 +151,12 @@ easy-mail/
 
 ### Extension entry point
 
-`src/extension.ts` (~1020 lines) — the `EasyMailApp` class coordinates state and VS Code API calls. After v2 refactoring, rendering, data persistence, analysis logic, and message handling are extracted into dedicated modules under `src/lib/`. v3 additions: draft polish/refine via LLM, Outlook compose window integration, next actions sync from thread analysis.
+`src/extension.ts` (~1190 lines) — the `EasyMailApp` class coordinates state and VS Code API calls. After v2 refactoring, rendering, data persistence, analysis logic, and message handling are extracted into dedicated modules under `src/lib/`. v3 additions: draft polish/refine via LLM, Outlook compose window integration, next actions sync from thread analysis, thread ignore/restore, configurable collector timeout.
 
 ### UI — Two-panel design
 
-- **Sidebar** (`sidebar-render.ts`) — WebviewView in the activity bar. Queue-first triage layout: queue navigation (category counts, Next Actions queue), compact mail rows, settings panel, action buttons.
-- **Workbench** (`workbench-render.ts`) — WebviewPanel in the editor area. Full-width reading pane for the item selected in sidebar. Shows analysis details, Thread Spotlight (thread analysis summary), editable draft area with polish/refine/compose actions, thread timelines, meeting details.
+- **Sidebar** (`sidebar-render.ts`) — WebviewView in the activity bar. Queue-first triage layout: queue navigation (category counts, Next Actions queue), compact mail rows, settings panel, action buttons. Fully-ignored threads (all `sourceMailIds` in the ignored set) surface in the ignored queue.
+- **Workbench** (`workbench-render.ts`) — WebviewPanel in the editor area. Full-width reading pane for the item selected in sidebar. Shows analysis details, Thread Spotlight (thread analysis summary), editable draft area with polish/refine/compose actions, thread timelines, meeting details, thread ignore/restore. In-progress drafts are persisted to `vscode.setState()` on input and restored after a webview HTML rebuild (stopgap for full-page re-renders on every backend refresh; see `docs/v2-design/fable/07-execution-plan-remediation.md` R1.6).
 - **Dashboard render** (`dashboard-render.ts`) — Shared rendering utilities: `formatClassification`, `formatPriority`, `renderDraftBox`, `renderEditableDraftBox`, `renderButtonSpinner`, etc. Also contains the legacy full-dashboard renderer.
 - **Dashboard labels** (`dashboard-labels.ts`) — `LABELS` constant with zh-CN / en-US translations, `getLabels()`, `buildCategoryLabels()`.
 
@@ -174,7 +174,7 @@ easy-mail/
 
 - **MailStore** (`mail-store.ts`) — raw pulled emails with retention/pruning, dedup via InternetMessageId/EntryId/hash
 - **MailIndex** (`mail-store.ts`) — lightweight dedup index with folder anchors for "load more" pagination
-- **ThreadStore** (`thread-store.ts` + `thread-engine.ts`) — groups mails into conversation threads by conversationId or normalized subject
+- **ThreadStore** (`thread-store.ts` + `thread-engine.ts`) — groups mails into conversation threads by conversationId or normalized subject. `thread-engine.ts` wires the quote-trimming helpers in `thread-timeline.ts` (`cleanMailBody`/`extractReplyDelta`/`markDuplicateBodies`) into each thread's timeline, populating `bodyClean`/`bodyDelta`/`isDuplicateBody`/`duplicateOfId` on `ThreadMessage` (`thread-schema.ts`). Thread ignore/restore has no dedicated store — it reuses the existing ignored-mail-id set by adding/removing all of a thread's `sourceMailIds`.
 - **ClassificationCache** (`classification.ts`) — security classification levels (PUBLIC/INTERNAL/REGISTERED/HIGH REGISTERED)
 - **AnalysisResult** (`analysis-schema.ts`) — structured Copilot output with categories, priorities, draft replies
 - **ThreadAnalysisResult** (`thread-analysis-schema.ts`) — thread-level analysis results
@@ -193,20 +193,24 @@ Prompts live in `prompts/` as markdown/JSON files:
 - `reply-draft-prompt.md` + `reply-template.md` — draft reply generation
 - `prompt-config.default.json` — category definitions (user-customizable copy at globalStorageUri)
 
+Both `composeAnalysisPrompt` (`prompt-config.ts`) and `buildThreadAnalysisPrompt` (`thread-prompt-builder.ts`) inject a `Today is YYYY-MM-DD (local IANA timezone).` line via `formatTodayLine` (`config-utils.ts`), using local date parts and `Intl.DateTimeFormat().resolvedOptions().timeZone` — not UTC.
+
 ### Utility modules
 
 - `html-utils.ts` — `escapeHtml`, `escapeAttr`, `domIdFor*`, `safeDomId`, `toJsLiteral`
-- `config-utils.ts` — `positiveNumber`, `parseFolders`, `getLocaleFromConfig`, `buildSecuritySettings`
-- `process-runner.ts` — `runProcess`, `sanitizeProcessArgs`, `formatError`, `formatElapsedSeconds`
+- `config-utils.ts` — `positiveNumber`, `parseFolders`, `getLocaleFromConfig`, `buildSecuritySettings`, `formatTodayLine`
+- `process-runner.ts` — `runProcess`, `sanitizeProcessArgs`, `formatError`, `formatElapsedSeconds`. Timeout is passed in by the caller — `pullMailCore`/`collectMeetings` in `extension.ts` read it from `easyMail.collectorTimeoutSeconds` (default 120s); the timeout error message already includes captured stdout (e.g. `FolderScan` diagnostic lines).
 - `dashboard-state.ts` — `buildDashboardState`, `filterVisibleThreadsForDashboard`, `buildThreadLookup`
 - `dashboard-provider.ts` — VS Code `WebviewViewProvider` for the sidebar
 - `redaction.ts` — PII redaction for prompts (emails, URLs, IPs, phone numbers, money)
 
 ### Mail collection & compose
 
-- `scripts/collect-outlook-mails.vbs` — VBScript for Outlook mail COM. Accepts CLI args for range, folders, body truncation, sample mode, pagination anchors.
-- `scripts/collect-outlook-meetings.vbs` — VBScript for Outlook calendar COM. Collects meetings within a date range.
+- `scripts/collect-outlook-mails.vbs` — VBScript for Outlook mail COM. Accepts CLI args for range, folders, body truncation, sample mode, pagination anchors. `toMe`/`ccMe` are resolved by iterating `mail.Recipients` and comparing each recipient's `Type` (olTo=1/olCC=2) against the current user's SMTP address (`ns.CurrentUser` → `GetExchangeUser.PrimarySmtpAddress`, falling back to display name); resolution failure falls back to `true` (matches prior always-true semantics rather than silently dropping the signal).
+- `scripts/collect-outlook-meetings.vbs` — VBScript for Outlook calendar COM. Collects meetings within a date range. Calendar iteration uses `GetFirst`/`GetNext` rather than index/`Count` access, because `items.IncludeRecurrences = True` makes `Count` unreliable for lazily-expanded recurring instances.
 - `scripts/compose-outlook-mail.vbs` — VBScript for Outlook compose (reply/replyAll/forward). Opens Outlook editor with optional draft body prefill; never calls Send.
+
+`easyMail.collectorTimeoutSeconds` (default 120s) bounds both collector scripts via `runProcess`; the three single-item Outlook open/compose calls (`openMailInOutlook`, `composeOutlookMail`, `openMeetingInOutlook`) keep a fixed 30s timeout since they don't scan folders.
 
 ### Reports
 
@@ -215,6 +219,7 @@ Three report generators: `report-daily.ts`, `report-single-mail.ts`, `report-thr
 ## Key Conventions
 
 - All config is read from VS Code settings (`easyMail.*` namespace), merged with `default-config.json` defaults
+- `mailStoreRetentionDays` defaults to 7 (aligned with `mailIndexRetentionDays`/`analysisRetentionDays`, both also 7) — a 1-day store retention against a 7-day dedup index used to prune mail bodies before they could ever be re-fetched
 - Analysis categories: `importantSender`, `mustHandleToday`, `risk`, `waitingForMe`, `followUp`, `notice`, `ignored`, `uncertain`
 - Priorities: P0–P3
 - Mail IDs use `InternetMessageId` or `EntryId` for dedup; hash fallback when both are missing
