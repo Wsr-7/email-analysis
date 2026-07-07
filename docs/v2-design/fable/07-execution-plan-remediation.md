@@ -86,7 +86,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`cscript //nologo scripts/collect-outlook-meetings.vbs --help` 无语法错误；`--sample` 走 `WriteSampleMeetingDigest`，不经过 `CollectCalendarItems`，对照改动前版本（`git stash` 切回）逐行 diff 仅 `GeneratedAt` 时间戳不同，确认未破坏共享代码路径。`npm test` 312/312 全绿，无回归。
   - Manual validation: **needs user validation on real Outlook**——需要在含周期性会议（如每周例会）的真实日历上验证：Meetings 队列不再为空、周期性会议能采到具体实例（而非被 `Count` 为 0/异常值吞掉）。这与 handover 历史 TODO「inspect why meeting invitations/calendar items are not collected」高度吻合，是该问题的第一假设修复，需要真机确认是否已解决队列空的根因。
   - Known issues: 无法在当前环境验证 `IncludeRecurrences=True` 时 `restricted.Count` 的真实异常表现（无法连接真实 Outlook/Exchange），此 fix 基于 01 文档记录的 Outlook 对象模型已知行为，逻辑本身（GetFirst/GetNext 迭代 + Start 升序提前退出 + 200 条保险丝）在语法与 TS 侧测试层面已验证正确。
-  - Commit: `PENDING`
+  - Commit: `9d1a469`
 
 ### [ ] R1.4 保留期对齐，消除 6 天正文黑洞（L-2）
 
