@@ -39,7 +39,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 ## 2. Milestone R1 — 正确性止血
 
-### [ ] R1.1 接线引用修剪函数（L-1，最高优先）
+### [x] R1.1 接线引用修剪函数（L-1，最高优先）
 
 - **改动点**：`src/lib/thread-engine.ts` 的 `toThreadMessage`（当前 84-88 行附近，三个 body 字段全部直赋原文）。`src/lib/thread-timeline.ts` 已导出 `cleanMailBody` / `extractReplyDelta` / `hashBody` / `markDuplicateBodies`，目前仅测试文件引用（死代码）。
 - **做法**：
@@ -49,6 +49,14 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 - **验收**：新增 `src/test/thread-engine.test.ts` 用例：构造 3 封含引用链的邮件（英文 `-----Original Message-----` 与中文 `发件人:` 头各至少一例）→ 断言 `bodyDelta` 不含引用块；两封正文相同 → 第二封 `isDuplicateBody === true` 且 `duplicateOfId` 指向第一封。`npm test` 全绿（现有 thread-timeline / thread-prompt-builder 测试不得回归）。
 - **边界**：本 step 只接线，不调整 `thread-timeline.ts` 内的修剪 heuristics。接线后若真实双语样本仍有残留，另开 step。
 - Completion Notes:
+  - 改动文件：`src/lib/thread-engine.ts`（import + `toThreadMessage` 接线 bodyClean/bodyDelta + `buildThreadRecord` 内跑 `markDuplicateBodies`，以 `mailId` 作为 duplicate 的 id 键）、`src/lib/thread-schema.ts`（`ThreadMessage` 新增可选字段 `duplicateOfId?: string`，此前 schema 缺失该字段，是"回填 duplicateOfId"验收项的前置缺口）、`src/lib/thread-store.ts`（`normalizeThreadMessage` 补上 `duplicateOfId` 的读回，保证持久化 round-trip 不丢）、`src/test/thread-engine.test.ts`（新增 2 个测试）。
+  - `bodyPreview` 消费方核查结果：UI 展示（`dashboard-render.ts:100`、`workbench-render.ts:165`、`workbench-render-v1.ts:93`）+ `thread-prompt-builder.ts:51` 的 fallback 链末位（`bodyDelta || bodyClean || bodyPreview`，接线后自动优先取 bodyDelta，无需改代码）+ `redaction.ts`/`security-gate.ts`（两处已分别处理三个字段，语义不受影响）。未发现需要额外改动的 prompt 消费点。
+  - `duplicateOfId` 用 `mailId`（非 `sourceMailId`）作为跨消息引用键，因为 UI 侧「Open in Outlook」等操作统一用 `mailId` 定位（workbench-render.ts 的 `data-mail-id`），保持一致性；`ThreadMessage.bodyHash` 语义从"原始邮件正文 hash（拷贝自 StoredMail.bodyHash）"变为"清洗后正文 hash（供重复检测用）"——grep 确认该字段除 normalize round-trip 外无其他消费方，改动安全。
+  - `markDuplicateBodies` 按每个线程（`buildThreadRecord` 内）独立跑，而非跨全部邮件全局跑；这是有意为之，与"线程内引用重复"的产品语义一致，也符合两处调用方（`extension.ts:511` pullMail 与 `app-data.ts:358` importDigestIfStoreMissing）总是用当前完整邮件集重建线程树的事实——不存在增量合并丢失 duplicate 标记的问题。
+  - Tests: `npm run compile` 零错误；`npm test` 全绿 312/312（新增 2 个：`wires reply-delta trimming into thread timeline bodyDelta`、`marks duplicate thread messages by cleaned body content`）。
+  - Manual validation: 不适用（纯 TS 逻辑，无 Outlook 交互）。
+  - Known issues: 无。
+  - Commit: `PENDING`
 
 ### [ ] R1.2 修复 toMe/ccMe 恒真（C-2）
 
@@ -169,9 +177,20 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 ## 6. Current Snapshot
 
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
+- 2026-07-08 · R1.1 完成并提交。R1.2-R1.7 未开始。
 
 ---
 
 ## 7. Handover Log
 
 - **2026-07-08 · Claude Fable 5（规划者）**：创建本执行计划。R1 七个 step 互相独立可任选；建议第一个 agent 从 R1.1（影响最大、改动最小）开始。无 dirty state。Next: claim R1.1。
+
+- **2026-07-08 · Claude Code（R1.1 pre-work checkpoint）**：读完本文件与 05 矩阵 L-1 行、02 文档 L16-27（`toThreadMessage` 三字段全赋原文、`isDuplicateBody` 硬编码 false 的根因）。`git status --short` 干净，HEAD `a815c51`（比 snapshot 记录的 `664620f` 多一条 CLAUDE.md→AGENTS.md 重定向提交，与本 step 无关）。已用 grep 重新定位锚点：`thread-engine.ts:66-96 toThreadMessage`、`thread-engine.ts:42-64 buildThreadRecord`；`bodyPreview` 消费方核实为 UI 展示（dashboard-render.ts/workbench-render.ts）+ prompt fallback 链末位（thread-prompt-builder.ts:51 `bodyDelta || bodyClean || bodyPreview`，接线后自动优先用 bodyDelta，无需改动）+ redaction/security-gate（两处已对三字段分别处理，无需改动）。额外发现：`ThreadMessage` schema 缺 `duplicateOfId` 字段（`thread-schema.ts` 只有 `isDuplicateBody`），`thread-store.ts normalizeThreadMessage` 也未做该字段的存取/回读——这是"回填 duplicateOfId"验收项的前置条件，纳入本 step 最小改动范围（新增可选字段，非新增功能）。Claim R1.1，开始写 RED 测试。
+
+- **2026-07-08 · Claude Code（R1.1 完成）**：
+  - Changed: `src/lib/thread-engine.ts` 接线 `cleanMailBody`/`extractReplyDelta`/`markDuplicateBodies`；`src/lib/thread-schema.ts` 新增 `ThreadMessage.duplicateOfId?: string`；`src/lib/thread-store.ts` 补上该字段的 normalize round-trip；`src/test/thread-engine.test.ts` 新增 2 个测试（引用链修剪 + 重复正文标记）。
+  - Validated: RED 先行——加测试后 `npm run compile` 报 `Property 'duplicateOfId' does not exist on type 'ThreadMessage'`（证实 schema 缺口是真实 gap，不是测试写错）；实现后 `npm run compile` 零错误；`npm test` 全绿 312/312（新增 2 个通过，`thread-timeline.test.ts`/`thread-prompt-builder.test.ts` 无回归）。
+  - Known issues: 无。接线后真实双语样本的 heuristics 覆盖率未做产品级评估（超出本 step 边界，留给后续如需要另开 step）。
+  - Last safe stopping point: R1.1 完成并提交。
+  - Uncommitted changes: 仅本文件（随 commit 一起提交）。
+  - Next: claim R1.2（`scripts/collect-outlook-mails.vbs` 的 `toMe`/`ccMe` 恒真修复，VBS 改动需在 Handover 标注 `needs user validation on real Outlook`）或 R1.3-R1.7 中任一，7 个 step 互相独立。

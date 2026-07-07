@@ -1,5 +1,6 @@
 import type { StoredMail } from "./mail-store";
 import type { ThreadContentStatus, ThreadMessage, ThreadRecord, ThreadStore } from "./thread-schema";
+import { cleanMailBody, extractReplyDelta, markDuplicateBodies } from "./thread-timeline";
 
 type InternalThreadMessage = ThreadMessage & {
   normalizedSubject: string;
@@ -40,7 +41,10 @@ export function normalizeThreadSubject(subject: string): string {
 }
 
 function buildThreadRecord(key: string, messages: InternalThreadMessage[]): ThreadRecord {
-  const timeline = [...messages].sort(compareThreadMessages);
+  const sorted = [...messages].sort(compareThreadMessages);
+  const timeline = markDuplicateBodies(
+    sorted.map((item) => ({ ...item, id: item.mailId, body: item.bodyClean }))
+  ).map(({ id, body, ...message }) => message);
   const first = timeline[0];
   const conversationId = first?.conversationId || "";
   const normalizedSubject = first?.normalizedSubject || normalizeThreadSubject(first?.subject || "");
@@ -82,8 +86,8 @@ function toThreadMessage(mail: StoredMail): InternalThreadMessage {
     sentTime: stringField(mail, "sentTime"),
     folder: stringField(mail, "folder"),
     bodyPreview: body,
-    bodyClean: body,
-    bodyDelta: body,
+    bodyClean: cleanMailBody(body),
+    bodyDelta: extractReplyDelta(body),
     bodyHash: stringField(mail, "bodyHash"),
     isDuplicateBody: false,
     contentAvailable: Boolean(body.trim()),

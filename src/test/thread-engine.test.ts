@@ -277,6 +277,89 @@ test("mergeThreadStores preserves existing thread messages when new pulls add to
   assert.equal(merged.lastBuiltAt, "2026-06-16T11:00:00.000Z");
 });
 
+test("wires reply-delta trimming into thread timeline bodyDelta", () => {
+  const englishBody = `Please use version 2 of the proposal.
+
+Thanks,
+Me
+
+From: Alice <alice@example.com>
+Sent: Tuesday, June 16, 2026 9:00 AM
+To: Me <me@example.com>
+Subject: Proposal review
+
+Please review version 1 of the proposal.`;
+
+  const chineseBody = `请以第二版报价为准。
+
+谢谢。
+
+发件人: 张三 <zhangsan@example.com>
+发送时间: 2026年6月16日 09:00
+收件人: 我 <me@example.com>
+主题: 报价确认
+
+请确认第一版报价。`;
+
+  const [thread] = buildThreadRecords([
+    mail({
+      mailId: "mail-en",
+      sourceMailId: "source-en",
+      conversationId: "conv-delta",
+      receivedTime: "2026-06-16 09:00:00",
+      bodyExcerpt: englishBody
+    }),
+    mail({
+      mailId: "mail-zh",
+      sourceMailId: "source-zh",
+      conversationId: "conv-delta",
+      receivedTime: "2026-06-16 10:00:00",
+      bodyExcerpt: chineseBody
+    })
+  ]);
+
+  const [en, zh] = thread.timeline;
+  assert.equal(en.bodyDelta, "Please use version 2 of the proposal.\n\nThanks,\nMe");
+  assert.ok(!en.bodyDelta.includes("Please review version 1"));
+  assert.equal(en.bodyPreview, englishBody);
+  assert.equal(zh.bodyDelta, "请以第二版报价为准。\n\n谢谢。");
+  assert.ok(!zh.bodyDelta.includes("请确认第一版报价"));
+  assert.equal(zh.bodyPreview, chineseBody);
+});
+
+test("marks duplicate thread messages by cleaned body content", () => {
+  const [thread] = buildThreadRecords([
+    mail({
+      mailId: "mail-1",
+      sourceMailId: "source-1",
+      conversationId: "conv-dup",
+      receivedTime: "2026-06-16 09:00:00",
+      bodyExcerpt: "Status update.\r\n\r\nReady."
+    }),
+    mail({
+      mailId: "mail-2",
+      sourceMailId: "source-2",
+      conversationId: "conv-dup",
+      receivedTime: "2026-06-16 10:00:00",
+      bodyExcerpt: "Status update.\n\nReady."
+    }),
+    mail({
+      mailId: "mail-3",
+      sourceMailId: "source-3",
+      conversationId: "conv-dup",
+      receivedTime: "2026-06-16 11:00:00",
+      bodyExcerpt: "Different content."
+    })
+  ]);
+
+  const [first, second, third] = thread.timeline;
+  assert.equal(first.isDuplicateBody, false);
+  assert.equal(second.isDuplicateBody, true);
+  assert.equal(second.duplicateOfId, "mail-1");
+  assert.equal(third.isDuplicateBody, false);
+  assert.equal(third.duplicateOfId, undefined);
+});
+
 function mail(overrides: Partial<ThreadCapableStoredMail>): ThreadCapableStoredMail {
   return {
     mailId: "mail-default",

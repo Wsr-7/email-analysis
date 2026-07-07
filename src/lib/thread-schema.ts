@@ -40,6 +40,7 @@ export interface ThreadMessage {
   bodyDelta: string;
   bodyHash: string;
   isDuplicateBody: boolean;
+  duplicateOfId?: string;
   contentAvailable: boolean;
   attachmentCount: number;
   attachmentNames: string[];
