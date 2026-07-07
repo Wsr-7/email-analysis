@@ -56,7 +56,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: `npm run compile` 零错误；`npm test` 全绿 312/312（新增 2 个：`wires reply-delta trimming into thread timeline bodyDelta`、`marks duplicate thread messages by cleaned body content`）。
   - Manual validation: 不适用（纯 TS 逻辑，无 Outlook 交互）。
   - Known issues: 无。
-  - Commit: `PENDING`
+  - Commit: `e60001c`
 
 ### [ ] R1.2 修复 toMe/ccMe 恒真（C-2）
 
@@ -191,6 +191,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Changed: `src/lib/thread-engine.ts` 接线 `cleanMailBody`/`extractReplyDelta`/`markDuplicateBodies`；`src/lib/thread-schema.ts` 新增 `ThreadMessage.duplicateOfId?: string`；`src/lib/thread-store.ts` 补上该字段的 normalize round-trip；`src/test/thread-engine.test.ts` 新增 2 个测试（引用链修剪 + 重复正文标记）。
   - Validated: RED 先行——加测试后 `npm run compile` 报 `Property 'duplicateOfId' does not exist on type 'ThreadMessage'`（证实 schema 缺口是真实 gap，不是测试写错）；实现后 `npm run compile` 零错误；`npm test` 全绿 312/312（新增 2 个通过，`thread-timeline.test.ts`/`thread-prompt-builder.test.ts` 无回归）。
   - Known issues: 无。接线后真实双语样本的 heuristics 覆盖率未做产品级评估（超出本 step 边界，留给后续如需要另开 step）。
+  - Commit: `e60001c`
   - Last safe stopping point: R1.1 完成并提交。
   - Uncommitted changes: 仅本文件（随 commit 一起提交）。
   - Next: claim R1.2（`scripts/collect-outlook-mails.vbs` 的 `toMe`/`ccMe` 恒真修复，VBS 改动需在 Handover 标注 `needs user validation on real Outlook`）或 R1.3-R1.7 中任一，7 个 step 互相独立。
