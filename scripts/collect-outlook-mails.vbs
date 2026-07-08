@@ -119,7 +119,7 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
   End If
 
   Dim timeProperty
-  timeProperty = FolderTimeProperty(folderPath)
+  timeProperty = FolderTimeProperty(ns, folder, folderPath)
 
   Dim items
   Set items = folder.Items
@@ -147,14 +147,21 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
     On Error Resume Next
     Set restricted = items.Restrict("[" & timeProperty & "] >= '" & FormatRestrictDate(cutoff) & "'")
     If Err.Number <> 0 Then
-      Fail "Unable to restrict Outlook folder by " & timeProperty & " cutoff: " & folderPath & ". " & Err.Description
+      WScript.Echo "FolderScan: folder=" & folderPath & "; warning=recentHoursRestrictFailed; timeProperty=" & timeProperty & "; error=" & Err.Description
+      Err.Clear
+    ElseIf Not restricted Is Nothing Then
+      Set items = restricted
     End If
     On Error GoTo 0
-    Set items = restricted
   End If
   Dim candidateItems
   candidateItems = SafeItemsCount(items)
+  On Error Resume Next
   items.Sort "[" & timeProperty & "]", True
+  If Err.Number <> 0 Then
+    Fail "Unable to sort Outlook folder by " & timeProperty & ": " & folderPath & ". " & Err.Description
+  End If
+  On Error GoTo 0
 
   Dim scanned
   scanned = 0
@@ -163,38 +170,42 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
   Dim capEnabled
   capEnabled = IsMaxItemsMode(rangeMode)
 
-  Dim i
-  For i = 1 To items.Count
-    On Error Resume Next
-    Dim item
-    Set item = items.Item(i)
-    If Err.Number <> 0 Then
-      Err.Clear
-      On Error GoTo 0
-    Else
-      On Error GoTo 0
-      If Not item Is Nothing Then
-        If TypeName(item) = "MailItem" Then
-          Dim sortDate
-          sortDate = MailSortDate(item, folderPath)
-          If IsAcceptableMailDate(sortDate) Then
-            If cutoffEnabled And sortDate < cutoff Then
-              Exit For
-            End If
-            Dim record
-            Set record = BuildMailRecord(item, folderPath, bodyChars, collectedCount + 1)
-            AddRecordToArray collected, collectedCount, record
-            scanned = scanned + 1
-            addedInFolder = addedInFolder + 1
-            If capEnabled And scanned >= maxItems Then
-              Exit For
-            End If
+  On Error Resume Next
+  Dim item
+  Set item = items.GetFirst
+  If Err.Number <> 0 Then
+    Fail "Unable to iterate Outlook folder: " & folderPath & ". " & Err.Description
+  End If
+  On Error GoTo 0
+
+  Do While Not item Is Nothing
+    scanned = scanned + 1
+    If TypeName(item) = "MailItem" Then
+      Dim sortDate
+      sortDate = MailSortDate(item, timeProperty)
+      If IsAcceptableMailDate(sortDate) Then
+        If cutoffEnabled And sortDate < cutoff Then
+          Exit Do
+        End If
+        If (Not cutoffEnabled) Or sortDate >= cutoff Then
+          Dim record
+          Set record = BuildMailRecord(item, folderPath, timeProperty, bodyChars, collectedCount + 1)
+          AddRecordToArray collected, collectedCount, record
+          addedInFolder = addedInFolder + 1
+          If capEnabled And addedInFolder >= maxItems Then
+            Exit Do
           End If
         End If
       End If
     End If
-  Next
-  WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; added=" & addedInFolder & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
+    On Error Resume Next
+    Set item = items.GetNext
+    If Err.Number <> 0 Then
+      Fail "Unable to continue Outlook folder iteration: " & folderPath & ". " & Err.Description
+    End If
+    On Error GoTo 0
+  Loop
+  WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; scanned=" & scanned & "; added=" & addedInFolder & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
 End Sub
 
 Function IsRecentHoursMode(byVal rangeMode)
@@ -205,12 +216,45 @@ Function IsMaxItemsMode(byVal rangeMode)
   IsMaxItemsMode = Not IsRecentHoursMode(rangeMode)
 End Function
 
-Function FolderTimeProperty(byVal folderPath)
-  If LCase(Trim(CStr(folderPath))) = "sent items" Then
+Function FolderTimeProperty(byRef ns, byRef folder, byVal folderPath)
+  If IsSentFolder(ns, folder) Or LCase(Trim(CStr(folderPath))) = "sent items" Then
     FolderTimeProperty = "SentOn"
   Else
     FolderTimeProperty = "ReceivedTime"
   End If
+End Function
+
+Function IsSentFolder(byRef ns, byRef folder)
+  IsSentFolder = False
+  On Error Resume Next
+  Dim sentFolder
+  Set sentFolder = ns.GetDefaultFolder(5)
+  If Err.Number <> 0 Or sentFolder Is Nothing Or folder Is Nothing Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Function
+  End If
+
+  Dim sentEntryId
+  sentEntryId = SafeString(sentFolder.EntryID)
+  Dim current
+  Set current = folder
+  Dim depth
+  For depth = 0 To 10
+    If current Is Nothing Then
+      Exit For
+    End If
+    If SafeString(current.EntryID) = sentEntryId Then
+      IsSentFolder = True
+      Exit For
+    End If
+    Set current = current.Parent
+    If Err.Number <> 0 Then
+      Err.Clear
+      Exit For
+    End If
+  Next
+  On Error GoTo 0
 End Function
 
 Function IsAcceptableMailDate(byVal value)
@@ -278,7 +322,7 @@ Function FormatRestrictDate(byVal dateValue)
   ElseIf hourPart > 12 Then
     hourPart = hourPart - 12
   End If
-  FormatRestrictDate = Month(dateValue) & "/" & Day(dateValue) & "/" & Year(dateValue) & " " & hourPart & ":" & Right("0" & Minute(dateValue), 2) & " " & suffix
+  FormatRestrictDate = Month(dateValue) & "/" & Day(dateValue) & "/" & Year(dateValue) & " " & hourPart & ":" & Right("0" & Minute(dateValue), 2) & ":" & Right("0" & Second(dateValue), 2) & " " & suffix
 End Function
 
 Function ParseAnchorDate(byVal value)
@@ -350,7 +394,7 @@ Function ResolveFolder(byRef ns, byVal folderPath)
   Set ResolveFolder = folder
 End Function
 
-Function BuildMailRecord(byRef mail, byVal folderPath, byVal bodyChars, byVal recordIndex)
+Function BuildMailRecord(byRef mail, byVal folderPath, byVal timeProperty, byVal bodyChars, byVal recordIndex)
   Dim record
   Set record = CreateObject("Scripting.Dictionary")
   record.CompareMode = 1
@@ -363,9 +407,9 @@ Function BuildMailRecord(byRef mail, byVal folderPath, byVal bodyChars, byVal re
   record.Add "subject", SafeString(mail.Subject)
   record.Add "senderName", SafeString(mail.SenderName)
   record.Add "senderEmail", SafeSenderEmail(mail)
-  record.Add "receivedTime", FormatDateValue(MailSortDate(mail, folderPath))
+  record.Add "receivedTime", FormatDateValue(MailSortDate(mail, timeProperty))
   record.Add "sentTime", SafeDateValue(mail.SentOn)
-  record.Add "sortKey", Replace(FormatDateValue(MailSortDate(mail, folderPath)), " ", "T")
+  record.Add "sortKey", Replace(FormatDateValue(MailSortDate(mail, timeProperty)), " ", "T")
   record.Add "folderPath", folderPath
   record.Add "unread", LCase(CStr(CBool(mail.UnRead)))
   record.Add "importance", ImportanceLabel(mail.Importance)
@@ -379,9 +423,9 @@ Function BuildMailRecord(byRef mail, byVal folderPath, byVal bodyChars, byVal re
   Set BuildMailRecord = record
 End Function
 
-Function MailSortDate(byRef mail, byVal folderPath)
+Function MailSortDate(byRef mail, byVal timeProperty)
   On Error Resume Next
-  If FolderTimeProperty(folderPath) = "SentOn" Then
+  If timeProperty = "SentOn" Then
     MailSortDate = mail.SentOn
   Else
     MailSortDate = mail.ReceivedTime

@@ -238,11 +238,14 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 - Completion Notes:
   - Changed: `scripts/collect-outlook-mails.vbs` 的 `CollectFolderItems` 在 recentHours 模式下先计算 cutoff，并对当前 `items` 执行 `Restrict("[" & timeProperty & "] >= '" & FormatRestrictDate(cutoff) & "'")`；若同时有 `olderThan`，沿用既有 older-than Restrict 后再叠加 cutoff Restrict，保持交集语义。
   - Changed: 降序循环里对可接受日期增加早停：`cutoffEnabled And sortDate < cutoff` 时 `Exit For`，防止 Restrict 未充分缩小集合时继续全量 COM 遍历。maxItems 路径不受影响，仍只按 `maxItems` cap 停止。
-  - Boundary: 未改 `FormatRestrictDate` 的美式日期串区域设置假设（C-7b）、未改 `FolderTimeProperty` 的 Sent Items 本地化判断（C-5a）、未改 digest 输出格式、未改排序/数组扩容。
-  - Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`cscript //nologo scripts/collect-outlook-mails.vbs --sample --output ...` 通过并生成原 digest markdown 字段结构；`npm run compile` 零错误；`npm test` 340/340 全绿。
-  - Manual validation: **needs user validation on real Outlook**——需在真实大邮箱中验证 Fetch New 明显变快，recentHours 结果集仍只包含 cutoff 之后邮件；同时留意 stdout `FolderScan` 的 `candidateItems` 是否明显小于 `totalItems`。
-  - Known issues: 真实 Outlook/Exchange 未验证；`FormatRestrictDate` 的区域设置风险仍是 C-7b，按本 step 边界未处理。
+  - Boundary: 初始 R2.5 只改 C-1；后续按用户要求对 R2.5 对抗式审查的所有 findings 做了最小修复，触及 C-5a/C-7b 的直接风险面：`FolderTimeProperty` 改为优先用解析后的 folder 父链匹配默认 Sent Items EntryID，`FormatRestrictDate` 保留既有美式日期串但补秒级精度。未改 digest 输出格式、未改数组扩容/排序迁移、未引入 DASL。
+  - Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`cscript //nologo scripts/collect-outlook-mails.vbs --sample --output ...` 通过，sample 只证明共享 `WriteDigest` 输出仍可生成、不经过真实 `CollectFolderItems`/Restrict 路径；用 `parseDigest` 解析 sample digest 得到 4 条样例邮件；`npm run compile` 零错误；`npm test` 340/340 全绿。
+  - Manual validation: **needs user validation on real Outlook**——需在真实大邮箱中验证 Fetch New 明显变快，recentHours 结果集仍只包含 cutoff 之后邮件；同时留意 stdout `FolderScan` 的 `candidateItems` 是否明显小于 `totalItems`、`scanned` 是否合理。
+  - Known issues: 真实 Outlook/Exchange 未验证；日期过滤仍未改 DASL/ISO，区域设置风险已因 recentHours Restrict 软失败 + 精确循环 cutoff 降低，但 older-than Restrict 仍依赖 Outlook 对 `M/D/YYYY h:mm:ss AM/PM` 的解析。
   - Commit: `35c8b79`
+  - Review fix: 3 个只读 subagent 对 R2.5 做对抗式审查后，修复全部 findings：recentHours cutoff Restrict 失败改为 warning + fallback 到原集合排序早停；`items.Sort` 增加错误处理；迭代改 `GetFirst`/`GetNext`，不再直接依赖 restricted `items.Count`；`FolderScan` 输出新增 `scanned`；`FormatRestrictDate` 补秒避免 older-than anchor 分钟截断漏邮件；Sent Items 时间字段判断改为解析后的 folder/default Sent Items EntryID 父链匹配；文档修正 sample 验收证据口径并补真实验证项。
+  - Review fix tests: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过；`parseDigest` 解析 sample digest 4 条；`npm run compile` 零错误；`npm test` 340/340 全绿。
+  - Review fix commit: `pending`
 
 ---
 
@@ -383,3 +386,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.5 pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `6184a08`、`759b050`、`4ff85ba`、`76bf72b`、`d065482`。按计划重新定位并阅读 05 矩阵 C-1、01 collector 文档 C-1：`recentHours` 目前在 `CollectFolderItems` 中全量遍历排序后的 `items.Count`，只在循环内判断 `sortDate >= cutoff`，没有 Restrict，也没有 `sortDate < cutoff` 早停；`--older-than-map` 已有同款 `items.Restrict("[" & timeProperty & "] < '...'")` 可复用。grep 锚点：`scripts/collect-outlook-mails.vbs:114-185 CollectFolderItems`、`FormatRestrictDate`、`IsRecentHoursMode`、`MailSortDate`。Claim R2.5；边界：只做 recentHours Restrict + 降序早停，不改 `FormatRestrictDate` 区域设置假设（C-7b）、不改 Sent Items 本地化判断（C-5a）、不改 digest 格式、不引入新依赖。
 
 - **2026-07-09 · Codex（R2.5 completion，needs user validation on real Outlook）**：Action: `CollectFolderItems` 在 recentHours 模式下复用既有 `items.Restrict` 风格按 cutoff 过滤，并在降序循环中遇到早于 cutoff 的可接受日期直接 `Exit For`；未改 C-7b/C-5a/输出格式。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过并生成 digest；`npm run compile` 零错误；`npm test` 340/340 全绿。Manual: **needs user validation on real Outlook**，需确认大邮箱 Fetch New 变快且 recentHours 结果集不变，观察 `FolderScan.candidateItems` 是否下降。Commit: `35c8b79`。Next: R2.5 完成后 Milestone R2 已全部完成；R3/R4 仍不得自行 claim，R3 开始前应统一执行此前积累的真实 VS Code/Copilot/Outlook 验证项。
+
+- **2026-07-09 · Codex（R2.5 adversarial review fix，needs user validation on real Outlook）**：用户要求多个 subagent 对 R2.5 做对抗式审查，所有 findings 不分等级全部优化。3 个只读 reviewer 覆盖 VBS 语义、plan/验收证据、Outlook COM/Restrict 兼容风险。Action: recentHours Restrict 失败软降级为 warning + 排序早停；Sort 增加错误处理；主循环改 `GetFirst`/`GetNext`；`FolderScan` 增加 `scanned`；`FormatRestrictDate` 补秒；Sent Items 判断改为默认 Sent folder EntryID 父链匹配；修正文档中 sample 证据措辞。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过；`parseDigest` 解析 sample digest 4 条；`npm run compile` 零错误；`npm test` 340/340 全绿。Manual: **needs user validation on real Outlook**，还需真实大邮箱/默认 Sent Items/子文件夹/本地化/zh-CN 与 en-US 区域设置验证。Commit: `pending`。Next: commit and push all changes per user request.
