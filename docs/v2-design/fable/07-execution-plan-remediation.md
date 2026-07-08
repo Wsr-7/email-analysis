@@ -225,7 +225,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Validation: grep 确认 `src` 中无 `cancellable: false`、无 `new vscode.CancellationTokenSource().token` 即弃形式、无旧的未带 token `sendPrompt` 调用。
   - Manual validation: 按用户要求留到 R3 开始前统一进行；需在真实 VS Code 扩展宿主 + Copilot 中验证取消按钮能中止/停止后续 chunk、429/quota 退避体验、手动草稿取消体验。
   - Known issues: retry delay 期间不会主动中断 timer，只会在下一次尝试前检查取消；未实现请求级硬超时，仍按 R2.4 计划只做取消 token 与退避重试；未做并行分析。
-  - Commit: pending
+  - Commit: `76bf72b`
 
 ### [ ] R2.5 recentHours 用 Restrict 过滤（C-1）
 
@@ -366,4 +366,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-08 · Codex（R2.4 pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -6` 最新为 `d065482`、`68cf5d1`、`9e775e0`、`381100c`、`0f8cb21`、`8cbc87c`。按计划重新定位并阅读 05 矩阵 L-5、02 文档 L-5：当前 `CopilotProvider.sendPrompt` 使用即弃 `CancellationTokenSource`，长分析无法取消；429/quota/瞬时故障没有退避重试；R2.4 应扩展 provider token 透传、`runWithBusy`/长操作用 cancellable progress，下传 token 到 LLM 调用与 chunk 循环，并对可识别限流错误最多 2 次指数退避（2s/8s）。用户指定：所有需要人工验证的项留到 R3 开始前统一进行。Claim R2.4；边界：不做并行分析、不做 R2.5 VBS Restrict、不引入依赖。
 
-- **2026-07-08 · Codex（R2.4 completion）**：R2.4 已实现取消 token 透传和 retryable LLM error 退避重试。Action: `LlmRequestOptions`/`AnalysisContext` 增加 `cancellationToken`，`CopilotProvider` 透传给 VS Code `sendRequest`；`sendPromptToModel` 对 429/quota/rate-limit/temporary/timeout 做最多 2 次 2s/8s 退避；`runWithBusy` 与手动草稿 LLM progress 改为 cancellable，batch chunk 循环在 chunk 间检查取消并保留已完成 chunk。Validated: RED compile 先失败；`npm run compile` 零错误；定向 R2.4 测试 58/58 通过；`npm test` 336/336 全绿；grep 确认 `src` 无旧即弃 token/不可取消 progress/未带 token 的 selected-model sendPrompt 调用。Manual: 用户要求留到 R3 前统一验证，届时需真实 VS Code + Copilot 验证取消按钮、退避重试体验和手动草稿取消。Commit: pending。Next: 可 claim R2.5；claim 前必须重读 05 矩阵 C-1 与 01 collector 文档相关段落，VBS 真实 Outlook 验证继续留到 R3 前统一进行。
+- **2026-07-08 · Codex（R2.4 completion）**：R2.4 已实现取消 token 透传和 retryable LLM error 退避重试。Action: `LlmRequestOptions`/`AnalysisContext` 增加 `cancellationToken`，`CopilotProvider` 透传给 VS Code `sendRequest`；`sendPromptToModel` 对 429/quota/rate-limit/temporary/timeout 做最多 2 次 2s/8s 退避；`runWithBusy` 与手动草稿 LLM progress 改为 cancellable，batch chunk 循环在 chunk 间检查取消并保留已完成 chunk。Validated: RED compile 先失败；`npm run compile` 零错误；定向 R2.4 测试 58/58 通过；`npm test` 336/336 全绿；grep 确认 `src` 无旧即弃 token/不可取消 progress/未带 token 的 selected-model sendPrompt 调用。Manual: 用户要求留到 R3 前统一验证，届时需真实 VS Code + Copilot 验证取消按钮、退避重试体验和手动草稿取消。Commit: `76bf72b`。Next: 可 claim R2.5；claim 前必须重读 05 矩阵 C-1 与 01 collector 文档相关段落，VBS 真实 Outlook 验证继续留到 R3 前统一进行。
