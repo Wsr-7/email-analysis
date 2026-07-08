@@ -183,10 +183,12 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Token budget 取舍：按用户补充，`model.maxInputTokens` 不视为最终真值，也不暴露为用户配置；实际预算为代码内甜点值 `12000`，若选中模型提供更小的 `maxInputTokens` 才取 `min(model.maxInputTokens, 12000)`，缺失时回落 `12000`。`splitByTokenBudget` 仍按计划采用 `chars/4` 近似 + `reservePerMail` 输出预留，单封超大邮件独占 chunk，避免死循环。
   - 解析失败处理：每个 chunk 独立发送、解析、merge、持久化；JSON parse 失败时向同一 provider 回喂原响应与 parser error 修复一次，修复仍失败则记录 `analyze:chunkSkipped` 并继续后续 chunk，已成功 chunk 的 `analysis-result.json` 与 summary 已落盘。
   - 进度/日志：`analyze:start` 记录 `chunks` 与 `maxInputTokens`；每 chunk 记录 `analyze:chunkStart`、`analyze:response`、`analyze:chunkDone`，跳过时记录 `analyze:chunkSkipped`；最终 `analyze:done` 记录 `analyzedCount`、`skippedChunks`、`redactionReplacements`、`mergedItems`。
+  - Review fix: R2.2 对抗式审查发现两个 P2：全 chunk 解析/修复失败时会静默成功返回；预算切分未扣固定 prompt 开销。修复为：若 `analyzedCount === 0` 则记录 `analyze:failed` 并抛错；返回值 `batchSize` 改为实际成功处理邮件数；切分前用空 digest 版 `composeAnalysisPrompt` 估算固定 prompt token 并从模型/甜点预算中扣除，同时单封邮件估算纳入 digest 标签字段。
   - Tests: RED 先行——新增测试后 `npm run compile` 先因 `splitByTokenBudget` 未导出与 `AvailableModel.maxInputTokens` 缺失失败；实现后 `npm run compile` 零错误，`node --test out/test/app-analysis.test.js` 9/9 通过，`npm test` 全绿 323/323。
+  - Review fix tests: 新增 2 个回归测试（全 chunk 失败必须 reject；固定 prompt 开销会影响 chunk 数）。RED：`node --test out/test/app-analysis.test.js` 先 2 处失败；修复后 `node --test out/test/app-analysis.test.js` 11/11 通过，`npm test` 325/325 全绿。
   - Manual validation: 不涉及 VBS/Outlook 脚本，无需真实 Outlook 验证。建议在真实 VS Code 扩展宿主 + Copilot 模型上用较大批量邮件验证：UI 日志显示 `chunk i/N`，中间某个 chunk 失败时前后成功结果仍保留。
-  - Known issues: token 估算仍是计划要求的近似值，不包含完整 prompt 固定开销的精确 tokenization；本 step 有意不做并行分析、不做取消/退避（R2.4）、不做用户可配置预算。
-  - Commit: `e7180c7`
+  - Known issues: token 估算仍是计划要求的近似值，不是真实 tokenizer；若固定 prompt 本身已经超过某个模型真实上下文，单封邮件 chunk 也可能被模型拒绝，此时会走 chunk 失败/全失败错误路径。本 step 有意不做并行分析、不做取消/退避（R2.4）、不做用户可配置预算。
+  - Commit: `e7180c7`, review fix pending
 
 ### [ ] R2.3 统一语言契约（L-4 + U-5，实施前必读 06 文档 Q2 全文）
 
@@ -333,3 +335,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Manual validation: 无 VBS/Outlook 脚本改动，不需要真实 Outlook 验证；建议在真实 VS Code Copilot 环境用大批量分析观察 `chunk i/N` 日志与部分成功持久化。
   - Last safe stopping point: R2.2 完成，commit `e7180c7`。
   - Next: claim R2.3（统一语言契约）前必须重读 05 矩阵 L-4/U-5 与 06 文档 Q2 全文；不得跳到 R2.4，R3/R4 仍不得自行 claim。
+
+- **2026-07-08 · Codex（R2.2 adversarial review fix）**：应用户要求开启 2 个只读 subagent 对 R2.2 做对抗式审查。Chunk/持久化审查发现 P2：全 chunk JSON parse + repair 均失败时函数仍成功返回，用户提示会误报完成；模型/预算审查发现 P2：切分预算未扣固定 prompt 开销，低上下文模型可能仍超限。Action: 新增两个回归测试；`analyzeBatchCore` 全 chunk 失败时抛错，部分成功返回实际处理邮件数；chunk 预算扣除空 digest 版固定 prompt 估算，单封邮件估算纳入 digest 标签字段。Validated: RED 先行（新增测试先 2 处失败）；`npm run compile` 零错误；`node --test out/test/app-analysis.test.js` 11/11 通过；`npm test` 325/325 全绿。Commit: pending。Next: 回填 commit hash 后才 claim R2.3。

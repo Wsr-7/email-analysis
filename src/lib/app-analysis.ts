@@ -87,13 +87,23 @@ export function splitByTokenBudget(
 
 function estimateMailTokens(mail: StoredMail): number {
   const chars = [
-    mail.mailId,
-    mail.subject,
-    mail.from,
-    mail.receivedTime,
-    mail.folder,
+    `## Mail: ${mail.mailId}`,
+    `Subject: ${mail.subject}`,
+    `From: ${mail.from}`,
+    `ReceivedTime: ${mail.receivedTime}`,
+    `Folder: ${mail.folder}`,
+    `Unread: ${mail.unread}`,
+    `Importance: ${mail.importance}`,
+    `ToMe: ${mail.toMe}`,
+    `CcMe: ${mail.ccMe}`,
+    "BodyExcerpt:",
     mail.bodyExcerpt
   ].join("\n").length;
+  return estimateTextTokens(chars);
+}
+
+function estimateTextTokens(textOrLength: string | number): number {
+  const chars = typeof textOrLength === "number" ? textOrLength : textOrLength.length;
   return Math.ceil(chars / 4);
 }
 
@@ -158,14 +168,26 @@ export async function analyzeBatchCore(
   const replyDraftPrompt = await fs.promises.readFile(path.join(ctx.extensionPath, "prompts", "reply-draft-prompt.md"), "utf8");
   const replyTemplate = await ctx.data.readReplyTemplate((event, d) => ctx.log(event, d));
   const configuredModel = typeof config.modelFamily === "string" ? config.modelFamily.trim() : "gpt-5.4";
-  const maxInputTokens = await analysisTokenBudget(ctx, configuredModel);
-  const chunks = splitByTokenBudget(batch, maxInputTokens, ANALYSIS_OUTPUT_RESERVE_PER_MAIL);
+  const modelInputTokenBudget = await analysisTokenBudget(ctx, configuredModel);
+  const promptOverheadTokens = estimateTextTokens(composeAnalysisPrompt({
+    basePrompt,
+    outputSchemaPrompt,
+    replyDraftPrompt,
+    replyTemplate,
+    digestText: buildBatchDigestMarkdown([]),
+    outputLanguage: String(config.outputLanguage || "en-US"),
+    promptConfig
+  }));
+  const chunkInputTokenBudget = Math.max(1, modelInputTokenBudget - promptOverheadTokens);
+  const chunks = splitByTokenBudget(batch, chunkInputTokenBudget, ANALYSIS_OUTPUT_RESERVE_PER_MAIL);
   await ctx.log("analyze:start", {
     selection: Array.isArray(selection) ? "selected" : typeof selection === "number" ? "batchSize" : selection || "nextBatch",
     requestedBatchSize: requestedBatch.length,
     batchSize: batch.length,
     chunks: chunks.length,
-    maxInputTokens,
+    maxInputTokens: modelInputTokenBudget,
+    promptOverheadTokens,
+    chunkInputTokenBudget,
     configuredModel
   });
   let merged = currentAnalysis;
@@ -226,6 +248,11 @@ export async function analyzeBatchCore(
     await ctx.log("analyze:chunkDone", { chunk: index + 1, chunks: chunks.length, mergedItems: merged.items.length });
   }
 
+  if (!analyzedCount) {
+    await ctx.log("analyze:failed", { batchSize: batch.length, skippedChunks });
+    throw new Error("All analysis chunks failed. Check model output or try a different model.");
+  }
+
   await ctx.log("analyze:done", {
     batchSize: batch.length,
     analyzedCount,
@@ -233,7 +260,7 @@ export async function analyzeBatchCore(
     redactionReplacements: totalReplacements,
     mergedItems: merged.items.length
   });
-  return { batchSize: batch.length };
+  return { batchSize: analyzedCount };
 }
 
 async function repairAnalysisJson(

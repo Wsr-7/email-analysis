@@ -53,7 +53,7 @@ function analysisResponse(mailId: string): string {
 describe("analyzeBatchCore", () => {
   it("splits mails by token budget without looping on oversized mails", () => {
     const mails = Array.from({ length: 5 }, (_, index) => ({ ...mail(index + 1), bodyExcerpt: "x".repeat(100) }));
-    const chunks = splitByTokenBudget(mails, 900, 400);
+    const chunks = splitByTokenBudget(mails, 1100, 400);
 
     assert.deepEqual(chunks.map((chunk) => chunk.map((item) => item.mailId)), [
       ["mail-001", "mail-002"],
@@ -134,6 +134,84 @@ describe("analyzeBatchCore", () => {
       assert.deepEqual(result.items.map((item) => item.mailId).sort(), ["mail-001", "mail-003"]);
       assert.equal(provider.prompts.length, 4);
       assert.match(provider.prompts[2], /Fix this invalid JSON response/);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when every chunk fails JSON parsing and repair", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [1, 2].map((index) => ({ ...mail(index), bodyExcerpt: "x".repeat(2400) }))
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }]);
+
+      const provider = new MockProvider({
+        responses: ["{not json", "{still not json", "{not json either", "{still not json either"]
+      });
+
+      await assert.rejects(
+        () => analyzeBatchCore({
+          data,
+          llmProvider: provider,
+          extensionPath: process.cwd(),
+          readConfig: async () => ({
+            autoAnalyzeMaxClassificationLevel: 2,
+            modelFamily: "mock-model",
+            outputLanguage: "en-US"
+          }),
+          log: async () => {},
+          availableModelsCache: null
+        }, "allAllowed"),
+        /All analysis chunks failed/
+      );
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("accounts for fixed prompt overhead when chunking by model token budget", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [1, 2].map((index) => ({ ...mail(index), bodyExcerpt: "x".repeat(3500) }))
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 3000 }]);
+
+      const provider = new MockProvider({
+        responses: [analysisResponse("mail-001"), analysisResponse("mail-002")]
+      });
+
+      const result = await analyzeBatchCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({
+          autoAnalyzeMaxClassificationLevel: 2,
+          modelFamily: "mock-model",
+          outputLanguage: "en-US"
+        }),
+        log: async () => {},
+        availableModelsCache: null
+      }, "allAllowed");
+
+      assert.equal(result.batchSize, 2);
+      assert.equal(provider.prompts.length, 2);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }
