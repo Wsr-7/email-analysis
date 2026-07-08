@@ -126,9 +126,16 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
   Dim totalItems
   totalItems = SafeItemsCount(items)
 
+  Dim cutoffEnabled
+  cutoffEnabled = IsRecentHoursMode(rangeMode)
+  Dim cutoff
+  If cutoffEnabled Then
+    cutoff = DateAdd("h", -recentHours, Now)
+  End If
+
+  Dim restricted
   If Trim(CStr(olderThan)) <> "" Then
     On Error Resume Next
-    Dim restricted
     Set restricted = items.Restrict("[" & timeProperty & "] < '" & FormatRestrictDate(ParseAnchorDate(olderThan)) & "'")
     If Err.Number <> 0 Then
       Fail "Unable to restrict Outlook folder by " & timeProperty & ": " & folderPath & ". " & Err.Description
@@ -136,16 +143,18 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
     On Error GoTo 0
     Set items = restricted
   End If
+  If cutoffEnabled Then
+    On Error Resume Next
+    Set restricted = items.Restrict("[" & timeProperty & "] >= '" & FormatRestrictDate(cutoff) & "'")
+    If Err.Number <> 0 Then
+      Fail "Unable to restrict Outlook folder by " & timeProperty & " cutoff: " & folderPath & ". " & Err.Description
+    End If
+    On Error GoTo 0
+    Set items = restricted
+  End If
   Dim candidateItems
   candidateItems = SafeItemsCount(items)
   items.Sort "[" & timeProperty & "]", True
-
-  Dim cutoffEnabled
-  cutoffEnabled = IsRecentHoursMode(rangeMode)
-  Dim cutoff
-  If cutoffEnabled Then
-    cutoff = DateAdd("h", -recentHours, Now)
-  End If
 
   Dim scanned
   scanned = 0
@@ -168,7 +177,10 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
         If TypeName(item) = "MailItem" Then
           Dim sortDate
           sortDate = MailSortDate(item, folderPath)
-          If IsAcceptableMailDate(sortDate) And ((Not cutoffEnabled) Or sortDate >= cutoff) Then
+          If IsAcceptableMailDate(sortDate) Then
+            If cutoffEnabled And sortDate < cutoff Then
+              Exit For
+            End If
             Dim record
             Set record = BuildMailRecord(item, folderPath, bodyChars, collectedCount + 1)
             AddRecordToArray collected, collectedCount, record

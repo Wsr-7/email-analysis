@@ -230,12 +230,19 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Review fix tests: RED 先行——`npm run compile` 先因 `CancellationTokenLike.onCancellationRequested` 缺失失败；修复后 `npm run compile` 零错误，定向 `node --test out/test/app-analysis.test.js out/test/llm-provider.test.js out/test/message-handler.test.js` 62/62 通过，`npm test` 340/340 全绿，`git diff --check` 通过。
   - Review fix commit: `759b050`
 
-### [ ] R2.5 recentHours 用 Restrict 过滤（C-1）
+### [x] R2.5 recentHours 用 Restrict 过滤（C-1）
 
 - **改动点**：`scripts/collect-outlook-mails.vbs` `CollectFolderItems`（recentHours 模式全量 `For i = 1 To items.Count`）。
 - **做法**：优先 `items.Restrict("[ReceivedTime] >= '...'")`——脚本内 `--older-than-map` 路径已有同款 Restrict 用法可直接复制其日期格式化；对 Restrict 结果仍按现有排序/上限逻辑处理。保底：降序遍历中 `If receivedTime < cutoff Then Exit For`。
 - **验收**：语法检查；`--sample` 不回归；digest 格式不变；Handover 标注 `needs user validation on real Outlook`（大邮箱 Fetch New 明显变快、结果集不变）。
 - Completion Notes:
+  - Changed: `scripts/collect-outlook-mails.vbs` 的 `CollectFolderItems` 在 recentHours 模式下先计算 cutoff，并对当前 `items` 执行 `Restrict("[" & timeProperty & "] >= '" & FormatRestrictDate(cutoff) & "'")`；若同时有 `olderThan`，沿用既有 older-than Restrict 后再叠加 cutoff Restrict，保持交集语义。
+  - Changed: 降序循环里对可接受日期增加早停：`cutoffEnabled And sortDate < cutoff` 时 `Exit For`，防止 Restrict 未充分缩小集合时继续全量 COM 遍历。maxItems 路径不受影响，仍只按 `maxItems` cap 停止。
+  - Boundary: 未改 `FormatRestrictDate` 的美式日期串区域设置假设（C-7b）、未改 `FolderTimeProperty` 的 Sent Items 本地化判断（C-5a）、未改 digest 输出格式、未改排序/数组扩容。
+  - Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`cscript //nologo scripts/collect-outlook-mails.vbs --sample --output ...` 通过并生成原 digest markdown 字段结构；`npm run compile` 零错误；`npm test` 340/340 全绿。
+  - Manual validation: **needs user validation on real Outlook**——需在真实大邮箱中验证 Fetch New 明显变快，recentHours 结果集仍只包含 cutoff 之后邮件；同时留意 stdout `FolderScan` 的 `candidateItems` 是否明显小于 `totalItems`。
+  - Known issues: 真实 Outlook/Exchange 未验证；`FormatRestrictDate` 的区域设置风险仍是 C-7b，按本 step 边界未处理。
+  - Commit: `pending`
 
 ---
 
@@ -372,3 +379,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-08 · Codex（R2.4 completion）**：R2.4 已实现取消 token 透传和 retryable LLM error 退避重试。Action: `LlmRequestOptions`/`AnalysisContext` 增加 `cancellationToken`，`CopilotProvider` 透传给 VS Code `sendRequest`；`sendPromptToModel` 对 429/quota/rate-limit/temporary/timeout 做最多 2 次 2s/8s 退避；`runWithBusy` 与手动草稿 LLM progress 改为 cancellable，batch chunk 循环在 chunk 间检查取消并保留已完成 chunk。Validated: RED compile 先失败；`npm run compile` 零错误；定向 R2.4 测试 58/58 通过；`npm test` 336/336 全绿；grep 确认 `src` 无旧即弃 token/不可取消 progress/未带 token 的 selected-model sendPrompt 调用。Manual: 用户要求留到 R3 前统一验证，届时需真实 VS Code + Copilot 验证取消按钮、退避重试体验和手动草稿取消。Commit: `76bf72b`。Next: 可 claim R2.5；claim 前必须重读 05 矩阵 C-1 与 01 collector 文档相关段落，VBS 真实 Outlook 验证继续留到 R3 前统一进行。
 
 - **2026-07-08 · Codex（R2.4 adversarial review fix）**：用户要求多 agent 对 R2.4 做对抗式审查并先修完 findings 才能进入 R2.5。3 个只读 subagent 分别审查 cancellation/progress、retry/error semantics、tests/plan evidence。Action: 修复 partial chunk cancellation 被误报 success、JSON repair 取消被吞、retry backoff 不响应取消、`runWithBusy` 对非 token-wired 操作暴露无效取消按钮；补 retry 耗尽/非 retryable/backoff cancellation/repair cancellation 回归测试；更新 R2.4 Completion Notes。Validated: `npm run compile` 零错误；定向 R2.4 review-fix 测试 62/62 通过；`npm test` 340/340 全绿；`git diff --check` 通过。Manual: 仍按用户要求留到 R3 前统一真实 VS Code + Copilot 验证。Commit: `759b050`。Next: R2.5 仍未 claim；进入前必须重读 05 矩阵 C-1 与 01 collector 文档相关段落。
+
+- **2026-07-09 · Codex（R2.5 pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `6184a08`、`759b050`、`4ff85ba`、`76bf72b`、`d065482`。按计划重新定位并阅读 05 矩阵 C-1、01 collector 文档 C-1：`recentHours` 目前在 `CollectFolderItems` 中全量遍历排序后的 `items.Count`，只在循环内判断 `sortDate >= cutoff`，没有 Restrict，也没有 `sortDate < cutoff` 早停；`--older-than-map` 已有同款 `items.Restrict("[" & timeProperty & "] < '...'")` 可复用。grep 锚点：`scripts/collect-outlook-mails.vbs:114-185 CollectFolderItems`、`FormatRestrictDate`、`IsRecentHoursMode`、`MailSortDate`。Claim R2.5；边界：只做 recentHours Restrict + 降序早停，不改 `FormatRestrictDate` 区域设置假设（C-7b）、不改 Sent Items 本地化判断（C-5a）、不改 digest 格式、不引入新依赖。
+
+- **2026-07-09 · Codex（R2.5 completion，needs user validation on real Outlook）**：Action: `CollectFolderItems` 在 recentHours 模式下复用既有 `items.Restrict` 风格按 cutoff 过滤，并在降序循环中遇到早于 cutoff 的可接受日期直接 `Exit For`；未改 C-7b/C-5a/输出格式。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过并生成 digest；`npm run compile` 零错误；`npm test` 340/340 全绿。Manual: **needs user validation on real Outlook**，需确认大邮箱 Fetch New 变快且 recentHours 结果集不变，观察 `FolderScan.candidateItems` 是否下降。Commit: `pending`。Next: R2.5 完成后 Milestone R2 已全部完成；R3/R4 仍不得自行 claim，R3 开始前应统一执行此前积累的真实 VS Code/Copilot/Outlook 验证项。
