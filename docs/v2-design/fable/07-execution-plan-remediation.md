@@ -161,11 +161,12 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 - **验收**：行为不变，`npm test` 全绿；MockProvider 路径不受影响。
 - Completion Notes:
   - 改动文件：`src/lib/app-analysis.ts`（`sendPromptToModel` 将已选 `AvailableModel` 传给 provider；`analyzeThreadCore` 函数开头只读一次 `promptConfig` 并复用 `categoryIds`）、`src/lib/llm-provider.ts`（`LlmRequestOptions` 增加可选 `model`）、`src/lib/copilot-provider.ts`（`listModels()` 缓存 VS Code 原生模型与标准化模型；`sendPrompt()` 优先用传入模型匹配缓存，匹配不到时回退到原 `modelFamily` 选择，避免磁盘模型缓存过期造成行为回归）、`src/test/app-analysis.test.ts`（新增最小测试确认 `sendPromptToModel` 把已选模型传给 provider）。
+  - Correction: `package.json` 删除 VS Code Settings 面板里的硬编码 `easyMail.modelFamily` contribution。插件内 webview 的 Load Models + 动态模型下拉仍保留，继续用运行时可用模型列表保存选择值；本 correction 不改该流程。
   - L-8c 处理：当前尚未进入 R2.2 chunk 化，现有代码没有 chunk 循环；本 step 未提前引入模板缓存抽象。R2.2 实施 chunk 循环时应复用本 step 的现有 prompt 读取位置，确保模板文件在循环外读取。
   - Tests: `npm run compile` 零错误；`npm test` 全绿 320/320（新增 1 个测试：`passes the selected model to the provider`）。
   - Manual validation: 不适用（纯 TS/Provider 接线，无 Outlook 交互）。
   - Known issues: 无。`CopilotProvider` 的真实 VS Code 原生模型缓存路径未在单元测试中直接 mock VS Code API；通过类型检查和 `sendPromptToModel` 单元测试覆盖接口契约，实际 Copilot 枚举仍需在扩展宿主中自然验证。
-  - Commit: `2417b2a`
+  - Commit: `2417b2a`, `pending`
 
 ### [ ] R2.2 批量分析 chunk 化 + token 预算（L-3）
 
@@ -310,3 +311,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Known issues: 无。真实 VS Code Copilot provider 的缓存复用路径未做扩展宿主手动验证；该 step 不涉及 Outlook。
   - Last safe stopping point: R2.1 完成并提交，commit `2417b2a`。
   - Next: claim R2.2（批量分析 chunk 化 + token 预算）。不得跳到 R2.3/R2.4；R3/R4 仍不得自行 claim。
+
+- **2026-07-08 · Codex（R2.1 correction）**：用户澄清：不要删除插件内 Load Models / model list 选择流程；要删除的是 VS Code Settings 面板中静态 `easyMail.modelFamily` 枚举（它与运行时动态模型列表重复且误导）。Action: 仅从 `package.json` contributes.configuration.properties 删除 `easyMail.modelFamily`，保留 `default-config.json` 与 webview 保存的 `modelFamily` 字段作为动态模型选择值。Next: 验证 JSON/编译/测试，提交后回填 hash。

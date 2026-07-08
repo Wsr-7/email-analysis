@@ -105,32 +105,6 @@
           "default": false,
           "description": "Generate sample mail data instead of reading Outlook."
         },
-        "easyMail.modelFamily": {
-          "type": "string",
-          "order": 6,
-          "enum": [
-            "gpt-5.4",
-            "gpt-5-mini",
-            "gpt-4o-mini",
-            "claude-haiku-4.5",
-            "copilot-utility",
-            "copilot-utility-small",
-            "oswe-vscode",
-            "oswe-vscode-modelD"
-          ],
-          "enumItemLabels": [
-            "gpt-5.4",
-            "gpt-5-mini",
-            "gpt-4o-mini",
-            "claude-haiku-4.5",
-            "copilot-utility",
-            "copilot-utility-small",
-            "oswe-vscode",
-            "oswe-vscode-modelD"
-          ],
-          "default": "gpt-5.4",
-          "description": "Copilot model family used for analysis. The Dashboard model selector still reflects models exposed by your current VS Code session."
-        },
         "easyMail.outputLanguage": {
           "type": "string",
           "order": 5,
