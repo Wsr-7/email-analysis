@@ -536,7 +536,8 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeNext",
       async (token) => await this.analyzeBatchCore(batchSize, token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`
+      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      true
     );
   }
 
@@ -548,7 +549,8 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeAll",
       async (token) => await this.analyzeBatchCore("allAllowed", token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`
+      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      true
     );
   }
 
@@ -560,7 +562,8 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeSelected",
       async (token) => await this.analyzeBatchCore(mailIds, token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`
+      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      true
     );
   }
 
@@ -588,7 +591,8 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeThread",
       async (token) => await this.analyzeThreadCore(threadId, token),
-      (result) => `Thread analysis completed for ${result.subject}.`
+      (result) => `Thread analysis completed for ${result.subject}.`,
+      true
     );
   }
 
@@ -611,7 +615,8 @@ class EasyMailApp {
     detail: string,
     kind: string,
     task: (cancellationToken: CancellationTokenLike) => Promise<T>,
-    completionMessage?: (result: T) => string
+    completionMessage?: (result: T) => string,
+    cancellable = false
   ): Promise<T> {
     if (this.busy) {
       throw new Error(`Another Easy Mail task is already running: ${this.busy.label}`);
@@ -623,7 +628,7 @@ class EasyMailApp {
     await this.refresh();
     try {
       const result = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: label, cancellable: true },
+        { location: vscode.ProgressLocation.Notification, title: label, cancellable },
         async (progress, token) => {
           progress.report({ message: detail });
           return await task(token);
@@ -725,7 +730,8 @@ class EasyMailApp {
         labels.progress.detail,
         "translate",
         async (token) => await this.translateExistingAnalysis(nextLocale, token),
-        (result) => `Easy Mail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`
+        (result) => `Easy Mail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
+        true
       );
     } else {
       await this.refresh();

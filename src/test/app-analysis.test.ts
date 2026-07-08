@@ -7,7 +7,7 @@ import { AppDataStore } from "../lib/app-data";
 import { analyzeBatchCore, analyzeThreadCore, sendPromptToModel, splitByTokenBudget } from "../lib/app-analysis";
 import { emptyMailIndex, type StoredMail } from "../lib/mail-store";
 import { MockProvider } from "../lib/mock-provider";
-import type { LlmProvider, LlmRequestOptions } from "../lib/llm-provider";
+import type { CancellationTokenLike, LlmProvider, LlmRequestOptions } from "../lib/llm-provider";
 
 function mail(index: number): StoredMail {
   const id = `mail-${String(index).padStart(3, "0")}`;
@@ -117,6 +117,95 @@ describe("analyzeBatchCore", () => {
     assert.ok(logs.includes("test:retry"));
   });
 
+  it("stops retrying after configured retry delays are exhausted", async () => {
+    const provider = new MockProvider({
+      responses: [
+        new Error("429 Too Many Requests"),
+        new Error("429 Too Many Requests"),
+        new Error("429 Too Many Requests"),
+        "{}"
+      ]
+    });
+    const logs: string[] = [];
+
+    await assert.rejects(
+      () => sendPromptToModel({
+        data: {
+          readCachedAvailableModels: async () => [{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }],
+          writeModelInfo: async () => {}
+        } as unknown as AppDataStore,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({}),
+        log: async (event) => { logs.push(event); },
+        availableModelsCache: null,
+        retryDelaysMs: [0, 0]
+      }, "prompt", "mock-model", "test"),
+      /429 Too Many Requests/
+    );
+
+    assert.equal(provider.prompts.length, 3);
+    assert.equal(logs.filter((event) => event === "test:retry").length, 2);
+  });
+
+  it("does not retry non-retryable model errors", async () => {
+    const provider = new MockProvider({ responses: [new Error("401 Unauthorized"), "{}"] });
+    const logs: string[] = [];
+
+    await assert.rejects(
+      () => sendPromptToModel({
+        data: {
+          readCachedAvailableModels: async () => [{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }],
+          writeModelInfo: async () => {}
+        } as unknown as AppDataStore,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({}),
+        log: async (event) => { logs.push(event); },
+        availableModelsCache: null,
+        retryDelaysMs: [0, 0]
+      }, "prompt", "mock-model", "test"),
+      /401 Unauthorized/
+    );
+
+    assert.equal(provider.prompts.length, 1);
+    assert.equal(logs.filter((event) => event === "test:retry").length, 0);
+  });
+
+  it("cancels retry backoff without waiting for the full delay", async () => {
+    const provider = new MockProvider({ responses: [new Error("429 Too Many Requests"), "{}"] });
+    let listener: (() => void) | undefined;
+    const token: { isCancellationRequested: boolean; onCancellationRequested: CancellationTokenLike["onCancellationRequested"] } = {
+      isCancellationRequested: false,
+      onCancellationRequested: (callback) => {
+        listener = callback;
+        return { dispose: () => { listener = undefined; } };
+      }
+    };
+    const startedAt = Date.now();
+    const pending = sendPromptToModel({
+      data: {
+        readCachedAvailableModels: async () => [{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }],
+        writeModelInfo: async () => {}
+      } as unknown as AppDataStore,
+      llmProvider: provider,
+      extensionPath: process.cwd(),
+      readConfig: async () => ({}),
+      log: async () => {},
+      availableModelsCache: null,
+      retryDelaysMs: [10000],
+      cancellationToken: token
+    }, "prompt", "mock-model", "test");
+
+    await new Promise((resolve) => setImmediate(resolve));
+    token.isCancellationRequested = true;
+    listener?.();
+
+    await assert.rejects(() => pending, /cancelled/i);
+    assert.equal(provider.prompts.length, 1);
+    assert.ok(Date.now() - startedAt < 1000);
+  });
+
   it("keeps successful chunks when one chunk fails JSON parsing and repair", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
@@ -163,7 +252,7 @@ describe("analyzeBatchCore", () => {
     }
   });
 
-  it("stops between chunks when cancellation is requested and preserves completed results", async () => {
+  it("rejects cancellation between chunks and preserves completed results", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
       const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
@@ -180,31 +269,80 @@ describe("analyzeBatchCore", () => {
 
       const token = { isCancellationRequested: false };
       const provider = new MockProvider({ responses: [analysisResponse("mail-001"), analysisResponse("mail-002")] });
-      const result = await analyzeBatchCore({
-        data,
-        llmProvider: {
-          listModels: () => provider.listModels(),
-          sendPrompt: async (prompt, options) => {
-            const response = await provider.sendPrompt(prompt, options);
-            token.isCancellationRequested = true;
-            return response;
-          }
-        },
-        extensionPath: process.cwd(),
-        readConfig: async () => ({
-          autoAnalyzeMaxClassificationLevel: 2,
-          modelFamily: "mock-model",
-          outputLanguage: "en-US"
-        }),
-        log: async () => {},
-        availableModelsCache: null,
-        cancellationToken: token
-      }, "allAllowed");
+      await assert.rejects(
+        () => analyzeBatchCore({
+          data,
+          llmProvider: provider,
+          extensionPath: process.cwd(),
+          readConfig: async () => ({
+            autoAnalyzeMaxClassificationLevel: 2,
+            modelFamily: "mock-model",
+            outputLanguage: "en-US"
+          }),
+          log: async (event) => {
+            if (event === "analyze:chunkDone") {
+              token.isCancellationRequested = true;
+            }
+          },
+          availableModelsCache: null,
+          cancellationToken: token
+        }, "allAllowed"),
+        /cancelled/i
+      );
 
       const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
-      assert.equal(result.batchSize, 1);
       assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001"]);
       assert.equal(provider.prompts.length, 1);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects cancellation during JSON repair instead of treating it as a skipped chunk", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [1, 2].map((index) => ({ ...mail(index), bodyExcerpt: "x".repeat(2400) }))
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }]);
+
+      const token = { isCancellationRequested: false };
+      const provider = new MockProvider({ responses: [analysisResponse("mail-001"), "{not json", analysisResponse("mail-002")] });
+
+      await assert.rejects(
+        () => analyzeBatchCore({
+          data,
+          llmProvider: {
+            listModels: () => provider.listModels(),
+            sendPrompt: async (prompt, options) => {
+              if (/Fix this invalid JSON response/.test(prompt)) {
+                token.isCancellationRequested = true;
+              }
+              return await provider.sendPrompt(prompt, options);
+            }
+          },
+          extensionPath: process.cwd(),
+          readConfig: async () => ({
+            autoAnalyzeMaxClassificationLevel: 2,
+            modelFamily: "mock-model",
+            outputLanguage: "en-US"
+          }),
+          log: async () => {},
+          availableModelsCache: null,
+          cancellationToken: token
+        }, "allAllowed"),
+        /cancelled/i
+      );
+
+      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
+      assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001"]);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

@@ -12,8 +12,13 @@ export interface LlmRequestOptions {
   cancellationToken?: CancellationTokenLike;
 }
 
+export interface DisposableLike {
+  dispose(): void;
+}
+
 export interface CancellationTokenLike {
   readonly isCancellationRequested: boolean;
+  onCancellationRequested?: (listener: () => void) => DisposableLike;
 }
 
 export interface LlmResponse {

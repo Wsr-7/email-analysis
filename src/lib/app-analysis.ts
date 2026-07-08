@@ -74,7 +74,9 @@ async function sendPromptWithRetry(
   while (true) {
     throwIfCancelled(ctx.cancellationToken);
     try {
-      return await ctx.llmProvider.sendPrompt(prompt, { modelFamily: configuredModel, model: selectedModel, cancellationToken: ctx.cancellationToken });
+      const response = await ctx.llmProvider.sendPrompt(prompt, { modelFamily: configuredModel, model: selectedModel, cancellationToken: ctx.cancellationToken });
+      throwIfCancelled(ctx.cancellationToken);
+      return response;
     } catch (error) {
       if (ctx.cancellationToken?.isCancellationRequested || attempt >= delays.length || !isRetryableLlmError(error)) {
         throw error;
@@ -82,7 +84,7 @@ async function sendPromptWithRetry(
       const delayMs = Math.max(0, Number(delays[attempt] || 0));
       attempt += 1;
       await ctx.log(`${eventPrefix}:retry`, { attempt, delayMs, error: error instanceof Error ? error.message : String(error) });
-      await delay(delayMs);
+      await delay(delayMs, ctx.cancellationToken);
     }
   }
 }
@@ -92,14 +94,33 @@ function isRetryableLlmError(error: unknown): boolean {
   return /429|too many requests|rate.?limit|quota|temporar|timeout/i.test(text);
 }
 
-function delay(ms: number): Promise<void> {
-  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+function delay(ms: number, token?: CancellationTokenLike): Promise<void> {
+  throwIfCancelled(token);
+  if (ms <= 0) {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve, reject) => {
+    let subscription: { dispose(): void } | undefined;
+    const timer = setTimeout(() => {
+      subscription?.dispose();
+      resolve();
+    }, ms);
+    subscription = token?.onCancellationRequested?.(() => {
+      clearTimeout(timer);
+      subscription?.dispose();
+      reject(cancelledError());
+    });
+  }).then(() => throwIfCancelled(token));
 }
 
 function throwIfCancelled(token?: CancellationTokenLike): void {
   if (token?.isCancellationRequested) {
-    throw new Error("Easy Mail task cancelled.");
+    throw cancelledError();
   }
+}
+
+function cancelledError(): Error {
+  return new Error("Easy Mail task cancelled.");
 }
 
 export function splitByTokenBudget(
@@ -239,10 +260,12 @@ export async function analyzeBatchCore(
   let analyzedCount = 0;
   let skippedChunks = 0;
   let totalReplacements = 0;
+  let cancelled = false;
   const summaryLabels = buildCategoryLabels(getLabels(getLocaleFromConfig(config)), promptConfig, getLocaleFromConfig(config));
 
   for (let index = 0; index < chunks.length; index += 1) {
     if (ctx.cancellationToken?.isCancellationRequested) {
+      cancelled = true;
       await ctx.log("analyze:cancelled", { analyzedCount, chunks: chunks.length, nextChunk: index + 1 });
       break;
     }
@@ -271,6 +294,9 @@ export async function analyzeBatchCore(
         const repaired = await repairAnalysisJson(ctx, raw, error, configuredModel);
         analysis = parseAnalysisJson(repaired, allowedCategoryIds(promptConfig));
       } catch (repairError) {
+        if (ctx.cancellationToken?.isCancellationRequested) {
+          throw repairError;
+        }
         skippedChunks += 1;
         await ctx.log("analyze:chunkSkipped", {
           chunk: index + 1,
@@ -295,6 +321,14 @@ export async function analyzeBatchCore(
     await fs.promises.writeFile(ctx.data.getAnalysisPath(), `${JSON.stringify(merged, null, 2)}\n`, "utf8");
     await fs.promises.writeFile(ctx.data.getSummaryPath(), buildSummaryMarkdown(merged, summaryLabels), "utf8");
     await ctx.log("analyze:chunkDone", { chunk: index + 1, chunks: chunks.length, mergedItems: merged.items.length });
+  }
+
+  if (cancelled || ctx.cancellationToken?.isCancellationRequested) {
+    if (!cancelled) {
+      await ctx.log("analyze:cancelled", { analyzedCount, chunks: chunks.length, nextChunk: analyzedCount + 1 });
+    }
+    throwIfCancelled(ctx.cancellationToken);
+    throw cancelledError();
   }
 
   if (!analyzedCount) {
