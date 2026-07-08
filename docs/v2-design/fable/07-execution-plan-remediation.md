@@ -186,7 +186,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: RED 先行——新增测试后 `npm run compile` 先因 `splitByTokenBudget` 未导出与 `AvailableModel.maxInputTokens` 缺失失败；实现后 `npm run compile` 零错误，`node --test out/test/app-analysis.test.js` 9/9 通过，`npm test` 全绿 323/323。
   - Manual validation: 不涉及 VBS/Outlook 脚本，无需真实 Outlook 验证。建议在真实 VS Code 扩展宿主 + Copilot 模型上用较大批量邮件验证：UI 日志显示 `chunk i/N`，中间某个 chunk 失败时前后成功结果仍保留。
   - Known issues: token 估算仍是计划要求的近似值，不包含完整 prompt 固定开销的精确 tokenization；本 step 有意不做并行分析、不做取消/退避（R2.4）、不做用户可配置预算。
-  - Commit: pending
+  - Commit: `e7180c7`
 
 ### [ ] R2.3 统一语言契约（L-4 + U-5，实施前必读 06 文档 Q2 全文）
 
@@ -331,5 +331,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Changed: `analyzeBatchCore` 改为基于 `splitByTokenBudget` 的串行 chunk 分析，prompt 模板文件在循环外读取；每个 chunk 独立 prompt/parse/merge/persist，坏 JSON 修复重试一次后只跳过该 chunk；模型元数据新增可选 `maxInputTokens`，实际采用代码内 12000 token 甜点预算并用更小的模型值做上限。
   - Validated: `npm run compile` 零错误；`node --test out/test/app-analysis.test.js` 9/9 通过；`npm test` 323/323 全绿。
   - Manual validation: 无 VBS/Outlook 脚本改动，不需要真实 Outlook 验证；建议在真实 VS Code Copilot 环境用大批量分析观察 `chunk i/N` 日志与部分成功持久化。
-  - Last safe stopping point: R2.2 完成，commit pending。
+  - Last safe stopping point: R2.2 完成，commit `e7180c7`。
   - Next: claim R2.3（统一语言契约）前必须重读 05 矩阵 L-4/U-5 与 06 文档 Q2 全文；不得跳到 R2.4，R3/R4 仍不得自行 claim。
