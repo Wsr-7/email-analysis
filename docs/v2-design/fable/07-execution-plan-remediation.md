@@ -166,7 +166,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: `npm run compile` 零错误；`npm test` 全绿 320/320（新增 1 个测试：`passes the selected model to the provider`）。
   - Manual validation: 不适用（纯 TS/Provider 接线，无 Outlook 交互）。
   - Known issues: 无。`CopilotProvider` 的真实 VS Code 原生模型缓存路径未在单元测试中直接 mock VS Code API；通过类型检查和 `sendPromptToModel` 单元测试覆盖接口契约，实际 Copilot 枚举仍需在扩展宿主中自然验证。
-  - Commit: `2417b2a`, `pending`
+  - Commit: `2417b2a`, `9bbd670`
 
 ### [ ] R2.2 批量分析 chunk 化 + token 预算（L-3）
 
@@ -312,4 +312,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
   - Last safe stopping point: R2.1 完成并提交，commit `2417b2a`。
   - Next: claim R2.2（批量分析 chunk 化 + token 预算）。不得跳到 R2.3/R2.4；R3/R4 仍不得自行 claim。
 
-- **2026-07-08 · Codex（R2.1 correction）**：用户澄清：不要删除插件内 Load Models / model list 选择流程；要删除的是 VS Code Settings 面板中静态 `easyMail.modelFamily` 枚举（它与运行时动态模型列表重复且误导）。Action: 仅从 `package.json` contributes.configuration.properties 删除 `easyMail.modelFamily`，保留 `default-config.json` 与 webview 保存的 `modelFamily` 字段作为动态模型选择值。Next: 验证 JSON/编译/测试，提交后回填 hash。
+- **2026-07-08 · Codex（R2.1 correction）**：用户澄清：不要删除插件内 Load Models / model list 选择流程；要删除的是 VS Code Settings 面板中静态 `easyMail.modelFamily` 枚举（它与运行时动态模型列表重复且误导）。Action: 仅从 `package.json` contributes.configuration.properties 删除 `easyMail.modelFamily`，保留 `default-config.json` 与 webview 保存的 `modelFamily` 字段作为动态模型选择值。Validated: `package.json` JSON parse OK；`rg` 确认 `package.json` 无静态模型枚举残留；`npm run compile` 零错误；`npm test` 320/320 全绿。Commit: `9bbd670`。Next: R2.2。
