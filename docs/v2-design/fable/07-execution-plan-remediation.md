@@ -245,7 +245,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Commit: `35c8b79`
   - Review fix: 3 个只读 subagent 对 R2.5 做对抗式审查后，修复全部 findings：recentHours cutoff Restrict 失败改为 warning + fallback 到原集合排序早停；`items.Sort` 增加错误处理；迭代改 `GetFirst`/`GetNext`，不再直接依赖 restricted `items.Count`；`FolderScan` 输出新增 `scanned`；`FormatRestrictDate` 补秒避免 older-than anchor 分钟截断漏邮件；Sent Items 时间字段判断改为解析后的 folder/default Sent Items EntryID 父链匹配；文档修正 sample 验收证据口径并补真实验证项。
   - Review fix tests: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过；`parseDigest` 解析 sample digest 4 条；`npm run compile` 零错误；`npm test` 340/340 全绿。
-  - Review fix commit: `pending`
+  - Review fix commit: `4ff3f09`
 
 ---
 
@@ -387,4 +387,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-09 · Codex（R2.5 completion，needs user validation on real Outlook）**：Action: `CollectFolderItems` 在 recentHours 模式下复用既有 `items.Restrict` 风格按 cutoff 过滤，并在降序循环中遇到早于 cutoff 的可接受日期直接 `Exit For`；未改 C-7b/C-5a/输出格式。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过并生成 digest；`npm run compile` 零错误；`npm test` 340/340 全绿。Manual: **needs user validation on real Outlook**，需确认大邮箱 Fetch New 变快且 recentHours 结果集不变，观察 `FolderScan.candidateItems` 是否下降。Commit: `35c8b79`。Next: R2.5 完成后 Milestone R2 已全部完成；R3/R4 仍不得自行 claim，R3 开始前应统一执行此前积累的真实 VS Code/Copilot/Outlook 验证项。
 
-- **2026-07-09 · Codex（R2.5 adversarial review fix，needs user validation on real Outlook）**：用户要求多个 subagent 对 R2.5 做对抗式审查，所有 findings 不分等级全部优化。3 个只读 reviewer 覆盖 VBS 语义、plan/验收证据、Outlook COM/Restrict 兼容风险。Action: recentHours Restrict 失败软降级为 warning + 排序早停；Sort 增加错误处理；主循环改 `GetFirst`/`GetNext`；`FolderScan` 增加 `scanned`；`FormatRestrictDate` 补秒；Sent Items 判断改为默认 Sent folder EntryID 父链匹配；修正文档中 sample 证据措辞。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过；`parseDigest` 解析 sample digest 4 条；`npm run compile` 零错误；`npm test` 340/340 全绿。Manual: **needs user validation on real Outlook**，还需真实大邮箱/默认 Sent Items/子文件夹/本地化/zh-CN 与 en-US 区域设置验证。Commit: `pending`。Next: commit and push all changes per user request.
+- **2026-07-09 · Codex（R2.5 adversarial review fix，needs user validation on real Outlook）**：用户要求多个 subagent 对 R2.5 做对抗式审查，所有 findings 不分等级全部优化。3 个只读 reviewer 覆盖 VBS 语义、plan/验收证据、Outlook COM/Restrict 兼容风险。Action: recentHours Restrict 失败软降级为 warning + 排序早停；Sort 增加错误处理；主循环改 `GetFirst`/`GetNext`；`FolderScan` 增加 `scanned`；`FormatRestrictDate` 补秒；Sent Items 判断改为默认 Sent folder EntryID 父链匹配；修正文档中 sample 证据措辞。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过；`parseDigest` 解析 sample digest 4 条；`npm run compile` 零错误；`npm test` 340/340 全绿。Manual: **needs user validation on real Outlook**，还需真实大邮箱/默认 Sent Items/子文件夹/本地化/zh-CN 与 en-US 区域设置验证。Commit: `4ff3f09`。Next: commit and push all changes per user request.
