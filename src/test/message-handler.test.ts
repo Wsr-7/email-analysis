@@ -168,6 +168,24 @@ describe("saveConfigFromMessage", () => {
     assert.equal(saved.recentHours, 48);
   });
 
+  it("does not persist language settings omitted from the patch", async () => {
+    const ctx = stubContext({
+      readConfig: mock.fn(async () => ({ rangeMode: "recentHours", recentHours: 24, outputLanguage: "zh-CN", draftLanguage: "zh-CN" }))
+    });
+    await saveConfigFromMessage(ctx, { config: { recentHours: "48" } });
+    const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
+    assert.equal(Object.prototype.hasOwnProperty.call(saved, "outputLanguage"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(saved, "draftLanguage"), false);
+  });
+
+  it("saves language settings when they are patched", async () => {
+    const ctx = stubContext();
+    await saveConfigFromMessage(ctx, { config: { outputLanguage: "zh-CN", draftLanguage: "invalid" } });
+    const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
+    assert.equal(saved.outputLanguage, "zh-CN");
+    assert.equal(saved.draftLanguage, "auto");
+  });
+
   it("does not write obsolete autoAnalyzeEnabled setting", async () => {
     const ctx = stubContext({
       readConfig: mock.fn(async () => ({ rangeMode: "recentHours", recentHours: 24, autoAnalyzeEnabled: false }))

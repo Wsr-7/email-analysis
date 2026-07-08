@@ -85,6 +85,8 @@ function toThreadMessage(mail: StoredMail): InternalThreadMessage {
     receivedTime: stringField(mail, "receivedTime"),
     sentTime: stringField(mail, "sentTime"),
     folder: stringField(mail, "folder"),
+    toMe: stringField(mail, "toMe"),
+    ccMe: stringField(mail, "ccMe"),
     bodyPreview: body,
     bodyClean: cleanMailBody(body),
     bodyDelta: extractReplyDelta(body),

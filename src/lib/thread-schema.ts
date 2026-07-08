@@ -35,6 +35,8 @@ export interface ThreadMessage {
   receivedTime: string;
   sentTime: string;
   folder: string;
+  toMe?: string;
+  ccMe?: string;
   bodyPreview: string;
   bodyClean: string;
   bodyDelta: string;

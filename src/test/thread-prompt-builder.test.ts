@@ -34,7 +34,7 @@ test("buildThreadAnalysisPrompt includes prompts, output language, and strict JS
   assert.match(prompt, /Analyze thread/);
   assert.match(prompt, /Return JSON/);
   assert.match(prompt, /Language Contract/);
-  assert.match(prompt, /oneLineSummary, currentStatus, suggestedAction.*Simplified Chinese/s);
+  assert.match(prompt, /all natural-language thread analysis fields.*keyDecisions.*waitingOn.*evidence\.reason.*Simplified Chinese/s);
   assert.match(prompt, /draftReply.*source thread language/s);
   assert.match(prompt, /"threadId": "conversation:conv-1"/);
   assert.doesNotMatch(prompt, /## Mail:/);
@@ -50,7 +50,7 @@ test("buildThreadAnalysisPrompt can pin draft replies to English", () => {
     thread: thread()
   });
 
-  assert.match(prompt, /oneLineSummary, currentStatus, suggestedAction.*English/s);
+  assert.match(prompt, /all natural-language thread analysis fields.*suggestedAction.*English/s);
   assert.match(prompt, /draftReply.*English/s);
 });
 

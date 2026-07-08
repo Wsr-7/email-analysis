@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
-import { detectDraftLanguageFromText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
+import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
 
 describe("positiveNumber", () => {
   it("returns parsed number when positive", () => {
@@ -94,13 +94,32 @@ describe("draft language detection", () => {
   it("detects English, Chinese, and mixed first-paragraph text", () => {
     assert.equal(detectDraftLanguageFromText("Please confirm the contract by Friday."), "en");
     assert.equal(detectDraftLanguageFromText("请在周五前确认合同。"), "zh-CN");
-    assert.equal(detectDraftLanguageFromText("请确认 contract status.\nPlease ignore this later English paragraph."), "zh-CN");
+    assert.equal(detectDraftLanguageFromText("请确认合同状态和审批意见 contract status.\nPlease ignore this later English paragraph."), "zh-CN");
+    assert.equal(detectDraftLanguageFromText("Hi Alice,\n请在周五前确认合同。"), "zh-CN");
   });
 
   it("resolves explicit draft language before auto detection", () => {
     assert.equal(resolveDraftLanguage("en", "请确认合同。"), "en");
     assert.equal(resolveDraftLanguage("zh-CN", "Please confirm."), "zh-CN");
     assert.equal(resolveDraftLanguage("auto", "请确认合同。"), "zh-CN");
+  });
+
+  it("uses the latest incoming thread message for auto draft language", () => {
+    const text = latestNonSelfThreadText({
+      timeline: [
+        { folder: "Inbox", toMe: "true", bodyDelta: "请确认合同。" },
+        { folder: "Custom Sent", toMe: "false", ccMe: "false", bodyDelta: "I will check." }
+      ]
+    });
+
+    assert.equal(text, "请确认合同。");
+  });
+
+  it("does not keep hardcoded English repair instructions in manual draft paths", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "src", "extension.ts"), "utf8");
+    assert.equal(source.includes("ensureEnglishDraftText"), false);
+    assert.equal(source.includes("Translate the following reply draft to English"), false);
+    assert.equal(source.includes("do not include Chinese characters"), false);
   });
 });
 

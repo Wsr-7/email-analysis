@@ -208,6 +208,9 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Manual validation: 不涉及 VBS/Outlook 脚本，无需真实 Outlook 验证；仍建议在真实 VS Code 扩展宿主 + Copilot 中验证首次安装时 `outputLanguage` 是否跟随 VS Code UI 语言，以及英文/中文来信下 `draftLanguage:auto` 的实际草稿语言是否符合预期。
   - Known issues: `draftLanguage:auto` 使用首段 CJK 比例阈值（0.15）的轻量规则，不是完整语言检测器；批量单邮件 prompt 让模型按每封 source mail language 生成草稿，线程路径在发送 prompt 前按最近非 Sent 线程消息解析一次；UI EN|中 快速切换仍按计划留到 R4。
   - Commit: `381100c`
+  - Review fix: 对 R2.3 开启 3 个只读 subagent 对抗式审查后，修复全部 findings：手动 Generate/Polish/Refine 草稿链路移除硬编码英文与二次翻译，改用 `draftLanguage`；`saveConfigFromMessage()` 不再持久化 patch 未包含的语言字段；首段检测改为按空行段落而不是单行；线程 auto 语言选择优先使用 `toMe`/`ccMe` 排除本人消息，`ThreadMessage` 同步保留这两个字段；Language Contract 覆盖扩大到所有自然语言分析字段；新增对应回归测试。
+  - Review fix tests: `npm run compile` 零错误；定向 `node --test out/test/config-utils.test.js out/test/message-handler.test.js out/test/app-analysis.test.js out/test/prompt-config.test.js out/test/thread-prompt-builder.test.js out/test/thread-engine.test.js` 95/95 通过；`npm test` 334/334 全绿；旧英文修补路径 grep 仅剩测试负向断言。
+  - Review fix commit: pending
 
 ### [ ] R2.4 请求取消 + 退避重试（L-5）
 
@@ -350,3 +353,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-08 · Codex（R2.3 pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 10]`；`git log --oneline -5` 最新为 `0f8cb21`、`8cbc87c`、`93c3cf9`、`e7180c7`、`19699be`。按计划重新定位并阅读 05 矩阵 L-4/U-5、02 文档 L-4、04 文档 U-5、06 文档 Q2：当前语言要求散落且矛盾，批分析有 `ensureEnglishDraftReplies`，线程分析有 CJK fallback 翻译，`reply-draft-prompt.md` 与 `prompt-config` 均硬编码英文草稿；R2.3 应统一 Language Contract，新增 `draftLanguage`（默认 `auto`），分析字段按 `outputLanguage`，草稿按来信/显式配置。grep 锚点：`src/lib/prompt-config.ts`、`src/lib/thread-prompt-builder.ts`、`src/lib/app-analysis.ts`、`prompts/reply-draft-prompt.md`、`prompts/prompt-config.default.json`、`default-config.json`、`package.json`、`extension.ts readConfig`。Claim R2.3；边界：不做 UI EN|中 快速切换，不做 R2.4 取消/退避，不引入依赖。
 
 - **2026-07-08 · Codex（R2.3 completion）**：R2.3 已实现统一语言契约：新增 `draftLanguage` 配置与 `language-contract.ts`，批分析/线程分析 prompt 改为 Language Contract，删除英文草稿二次修补与线程 CJK fallback 翻译，移除 prompt/config 中硬编码英文草稿要求。Validation: `npm run compile` 零错误；定向语言/分析/settings 测试 79/79 通过；`npm test` 330/330 全绿；JSON 校验通过；旧指令/函数 grep 仅剩测试负向断言。Manual: 未跑 VS Code 扩展宿主或真实 Copilot/Outlook，需用户后续验证首次 `outputLanguage` 跟随 VS Code UI 语言、`draftLanguage:auto` 在真实英文/中文邮件和线程上的草稿语言。Commit: `381100c`。Next: claim R2.4 前必须重读 05 矩阵 L-5 与 02 文档 L-5；不得跳到 R2.5/R3/R4。
+
+- **2026-07-08 · Codex（R2.3 adversarial review fix）**：用户要求 R2.3 对抗式审查 findings 必须全部处理完才可进入 R2.4。Action: 修复两个 P1（手动草稿链路仍强制英文；settings autosave 会把 env-derived 语言固化为 Global）、两个 P2（首段检测按单行切分；线程 auto 只靠 Sent 文件夹名）和 contract 字段覆盖缺口；补 `saveConfigFromMessage` 负向/正向测试、线程真实 provider prompt 断言、首段/最新 incoming message 语言检测测试、旧英文修补路径源码负向断言。Validated: `npm run compile` 零错误；定向 review-fix 测试 95/95 通过；`npm test` 334/334 全绿；旧英文修补路径 grep 仅剩测试负向断言。Manual: 未跑 VS Code 扩展宿主或真实 Copilot/Outlook，仍需用户验证真实 Generate/Polish/Refine 与 `draftLanguage:auto` 体验。Commit: pending。Next: R2.4 仍未 claim；进入前必须重读 05 矩阵 L-5 与 02 文档 L-5。

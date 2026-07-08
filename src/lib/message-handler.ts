@@ -334,7 +334,7 @@ export async function saveConfigFromMessage(
 
   const current = await ctx.readConfig();
   const patch = message.config as Record<string, unknown>;
-  const next = {
+  const next: Record<string, unknown> = {
     rangeMode: Object.prototype.hasOwnProperty.call(patch, "rangeMode") ? (patch.rangeMode === "maxItems" ? "maxItems" : "recentHours") : current.rangeMode,
     recentHours: Object.prototype.hasOwnProperty.call(patch, "recentHours") ? positiveNumber(patch.recentHours, current.recentHours || 24) : current.recentHours,
     maxItems: Object.prototype.hasOwnProperty.call(patch, "maxItems") ? positiveNumber(patch.maxItems, current.maxItems || 50) : current.maxItems,
@@ -349,6 +349,12 @@ export async function saveConfigFromMessage(
     analysisRetentionDays: Object.prototype.hasOwnProperty.call(patch, "analysisRetentionDays") ? positiveNumber(patch.analysisRetentionDays, current.analysisRetentionDays || 7) : current.analysisRetentionDays,
     importantSenders: Object.prototype.hasOwnProperty.call(patch, "importantSenders") ? parseFolders(patch.importantSenders, current.importantSenders || []) : current.importantSenders
   };
+  if (!Object.prototype.hasOwnProperty.call(patch, "outputLanguage")) {
+    delete next.outputLanguage;
+  }
+  if (!Object.prototype.hasOwnProperty.call(patch, "draftLanguage")) {
+    delete next.draftLanguage;
+  }
   await ctx.updateSettings(next);
   if (!message.silent) {
     ctx.showInfo("Easy Mail settings saved to VS Code Settings.");

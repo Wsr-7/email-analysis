@@ -1,6 +1,15 @@
 export type DraftLanguage = "auto" | "en" | "zh-CN";
 export type ResolvedDraftLanguage = Exclude<DraftLanguage, "auto">;
 export type OutputLanguage = "en-US" | "zh-CN";
+export type DraftLanguageSource = {
+  folder?: string;
+  toMe?: string;
+  ccMe?: string;
+  bodyDelta?: string;
+  bodyClean?: string;
+  bodyPreview?: string;
+  bodyExcerpt?: string;
+};
 
 export function resolveOutputLanguage(value: unknown, envLanguage: string): OutputLanguage {
   if (value === "en-US" || value === "zh-CN") {
@@ -23,6 +32,19 @@ export function detectDraftLanguageFromText(text: string): ResolvedDraftLanguage
 export function resolveDraftLanguage(value: unknown, text: string): ResolvedDraftLanguage {
   const language = normalizeDraftLanguage(value);
   return language === "auto" ? detectDraftLanguageFromText(text) : language;
+}
+
+export function draftOutputInstruction(language: ResolvedDraftLanguage): string {
+  return language === "zh-CN"
+    ? "Output Simplified Chinese only, except source quotes, email addresses, exact IDs, and proper nouns."
+    : "Output English only, except source quotes, email addresses, exact IDs, and proper nouns.";
+}
+
+export function latestNonSelfThreadText(thread: { timeline?: DraftLanguageSource[] }): string {
+  const timeline = [...(thread.timeline || [])].reverse();
+  const message = timeline.find(isIncomingMessage) || timeline[0];
+  return [message?.bodyDelta, message?.bodyClean, message?.bodyPreview, message?.bodyExcerpt]
+    .find((value) => String(value || "").trim()) || "";
 }
 
 export function buildLanguageContract(input: {
@@ -48,5 +70,22 @@ function languageName(language: ResolvedDraftLanguage): string {
 }
 
 function firstParagraph(text: string): string {
-  return String(text || "").split(/\r?\n\s*\r?\n|\r?\n/).map((part) => part.trim()).find(Boolean) || "";
+  return String(text || "").split(/\r?\n\s*\r?\n/).map((part) => part.trim()).find(Boolean) || "";
+}
+
+function isIncomingMessage(message: DraftLanguageSource): boolean {
+  const toMe = booleanText(message.toMe);
+  const ccMe = booleanText(message.ccMe);
+  if (toMe || ccMe) {
+    return true;
+  }
+  if (message.toMe || message.ccMe) {
+    return false;
+  }
+  return !String(message.folder || "").toLowerCase().includes("sent");
+}
+
+function booleanText(value: unknown): boolean {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "true" || normalized === "yes" || normalized === "1";
 }

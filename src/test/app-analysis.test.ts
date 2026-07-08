@@ -516,6 +516,7 @@ describe("analyzeBatchCore", () => {
       assert.equal(result.items[0].currentStatus, "等待确认。");
       assert.equal(result.items[0].openQuestions[0], "是否批准？");
       assert.equal(provider.prompts.length, 1);
+      assert.match(provider.prompts[0], /draftReply.*Simplified Chinese/s);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

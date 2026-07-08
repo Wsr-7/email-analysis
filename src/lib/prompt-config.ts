@@ -112,7 +112,7 @@ export function composeAnalysisPrompt(input: {
       outputLanguage: input.outputLanguage,
       draftLanguage: normalizeDraftLanguage(input.draftLanguage),
       draftAutoDescription: "the source mail language",
-      analysisFields: "summary, reason, and suggestedAction"
+      analysisFields: "all natural-language analysis fields, including summary, reason, suggestedAction, and evidence.reason"
     }),
     "Allowed categories:",
     renderCategories(input.promptConfig.categories),

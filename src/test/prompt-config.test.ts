@@ -39,7 +39,7 @@ test("composeAnalysisPrompt injects one language contract for analysis and draft
   });
 
   assert.match(prompt, /Language Contract/);
-  assert.match(prompt, /summary, reason, and suggestedAction.*Simplified Chinese/s);
+  assert.match(prompt, /all natural-language analysis fields.*evidence\.reason.*Simplified Chinese/s);
   assert.match(prompt, /draftReply.*source mail language/s);
   assert.doesNotMatch(prompt, /Keep draftReply in English/);
   assert.doesNotMatch(prompt, /Draft replies must stay in English/);

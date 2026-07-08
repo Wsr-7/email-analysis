@@ -5,7 +5,7 @@ import { applyAnalysisTranslation, buildAnalysisTranslationPrompt } from "./anal
 import { buildQueueState, ensureClassifications } from "./classification";
 import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "./config-utils";
 import { getLabels, buildCategoryLabels } from "./dashboard-labels";
-import { normalizeDraftLanguage, resolveDraftLanguage } from "./language-contract";
+import { latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage } from "./language-contract";
 import { selectConfiguredModel, type AvailableModel, type LlmProvider } from "./llm-provider";
 import { buildBatchDigestMarkdown, pruneMailIndex, type StoredMail } from "./mail-store";
 import { allowedCategoryIds, composeAnalysisPrompt } from "./prompt-config";
@@ -327,13 +327,6 @@ export async function analyzeThreadCore(
   await ctx.data.writeThreadAnalysisResult(merged);
   await ctx.log("threadAnalyze:done", { threadId, mergedItems: merged.items.length });
   return { subject: thread.subject || thread.threadId };
-}
-
-function latestNonSelfThreadText(thread: { timeline?: Array<{ folder?: string; bodyDelta?: string; bodyClean?: string; bodyPreview?: string }> }): string {
-  const timeline = [...(thread.timeline || [])].reverse();
-  const message = timeline.find((item) => !String(item.folder || "").toLowerCase().includes("sent"))
-    || timeline[0];
-  return [message?.bodyDelta, message?.bodyClean, message?.bodyPreview].find((value) => String(value || "").trim()) || "";
 }
 
 export async function translateExistingAnalysis(

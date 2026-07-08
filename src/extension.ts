@@ -22,7 +22,7 @@ import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
 import { handleWebviewMessage, type MessageHandlerContext } from "./lib/message-handler";
-import { normalizeDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
+import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
 import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/process-runner";
 import { AppDataStore } from "./lib/app-data";
 import { DashboardProvider } from "./lib/dashboard-provider";
@@ -96,10 +96,6 @@ function extractDraftText(raw: string): string {
     return text;
   }
   return text;
-}
-
-function containsCjk(text: string): boolean {
-  return /[\u3400-\u9fff]/.test(String(text || ""));
 }
 
 class EasyMailApp {
@@ -214,7 +210,8 @@ class EasyMailApp {
   private async polishDraft(draftText: string, itemId: string): Promise<void> {
     await this.log("draft:polish", { itemId });
     const config = await this.readConfig();
-    const prompt = `You are an email writing assistant. Polish the following draft reply: improve grammar, clarity, and tone while preserving the original intent and meaning. Keep the style concise, professional, and appropriate for internal workplace communication. Output only the improved reply text, nothing else. Output English only; do not include Chinese characters.\n\nDraft:\n${draftText}`;
+    const language = resolveDraftLanguage(config.draftLanguage, draftText);
+    const prompt = `You are an email writing assistant. Polish the following draft reply: improve grammar, clarity, and tone while preserving the original intent and meaning. Keep the style concise, professional, and appropriate for internal workplace communication. Output only the improved reply text, nothing else. ${draftOutputInstruction(language)}\n\nDraft:\n${draftText}`;
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Polish draft", cancellable: false },
@@ -223,7 +220,7 @@ class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "polish")).raw;
         }
       );
-      const result = await this.ensureEnglishDraftText(raw.trim(), String(config.modelFamily || ""), "polish");
+      const result = raw.trim();
       this.workingDrafts.set(itemId, result);
       this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId });
       vscode.window.showInformationMessage("Draft polished.");
@@ -235,7 +232,8 @@ class EasyMailApp {
   private async refineDraft(draftText: string, instruction: string, itemId: string): Promise<void> {
     await this.log("draft:refine", { itemId });
     const config = await this.readConfig();
-    const prompt = `You are an email writing assistant. Rewrite the following draft reply according to the user's instruction. Keep the style concise, professional, and appropriate for internal workplace communication unless the instruction says otherwise. Output only the rewritten reply text, nothing else. Output English only; do not include Chinese characters.\n\nInstruction: ${instruction}\n\nDraft:\n${draftText}`;
+    const language = resolveDraftLanguage(config.draftLanguage, draftText);
+    const prompt = `You are an email writing assistant. Rewrite the following draft reply according to the user's instruction. Keep the style concise, professional, and appropriate for internal workplace communication unless the instruction says otherwise. Output only the rewritten reply text, nothing else. ${draftOutputInstruction(language)}\n\nInstruction: ${instruction}\n\nDraft:\n${draftText}`;
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Refine draft", cancellable: false },
@@ -244,7 +242,7 @@ class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "refine")).raw;
         }
       );
-      const result = await this.ensureEnglishDraftText(raw.trim(), String(config.modelFamily || ""), "refine");
+      const result = raw.trim();
       this.workingDrafts.set(itemId, result);
       this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId });
       vscode.window.showInformationMessage("Draft refined.");
@@ -263,7 +261,7 @@ class EasyMailApp {
     await this.log("draft:generate", { itemId: targetItemId, sourceId: targetSourceId });
     const config = await this.readConfig();
     try {
-      const prompt = await this.buildDraftGenerationPrompt(targetItemId, targetSourceId);
+      const prompt = await this.buildDraftGenerationPrompt(targetItemId, targetSourceId, config.draftLanguage);
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Generate draft", cancellable: false },
         async (progress) => {
@@ -271,7 +269,7 @@ class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "draftGenerate")).raw;
         }
       );
-      const result = await this.ensureEnglishDraftText(extractDraftText(raw), String(config.modelFamily || ""), "draftGenerate");
+      const result = extractDraftText(raw);
       if (!result.trim()) {
         vscode.window.showWarningMessage("No reply draft was generated for this item.");
         return;
@@ -284,7 +282,7 @@ class EasyMailApp {
     }
   }
 
-  private async buildDraftGenerationPrompt(itemId: string, sourceId: string): Promise<string> {
+  private async buildDraftGenerationPrompt(itemId: string, sourceId: string, draftLanguage: unknown): Promise<string> {
     if (itemId.startsWith("thread:")) {
       const threadStore = await this.data.readThreadStore();
       const thread = threadStore.items.find((item) => item.threadId === sourceId);
@@ -292,10 +290,11 @@ class EasyMailApp {
         throw new Error("Thread not found. Refresh or pull mail first.");
       }
       const threadAnalysis = (await this.data.readThreadAnalysisResult()).items.find((item) => item.threadId === sourceId);
+      const language = resolveDraftLanguage(draftLanguage, latestNonSelfThreadText(thread));
       return [
         "You are an email writing assistant. Generate a concise professional reply draft for the selected Outlook thread.",
         "Output only the reply draft text. Do not output JSON, Markdown, analysis, or explanation.",
-        "Output English only. If the source thread is Chinese, write the reply in English and do not include Chinese characters.",
+        draftOutputInstruction(language),
         "If no reply is appropriate, output an empty string.",
         "",
         `Thread subject: ${thread.subject || sourceId}`,
@@ -317,10 +316,11 @@ class EasyMailApp {
     if (!mail && !analysis) {
       throw new Error("Mail not found. Pull mail again before generating a draft.");
     }
+    const language = resolveDraftLanguage(draftLanguage, mail?.bodyExcerpt || analysis?.summary || "");
     return [
       "You are an email writing assistant. Generate a concise professional reply draft for the selected Outlook mail.",
       "Output only the reply draft text. Do not output JSON, Markdown, analysis, or explanation.",
-      "Output English only. If the source mail is Chinese, write the reply in English and do not include Chinese characters.",
+      draftOutputInstruction(language),
       "If no reply is appropriate, output an empty string.",
       "",
       `Subject: ${mail?.subject || analysis?.subject || sourceId}`,
@@ -333,26 +333,6 @@ class EasyMailApp {
       "Mail body:",
       mail?.bodyExcerpt || ""
     ].filter(Boolean).join("\n");
-  }
-
-  private async ensureEnglishDraftText(text: string, modelFamily: string, eventPrefix: string): Promise<string> {
-    const draft = String(text || "").trim();
-    if (!draft || !containsCjk(draft)) {
-      return draft;
-    }
-    const prompt = [
-      "Translate the following reply draft to English.",
-      "Output only the translated reply text, with no Markdown, JSON, explanation, or Chinese characters.",
-      "",
-      draft
-    ].join("\n");
-    try {
-      const { raw } = await sendPromptToModel(this.analysisContext(), prompt, modelFamily, `${eventPrefix}:draftTranslate`);
-      return extractDraftText(raw).trim();
-    } catch (err) {
-      await this.log("draft:translateFailed", { eventPrefix, error: formatError(err) });
-      return draft;
-    }
   }
 
   private async getWorkbenchHtml(): Promise<string> {

@@ -21,7 +21,7 @@ export function buildThreadAnalysisPrompt(parts: ThreadPromptParts): string {
       outputLanguage: parts.outputLanguage,
       draftLanguage: normalizeDraftLanguage(parts.draftLanguage),
       draftAutoDescription: "the source thread language",
-      analysisFields: "oneLineSummary, currentStatus, suggestedAction, questions, actions, risks, and status fields"
+      analysisFields: "all natural-language thread analysis fields, including oneLineSummary, currentStatus, keyDecisions, questions, actions, risks, waitingOn, suggestedAction, and evidence.reason"
     }),
     parts.analysisPrompt.trim(),
     "",
