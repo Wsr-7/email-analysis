@@ -167,7 +167,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Tests: `npm run compile` 零错误；`npm test` 全绿 321/321（新增 2 个测试：`passes the selected model to the provider`、`round-trips private config values`）。
   - Manual validation: 不适用（纯 TS/Provider 接线，无 Outlook 交互）。
   - Known issues: 无。`CopilotProvider` 的真实 VS Code 原生模型缓存路径未在单元测试中直接 mock VS Code API；通过类型检查和 `sendPromptToModel` 单元测试覆盖接口契约，实际 Copilot 枚举仍需在扩展宿主中自然验证。
-  - Commit: `2417b2a`, `9bbd670`, `pending`
+  - Commit: `2417b2a`, `9bbd670`, `d1f0636`
 
 ### [ ] R2.2 批量分析 chunk 化 + token 预算（L-3）
 
@@ -315,4 +315,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-08 · Codex（R2.1 correction）**：用户澄清：不要删除插件内 Load Models / model list 选择流程；要删除的是 VS Code Settings 面板中静态 `easyMail.modelFamily` 枚举（它与运行时动态模型列表重复且误导）。Action: 仅从 `package.json` contributes.configuration.properties 删除 `easyMail.modelFamily`，保留 `default-config.json` 与 webview 保存的 `modelFamily` 字段作为动态模型选择值。Validated: `package.json` JSON parse OK；`rg` 确认 `package.json` 无静态模型枚举残留；`npm run compile` 零错误；`npm test` 320/320 全绿。Commit: `9bbd670`。Next: R2.2。
 
-- **2026-07-08 · Codex（R2.1 adversarial review fix）**：应用户要求开启 2 个只读 subagent 做 R2 以来改动对抗式审查。Provider 链路审查：No findings；确认 `sendPromptToModel` 传 `AvailableModel` 与 `CopilotProvider` native model index 复用逻辑成立，残余风险仅为 VS Code 运行时模型被移除时可能由 API 拒绝。Manifest/settings 审查发现 P1：删除 `easyMail.modelFamily` contribution 后，webview autosave 仍会经 `settings.update("modelFamily")` 写未注册配置，VS Code API 类型定义标注会抛错。Action: `AppDataStore` 新增私有 config 读回；`EasyMailApp.readConfig()` 从 `easy-mail.config.json` 读取 `modelFamily`；`EasyMailApp.updateSettings()` 将 `modelFamily` 写入私有 config 并跳过 VS Code Settings 写入，其余 settings 不变；新增私有 config round-trip 测试。Validated: `npm run compile` 零错误；`npm test` 321/321 全绿。Commit: `pending`。Next: 回填 hash 后才可 claim R2.2。
+- **2026-07-08 · Codex（R2.1 adversarial review fix）**：应用户要求开启 2 个只读 subagent 做 R2 以来改动对抗式审查。Provider 链路审查：No findings；确认 `sendPromptToModel` 传 `AvailableModel` 与 `CopilotProvider` native model index 复用逻辑成立，残余风险仅为 VS Code 运行时模型被移除时可能由 API 拒绝。Manifest/settings 审查发现 P1：删除 `easyMail.modelFamily` contribution 后，webview autosave 仍会经 `settings.update("modelFamily")` 写未注册配置，VS Code API 类型定义标注会抛错。Action: `AppDataStore` 新增私有 config 读回；`EasyMailApp.readConfig()` 从 `easy-mail.config.json` 读取 `modelFamily`；`EasyMailApp.updateSettings()` 将 `modelFamily` 写入私有 config 并跳过 VS Code Settings 写入，其余 settings 不变；新增私有 config round-trip 测试。Validated: `npm run compile` 零错误；`npm test` 321/321 全绿。Commit: `d1f0636`。Next: R2.2。
