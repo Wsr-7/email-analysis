@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AppDataStore } from "../lib/app-data";
-import { analyzeBatchCore, analyzeThreadCore, sendPromptToModel } from "../lib/app-analysis";
+import { analyzeBatchCore, analyzeThreadCore, sendPromptToModel, splitByTokenBudget } from "../lib/app-analysis";
 import { emptyMailIndex, type StoredMail } from "../lib/mail-store";
 import { MockProvider } from "../lib/mock-provider";
 import type { LlmProvider, LlmRequestOptions } from "../lib/llm-provider";
@@ -29,7 +29,44 @@ function mail(index: number): StoredMail {
   };
 }
 
+function analysisResponse(mailId: string): string {
+  return JSON.stringify({
+    generatedAt: "",
+    overview: {},
+    items: [{
+      mailId,
+      category: "notice",
+      priority: "P3",
+      subject: `Subject ${mailId}`,
+      sender: "sender@example.com",
+      receivedTime: "2026-07-02 09:00:00",
+      summary: "Informational update.",
+      reason: "No action needed.",
+      suggestedAction: "No action.",
+      draftReply: "",
+      confidence: 0.9,
+      needsOriginalMailCheck: false
+    }]
+  });
+}
+
 describe("analyzeBatchCore", () => {
+  it("splits mails by token budget without looping on oversized mails", () => {
+    const mails = Array.from({ length: 5 }, (_, index) => ({ ...mail(index + 1), bodyExcerpt: "x".repeat(100) }));
+    const chunks = splitByTokenBudget(mails, 900, 400);
+
+    assert.deepEqual(chunks.map((chunk) => chunk.map((item) => item.mailId)), [
+      ["mail-001", "mail-002"],
+      ["mail-003", "mail-004"],
+      ["mail-005"]
+    ]);
+
+    const hugeChunks = splitByTokenBudget([{ ...mail(99), bodyExcerpt: "x".repeat(10000) }, mail(100)], 900, 400);
+    assert.equal(hugeChunks[0].length, 1);
+    assert.equal(hugeChunks[0][0].mailId, "mail-099");
+    assert.equal(hugeChunks[1][0].mailId, "mail-100");
+  });
+
   it("passes the selected model to the provider", async () => {
     const selectedModel = { vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" };
     let capturedOptions: LlmRequestOptions | undefined;
@@ -54,6 +91,52 @@ describe("analyzeBatchCore", () => {
     }, "prompt", "mock-model", "test");
 
     assert.deepEqual(capturedOptions?.model, selectedModel);
+  });
+
+  it("keeps successful chunks when one chunk fails JSON parsing and repair", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [1, 2, 3].map((index) => ({ ...mail(index), bodyExcerpt: "x".repeat(2400) }))
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }]);
+
+      const provider = new MockProvider({
+        responses: [
+          analysisResponse("mail-001"),
+          "{not json",
+          "{still not json",
+          analysisResponse("mail-003")
+        ]
+      });
+
+      await analyzeBatchCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({
+          autoAnalyzeMaxClassificationLevel: 2,
+          modelFamily: "mock-model",
+          outputLanguage: "en-US"
+        }),
+        log: async () => {},
+        availableModelsCache: null
+      }, "allAllowed");
+
+      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
+      assert.deepEqual(result.items.map((item) => item.mailId).sort(), ["mail-001", "mail-003"]);
+      assert.equal(provider.prompts.length, 4);
+      assert.match(provider.prompts[2], /Fix this invalid JSON response/);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
   });
 
   it("uses explicit batch size instead of saved config batch size", async () => {
@@ -90,9 +173,9 @@ describe("analyzeBatchCore", () => {
       }, 50);
 
       assert.equal(result.batchSize, 50);
-      assert.match(provider.prompts[0], /MaxItems: 50/);
-      assert.match(provider.prompts[0], /## Mail: mail-050/);
-      assert.doesNotMatch(provider.prompts[0], /## Mail: mail-051/);
+      const sentPrompts = provider.prompts.join("\n");
+      assert.match(sentPrompts, /## Mail: mail-050/);
+      assert.doesNotMatch(sentPrompts, /## Mail: mail-051/);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

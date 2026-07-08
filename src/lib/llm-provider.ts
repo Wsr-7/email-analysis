@@ -3,6 +3,7 @@ export interface AvailableModel {
   family: string;
   name: string;
   vendor: string;
+  maxInputTokens?: number;
 }
 
 export interface LlmRequestOptions {
@@ -21,13 +22,24 @@ export interface LlmProvider {
   sendPrompt(prompt: string, options: LlmRequestOptions): Promise<LlmResponse>;
 }
 
-export function normalizeAvailableModel(model: { id?: unknown; family?: unknown; name?: unknown; vendor?: unknown }): AvailableModel {
-  return {
+export function normalizeAvailableModel(model: {
+  id?: unknown;
+  family?: unknown;
+  name?: unknown;
+  vendor?: unknown;
+  maxInputTokens?: unknown;
+}): AvailableModel {
+  const normalized: AvailableModel = {
     id: String(model.id || ""),
     family: String(model.family || ""),
     name: String(model.name || ""),
     vendor: String(model.vendor || "")
   };
+  const maxInputTokens = Number(model.maxInputTokens);
+  if (Number.isFinite(maxInputTokens) && maxInputTokens > 0) {
+    normalized.maxInputTokens = maxInputTokens;
+  }
+  return normalized;
 }
 
 export function selectConfiguredModel(models: AvailableModel[], selectedValue: string): AvailableModel | undefined {

@@ -6,7 +6,7 @@ import { buildQueueState, ensureClassifications } from "./classification";
 import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "./config-utils";
 import { getLabels, buildCategoryLabels } from "./dashboard-labels";
 import { selectConfiguredModel, type AvailableModel, type LlmProvider } from "./llm-provider";
-import { buildBatchDigestMarkdown } from "./mail-store";
+import { buildBatchDigestMarkdown, pruneMailIndex, type StoredMail } from "./mail-store";
 import { allowedCategoryIds, composeAnalysisPrompt } from "./prompt-config";
 import { redactStoredMails, redactThreadForPrompt } from "./redaction";
 import { applyReplyTemplateToAnalysis } from "./reply-template";
@@ -14,8 +14,10 @@ import { buildThreadGateDecision, buildMailSecurityDecisionMap, canAnalyzeMail }
 import { buildSummaryMarkdown } from "./summary";
 import { normalizeThreadAnalysis, parseThreadAnalysisJson, mergeThreadAnalysisResults } from "./thread-analysis-schema";
 import { buildThreadAnalysisPrompt } from "./thread-prompt-builder";
-import { pruneMailIndex } from "./mail-store";
 import type { AppDataStore } from "./app-data";
+
+const ANALYSIS_CHUNK_TOKEN_BUDGET = 12000;
+const ANALYSIS_OUTPUT_RESERVE_PER_MAIL = 400;
 
 export interface AnalysisContext {
   data: AppDataStore;
@@ -54,6 +56,54 @@ export async function sendPromptToModel(
   });
 
   return { raw: response.rawText };
+}
+
+export function splitByTokenBudget(
+  mails: StoredMail[],
+  maxInputTokens: number,
+  reservePerMail: number
+): StoredMail[][] {
+  const budget = Math.max(1, Math.floor(maxInputTokens));
+  const reserve = Math.max(0, Math.floor(reservePerMail));
+  const chunks: StoredMail[][] = [];
+  let current: StoredMail[] = [];
+  let currentTokens = 0;
+
+  for (const mail of mails) {
+    const mailTokens = estimateMailTokens(mail) + reserve;
+    if (current.length && currentTokens + mailTokens > budget) {
+      chunks.push(current);
+      current = [];
+      currentTokens = 0;
+    }
+    current.push(mail);
+    currentTokens += mailTokens;
+  }
+  if (current.length) {
+    chunks.push(current);
+  }
+  return chunks;
+}
+
+function estimateMailTokens(mail: StoredMail): number {
+  const chars = [
+    mail.mailId,
+    mail.subject,
+    mail.from,
+    mail.receivedTime,
+    mail.folder,
+    mail.bodyExcerpt
+  ].join("\n").length;
+  return Math.ceil(chars / 4);
+}
+
+async function analysisTokenBudget(ctx: AnalysisContext, configuredModel: string): Promise<number> {
+  const models = await ctx.data.readCachedAvailableModels(ctx.availableModelsCache, (event, d) => ctx.log(event, d));
+  const selectedModel = selectConfiguredModel(models, configuredModel);
+  const modelBudget = Number(selectedModel?.maxInputTokens);
+  return Number.isFinite(modelBudget) && modelBudget > 0
+    ? Math.min(modelBudget, ANALYSIS_CHUNK_TOKEN_BUDGET)
+    : ANALYSIS_CHUNK_TOKEN_BUDGET;
 }
 
 export async function analyzeBatchCore(
@@ -103,49 +153,103 @@ export async function analyzeBatchCore(
 
   const promptConfig = await ctx.data.readPromptConfig();
   promptConfig.importantSenders = mergeStringLists(promptConfig.importantSenders, parseFolders(config.importantSenders, []));
-  const redacted = redactStoredMails(batch, buildDefaultRedactionPolicy());
-  const digestText = buildBatchDigestMarkdown(redacted.items);
   const basePrompt = await fs.promises.readFile(path.join(ctx.extensionPath, "prompts", "base-system.md"), "utf8");
   const outputSchemaPrompt = await fs.promises.readFile(path.join(ctx.extensionPath, "prompts", "output-schema.md"), "utf8");
   const replyDraftPrompt = await fs.promises.readFile(path.join(ctx.extensionPath, "prompts", "reply-draft-prompt.md"), "utf8");
   const replyTemplate = await ctx.data.readReplyTemplate((event, d) => ctx.log(event, d));
   const configuredModel = typeof config.modelFamily === "string" ? config.modelFamily.trim() : "gpt-5.4";
+  const maxInputTokens = await analysisTokenBudget(ctx, configuredModel);
+  const chunks = splitByTokenBudget(batch, maxInputTokens, ANALYSIS_OUTPUT_RESERVE_PER_MAIL);
   await ctx.log("analyze:start", {
     selection: Array.isArray(selection) ? "selected" : typeof selection === "number" ? "batchSize" : selection || "nextBatch",
     requestedBatchSize: requestedBatch.length,
     batchSize: batch.length,
-    redactionReplacements: redacted.totalReplacements,
+    chunks: chunks.length,
+    maxInputTokens,
     configuredModel
   });
-  const prompt = composeAnalysisPrompt({
-    basePrompt,
-    outputSchemaPrompt,
-    replyDraftPrompt,
-    replyTemplate,
-    digestText,
-    outputLanguage: String(config.outputLanguage || "en-US"),
-    promptConfig
-  });
-  const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "analyze");
-  await ctx.log("analyze:response", { rawLength: raw.length });
-  const analysis = parseAnalysisJson(raw, allowedCategoryIds(promptConfig));
-
-  const normalized = applyReplyTemplateToAnalysis(
-    normalizeAnalysis(analysis, allowedCategoryIds(promptConfig)),
-    replyTemplate
-  );
-  normalized.language = getLocaleFromConfig(config);
-  const draftNormalized = await ensureEnglishDraftReplies(ctx, normalized, configuredModel);
-  const merged = pruneAnalysisResult(
-    mergeAnalysisResults(currentAnalysis, draftNormalized, allowedCategoryIds(promptConfig)),
-    Number(config.analysisRetentionDays || 7),
-    allowedCategoryIds(promptConfig)
-  );
+  let merged = currentAnalysis;
+  let analyzedCount = 0;
+  let skippedChunks = 0;
+  let totalReplacements = 0;
   const summaryLabels = buildCategoryLabels(getLabels(getLocaleFromConfig(config)), promptConfig, getLocaleFromConfig(config));
-  await fs.promises.writeFile(ctx.data.getAnalysisPath(), `${JSON.stringify(merged, null, 2)}\n`, "utf8");
-  await fs.promises.writeFile(ctx.data.getSummaryPath(), buildSummaryMarkdown(merged, summaryLabels), "utf8");
-  await ctx.log("analyze:done", { batchSize: batch.length, mergedItems: merged.items.length });
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    const chunk = chunks[index];
+    const redacted = redactStoredMails(chunk, buildDefaultRedactionPolicy());
+    totalReplacements += redacted.totalReplacements;
+    const digestText = buildBatchDigestMarkdown(redacted.items);
+    const prompt = composeAnalysisPrompt({
+      basePrompt,
+      outputSchemaPrompt,
+      replyDraftPrompt,
+      replyTemplate,
+      digestText,
+      outputLanguage: String(config.outputLanguage || "en-US"),
+      promptConfig
+    });
+    await ctx.log("analyze:chunkStart", { chunk: index + 1, chunks: chunks.length, mails: chunk.length });
+    const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "analyze");
+    await ctx.log("analyze:response", { chunk: index + 1, chunks: chunks.length, rawLength: raw.length });
+    let analysis: ReturnType<typeof parseAnalysisJson>;
+    try {
+      analysis = parseAnalysisJson(raw, allowedCategoryIds(promptConfig));
+    } catch (error) {
+      try {
+        const repaired = await repairAnalysisJson(ctx, raw, error, configuredModel);
+        analysis = parseAnalysisJson(repaired, allowedCategoryIds(promptConfig));
+      } catch (repairError) {
+        skippedChunks += 1;
+        await ctx.log("analyze:chunkSkipped", {
+          chunk: index + 1,
+          chunks: chunks.length,
+          error: repairError instanceof Error ? repairError.message : String(repairError)
+        });
+        continue;
+      }
+    }
+
+    const normalized = applyReplyTemplateToAnalysis(
+      normalizeAnalysis(analysis, allowedCategoryIds(promptConfig)),
+      replyTemplate
+    );
+    normalized.language = getLocaleFromConfig(config);
+    const draftNormalized = await ensureEnglishDraftReplies(ctx, normalized, configuredModel);
+    merged = pruneAnalysisResult(
+      mergeAnalysisResults(merged, draftNormalized, allowedCategoryIds(promptConfig)),
+      Number(config.analysisRetentionDays || 7),
+      allowedCategoryIds(promptConfig)
+    );
+    analyzedCount += chunk.length;
+    await fs.promises.writeFile(ctx.data.getAnalysisPath(), `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+    await fs.promises.writeFile(ctx.data.getSummaryPath(), buildSummaryMarkdown(merged, summaryLabels), "utf8");
+    await ctx.log("analyze:chunkDone", { chunk: index + 1, chunks: chunks.length, mergedItems: merged.items.length });
+  }
+
+  await ctx.log("analyze:done", {
+    batchSize: batch.length,
+    analyzedCount,
+    skippedChunks,
+    redactionReplacements: totalReplacements,
+    mergedItems: merged.items.length
+  });
   return { batchSize: batch.length };
+}
+
+async function repairAnalysisJson(
+  ctx: AnalysisContext,
+  raw: string,
+  error: unknown,
+  configuredModel: string
+): Promise<string> {
+  const prompt = [
+    "Fix this invalid JSON response.",
+    "Return strict JSON only. Do not add markdown fences or commentary.",
+    `Parser error: ${error instanceof Error ? error.message : String(error)}`,
+    "",
+    raw
+  ].join("\n");
+  return (await sendPromptToModel(ctx, prompt, configuredModel, "analyze:repair")).raw;
 }
 
 export async function analyzeThreadCore(

@@ -169,7 +169,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 无。`CopilotProvider` 的真实 VS Code 原生模型缓存路径未在单元测试中直接 mock VS Code API；通过类型检查和 `sendPromptToModel` 单元测试覆盖接口契约，实际 Copilot 枚举仍需在扩展宿主中自然验证。
   - Commit: `2417b2a`, `9bbd670`, `d1f0636`
 
-### [ ] R2.2 批量分析 chunk 化 + token 预算（L-3）
+### [x] R2.2 批量分析 chunk 化 + token 预算（L-3）
 
 - **改动点**：`src/lib/app-analysis.ts` `analyzeBatchCore`。
 - **做法**：
@@ -179,6 +179,14 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 - **验收**：`splitByTokenBudget` 单测（超预算批被正确切分、单封超大邮件独占 chunk 不死循环）；MockProvider 集成测试：3 chunk 中第 2 个返回坏 JSON → 第 1/3 chunk 结果正常落盘。`model.maxInputTokens` 取不到时回落保守常量（如 8000）。
 - **边界**：默认仍串行。不加并发（那需要先改 `runWithBusy` 忙锁语义，见 06 文档 Q3，另立 step）。
 - Completion Notes:
+  - 改动文件：`src/lib/app-analysis.ts`（新增 `splitByTokenBudget`、固定甜点预算 `ANALYSIS_CHUNK_TOKEN_BUDGET = 12000`、每封输出预留 `400`、`analyzeBatchCore` 改为串行 chunk 循环、每个成功 chunk 独立 merge/persist、失败 chunk 修复重试一次后跳过）、`src/lib/llm-provider.ts`（`AvailableModel.maxInputTokens?: number` 可选保留，供已加载模型元数据给 R2.2 做更小上限参考）、`src/test/app-analysis.test.ts`（新增 split 单测与 chunk 失败隔离集成测试，并调整 explicit batch size 测试不再假设单 prompt）。
+  - Token budget 取舍：按用户补充，`model.maxInputTokens` 不视为最终真值，也不暴露为用户配置；实际预算为代码内甜点值 `12000`，若选中模型提供更小的 `maxInputTokens` 才取 `min(model.maxInputTokens, 12000)`，缺失时回落 `12000`。`splitByTokenBudget` 仍按计划采用 `chars/4` 近似 + `reservePerMail` 输出预留，单封超大邮件独占 chunk，避免死循环。
+  - 解析失败处理：每个 chunk 独立发送、解析、merge、持久化；JSON parse 失败时向同一 provider 回喂原响应与 parser error 修复一次，修复仍失败则记录 `analyze:chunkSkipped` 并继续后续 chunk，已成功 chunk 的 `analysis-result.json` 与 summary 已落盘。
+  - 进度/日志：`analyze:start` 记录 `chunks` 与 `maxInputTokens`；每 chunk 记录 `analyze:chunkStart`、`analyze:response`、`analyze:chunkDone`，跳过时记录 `analyze:chunkSkipped`；最终 `analyze:done` 记录 `analyzedCount`、`skippedChunks`、`redactionReplacements`、`mergedItems`。
+  - Tests: RED 先行——新增测试后 `npm run compile` 先因 `splitByTokenBudget` 未导出与 `AvailableModel.maxInputTokens` 缺失失败；实现后 `npm run compile` 零错误，`node --test out/test/app-analysis.test.js` 9/9 通过，`npm test` 全绿 323/323。
+  - Manual validation: 不涉及 VBS/Outlook 脚本，无需真实 Outlook 验证。建议在真实 VS Code 扩展宿主 + Copilot 模型上用较大批量邮件验证：UI 日志显示 `chunk i/N`，中间某个 chunk 失败时前后成功结果仍保留。
+  - Known issues: token 估算仍是计划要求的近似值，不包含完整 prompt 固定开销的精确 tokenization；本 step 有意不做并行分析、不做取消/退避（R2.4）、不做用户可配置预算。
+  - Commit: pending
 
 ### [ ] R2.3 统一语言契约（L-4 + U-5，实施前必读 06 文档 Q2 全文）
 
@@ -316,3 +324,12 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-08 · Codex（R2.1 correction）**：用户澄清：不要删除插件内 Load Models / model list 选择流程；要删除的是 VS Code Settings 面板中静态 `easyMail.modelFamily` 枚举（它与运行时动态模型列表重复且误导）。Action: 仅从 `package.json` contributes.configuration.properties 删除 `easyMail.modelFamily`，保留 `default-config.json` 与 webview 保存的 `modelFamily` 字段作为动态模型选择值。Validated: `package.json` JSON parse OK；`rg` 确认 `package.json` 无静态模型枚举残留；`npm run compile` 零错误；`npm test` 320/320 全绿。Commit: `9bbd670`。Next: R2.2。
 
 - **2026-07-08 · Codex（R2.1 adversarial review fix）**：应用户要求开启 2 个只读 subagent 做 R2 以来改动对抗式审查。Provider 链路审查：No findings；确认 `sendPromptToModel` 传 `AvailableModel` 与 `CopilotProvider` native model index 复用逻辑成立，残余风险仅为 VS Code 运行时模型被移除时可能由 API 拒绝。Manifest/settings 审查发现 P1：删除 `easyMail.modelFamily` contribution 后，webview autosave 仍会经 `settings.update("modelFamily")` 写未注册配置，VS Code API 类型定义标注会抛错。Action: `AppDataStore` 新增私有 config 读回；`EasyMailApp.readConfig()` 从 `easy-mail.config.json` 读取 `modelFamily`；`EasyMailApp.updateSettings()` 将 `modelFamily` 写入私有 config 并跳过 VS Code Settings 写入，其余 settings 不变；新增私有 config round-trip 测试。Validated: `npm run compile` 零错误；`npm test` 321/321 全绿。Commit: `d1f0636`。Next: R2.2。
+
+- **2026-07-08 · Codex（R2.2 pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 6]`；`git log --oneline -6` 最新为 `19699be`、`d1f0636`、`c68b766`、`9bbd670`、`ec6f203`、`2417b2a`。读 05 矩阵 L-3 行与 02 文档 L-3 小节、06 文档 Q3 相关段落：整批单调用无 token 预算会导致超限/截断后整批全损；应按 token 预算切尽量大的 chunk，chunk 串行独立成败、独立 merge，解析失败先做一次原响应+错误回喂修复重试；并发不在本 step。用户补充：`model.maxInputTokens` 不是最终值，本 step 可直接使用代码内甜点值，不做用户配置。Claim R2.2；下一步按 TDD 先写 `splitByTokenBudget` 与 chunk 失败隔离 RED 测试。
+
+- **2026-07-08 · Codex（R2.2 完成）**：
+  - Changed: `analyzeBatchCore` 改为基于 `splitByTokenBudget` 的串行 chunk 分析，prompt 模板文件在循环外读取；每个 chunk 独立 prompt/parse/merge/persist，坏 JSON 修复重试一次后只跳过该 chunk；模型元数据新增可选 `maxInputTokens`，实际采用代码内 12000 token 甜点预算并用更小的模型值做上限。
+  - Validated: `npm run compile` 零错误；`node --test out/test/app-analysis.test.js` 9/9 通过；`npm test` 323/323 全绿。
+  - Manual validation: 无 VBS/Outlook 脚本改动，不需要真实 Outlook 验证；建议在真实 VS Code Copilot 环境用大批量分析观察 `chunk i/N` 日志与部分成功持久化。
+  - Last safe stopping point: R2.2 完成，commit pending。
+  - Next: claim R2.3（统一语言契约）前必须重读 05 矩阵 L-4/U-5 与 06 文档 Q2 全文；不得跳到 R2.4，R3/R4 仍不得自行 claim。
