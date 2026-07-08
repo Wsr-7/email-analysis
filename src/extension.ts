@@ -920,6 +920,7 @@ class EasyMailApp {
   private async readConfig(): Promise<Record<string, any>> {
     await this.data.ensureConfig();
     const defaults = await this.data.readDefaults();
+    const storedConfig = await this.data.readConfig();
     const settings = vscode.workspace.getConfiguration("easyMail");
     const defaultFolders = Array.isArray(defaults.folders) ? defaults.folders.map(String) : ["Inbox", "Sent Items"];
     return {
@@ -930,7 +931,9 @@ class EasyMailApp {
       folders: normalizeMailFolders(settings.get("folders", defaultFolders), defaultFolders),
       bodyExcerptChars: settings.get("bodyExcerptChars", defaults.bodyExcerptChars),
       sampleMode: settings.get("sampleMode", defaults.sampleMode),
-      modelFamily: settings.get("modelFamily", defaults.modelFamily),
+      modelFamily: typeof storedConfig.modelFamily === "string" && storedConfig.modelFamily.trim()
+        ? storedConfig.modelFamily.trim()
+        : defaults.modelFamily,
       outputLanguage: settings.get("outputLanguage", defaults.outputLanguage || "en-US"),
       autoAnalyzeMaxClassificationLevel: settings.get("autoAnalyzeMaxClassificationLevel", defaults.autoAnalyzeMaxClassificationLevel),
       mailStoreRetentionDays: settings.get("mailStoreRetentionDays", defaults.mailStoreRetentionDays),
@@ -951,7 +954,17 @@ class EasyMailApp {
 
   private async updateSettings(values: Record<string, unknown>): Promise<void> {
     const settings = vscode.workspace.getConfiguration("easyMail");
+    if (Object.prototype.hasOwnProperty.call(values, "modelFamily")) {
+      const current = await this.data.readConfig();
+      await this.data.writeConfig({
+        ...current,
+        modelFamily: String(values.modelFamily || current.modelFamily || "gpt-5.4").trim()
+      });
+    }
     for (const [key, value] of Object.entries(values)) {
+      if (key === "modelFamily") {
+        continue;
+      }
       await settings.update(key, value, vscode.ConfigurationTarget.Global);
     }
   }

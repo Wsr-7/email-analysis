@@ -149,6 +149,15 @@ export class AppDataStore {
     return JSON.parse(await fs.promises.readFile(path.join(this.paths.extensionPath, "default-config.json"), "utf8"));
   }
 
+  async readConfig(): Promise<Record<string, unknown>> {
+    await this.ensureConfig();
+    try {
+      return JSON.parse(await fs.promises.readFile(this.getConfigPath(), "utf8"));
+    } catch {
+      return {};
+    }
+  }
+
   async writeConfig(config: Record<string, unknown>): Promise<void> {
     await fs.promises.writeFile(this.getConfigPath(), `${JSON.stringify(config, null, 2)}\n`, "utf8");
   }

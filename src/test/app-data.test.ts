@@ -1,11 +1,28 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
 import * as path from "node:path";
 import { AppDataStore } from "../lib/app-data";
 
 const store = new AppDataStore({
   globalStoragePath: "/mock/storage",
   extensionPath: "/mock/extension"
+});
+
+describe("AppDataStore config", () => {
+  it("round-trips private config values", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-config-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await data.writeConfig({ modelFamily: "copilot-utility" });
+
+      assert.deepEqual(await data.readConfig(), { modelFamily: "copilot-utility" });
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("AppDataStore path getters", () => {
