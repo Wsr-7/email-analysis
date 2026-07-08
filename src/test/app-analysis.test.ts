@@ -70,6 +70,7 @@ describe("analyzeBatchCore", () => {
   it("passes the selected model to the provider", async () => {
     const selectedModel = { vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" };
     let capturedOptions: LlmRequestOptions | undefined;
+    const cancellationToken = { isCancellationRequested: false };
     const provider: LlmProvider = {
       listModels: async () => [selectedModel],
       sendPrompt: async (_prompt, options) => {
@@ -87,10 +88,33 @@ describe("analyzeBatchCore", () => {
       extensionPath: process.cwd(),
       readConfig: async () => ({}),
       log: async () => {},
-      availableModelsCache: null
+      availableModelsCache: null,
+      cancellationToken
     }, "prompt", "mock-model", "test");
 
     assert.deepEqual(capturedOptions?.model, selectedModel);
+    assert.equal(capturedOptions?.cancellationToken, cancellationToken);
+  });
+
+  it("retries retryable model errors before succeeding", async () => {
+    const provider = new MockProvider({ responses: [new Error("429 Too Many Requests"), "{}"] });
+    const logs: string[] = [];
+
+    await sendPromptToModel({
+      data: {
+        readCachedAvailableModels: async () => [{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }],
+        writeModelInfo: async () => {}
+      } as unknown as AppDataStore,
+      llmProvider: provider,
+      extensionPath: process.cwd(),
+      readConfig: async () => ({}),
+      log: async (event) => { logs.push(event); },
+      availableModelsCache: null,
+      retryDelaysMs: [0, 0]
+    }, "prompt", "mock-model", "test");
+
+    assert.equal(provider.prompts.length, 2);
+    assert.ok(logs.includes("test:retry"));
   });
 
   it("keeps successful chunks when one chunk fails JSON parsing and repair", async () => {
@@ -134,6 +158,53 @@ describe("analyzeBatchCore", () => {
       assert.deepEqual(result.items.map((item) => item.mailId).sort(), ["mail-001", "mail-003"]);
       assert.equal(provider.prompts.length, 4);
       assert.match(provider.prompts[2], /Fix this invalid JSON response/);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("stops between chunks when cancellation is requested and preserves completed results", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [1, 2].map((index) => ({ ...mail(index), bodyExcerpt: "x".repeat(2400) }))
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }]);
+
+      const token = { isCancellationRequested: false };
+      const provider = new MockProvider({ responses: [analysisResponse("mail-001"), analysisResponse("mail-002")] });
+      const result = await analyzeBatchCore({
+        data,
+        llmProvider: {
+          listModels: () => provider.listModels(),
+          sendPrompt: async (prompt, options) => {
+            const response = await provider.sendPrompt(prompt, options);
+            token.isCancellationRequested = true;
+            return response;
+          }
+        },
+        extensionPath: process.cwd(),
+        readConfig: async () => ({
+          autoAnalyzeMaxClassificationLevel: 2,
+          modelFamily: "mock-model",
+          outputLanguage: "en-US"
+        }),
+        log: async () => {},
+        availableModelsCache: null,
+        cancellationToken: token
+      }, "allAllowed");
+
+      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
+      assert.equal(result.batchSize, 1);
+      assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001"]);
+      assert.equal(provider.prompts.length, 1);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

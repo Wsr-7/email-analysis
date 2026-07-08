@@ -6,7 +6,7 @@ import { buildQueueState, ensureClassifications } from "./classification";
 import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "./config-utils";
 import { getLabels, buildCategoryLabels } from "./dashboard-labels";
 import { latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage } from "./language-contract";
-import { selectConfiguredModel, type AvailableModel, type LlmProvider } from "./llm-provider";
+import { selectConfiguredModel, type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./llm-provider";
 import { buildBatchDigestMarkdown, pruneMailIndex, type StoredMail } from "./mail-store";
 import { allowedCategoryIds, composeAnalysisPrompt } from "./prompt-config";
 import { redactStoredMails, redactThreadForPrompt } from "./redaction";
@@ -19,6 +19,7 @@ import type { AppDataStore } from "./app-data";
 
 const ANALYSIS_CHUNK_TOKEN_BUDGET = 12000;
 const ANALYSIS_OUTPUT_RESERVE_PER_MAIL = 400;
+const DEFAULT_RETRY_DELAYS_MS = [2000, 8000];
 
 export interface AnalysisContext {
   data: AppDataStore;
@@ -27,6 +28,8 @@ export interface AnalysisContext {
   readConfig: () => Promise<Record<string, any>>;
   log: (event: string, data: Record<string, unknown>) => Promise<void>;
   availableModelsCache: AvailableModel[] | null;
+  cancellationToken?: CancellationTokenLike;
+  retryDelaysMs?: number[];
 }
 
 export async function sendPromptToModel(
@@ -44,7 +47,7 @@ export async function sendPromptToModel(
   if (!selectedModel) {
     throw new Error("Load GitHub Copilot models first, then select a model before analyzing.");
   }
-  const response = await ctx.llmProvider.sendPrompt(prompt, { modelFamily: configuredModel, model: selectedModel });
+  const response = await sendPromptWithRetry(ctx, prompt, configuredModel, selectedModel, eventPrefix);
 
   await ctx.data.writeModelInfo({
     requestedFamily: configuredModel || "auto",
@@ -57,6 +60,46 @@ export async function sendPromptToModel(
   });
 
   return { raw: response.rawText };
+}
+
+async function sendPromptWithRetry(
+  ctx: AnalysisContext,
+  prompt: string,
+  configuredModel: string,
+  selectedModel: AvailableModel,
+  eventPrefix: string
+) {
+  const delays = ctx.retryDelaysMs || DEFAULT_RETRY_DELAYS_MS;
+  let attempt = 0;
+  while (true) {
+    throwIfCancelled(ctx.cancellationToken);
+    try {
+      return await ctx.llmProvider.sendPrompt(prompt, { modelFamily: configuredModel, model: selectedModel, cancellationToken: ctx.cancellationToken });
+    } catch (error) {
+      if (ctx.cancellationToken?.isCancellationRequested || attempt >= delays.length || !isRetryableLlmError(error)) {
+        throw error;
+      }
+      const delayMs = Math.max(0, Number(delays[attempt] || 0));
+      attempt += 1;
+      await ctx.log(`${eventPrefix}:retry`, { attempt, delayMs, error: error instanceof Error ? error.message : String(error) });
+      await delay(delayMs);
+    }
+  }
+}
+
+function isRetryableLlmError(error: unknown): boolean {
+  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error || "");
+  return /429|too many requests|rate.?limit|quota|temporar|timeout/i.test(text);
+}
+
+function delay(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+}
+
+function throwIfCancelled(token?: CancellationTokenLike): void {
+  if (token?.isCancellationRequested) {
+    throw new Error("Easy Mail task cancelled.");
+  }
 }
 
 export function splitByTokenBudget(
@@ -199,6 +242,10 @@ export async function analyzeBatchCore(
   const summaryLabels = buildCategoryLabels(getLabels(getLocaleFromConfig(config)), promptConfig, getLocaleFromConfig(config));
 
   for (let index = 0; index < chunks.length; index += 1) {
+    if (ctx.cancellationToken?.isCancellationRequested) {
+      await ctx.log("analyze:cancelled", { analyzedCount, chunks: chunks.length, nextChunk: index + 1 });
+      break;
+    }
     const chunk = chunks[index];
     const redacted = redactStoredMails(chunk, buildDefaultRedactionPolicy());
     totalReplacements += redacted.totalReplacements;
@@ -251,6 +298,7 @@ export async function analyzeBatchCore(
   }
 
   if (!analyzedCount) {
+    throwIfCancelled(ctx.cancellationToken);
     await ctx.log("analyze:failed", { batchSize: batch.length, skippedChunks });
     throw new Error("All analysis chunks failed. Check model output or try a different model.");
   }

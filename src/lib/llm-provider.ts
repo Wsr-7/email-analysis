@@ -9,6 +9,11 @@ export interface AvailableModel {
 export interface LlmRequestOptions {
   modelFamily: string;
   model?: AvailableModel;
+  cancellationToken?: CancellationTokenLike;
+}
+
+export interface CancellationTokenLike {
+  readonly isCancellationRequested: boolean;
 }
 
 export interface LlmResponse {

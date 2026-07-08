@@ -12,6 +12,7 @@ import {
 export class CopilotProvider implements LlmProvider {
   private nativeModels: vscode.LanguageModelChat[] = [];
   private availableModels: AvailableModel[] = [];
+  private readonly fallbackCancellation = new vscode.CancellationTokenSource();
 
   public async listModels(): Promise<AvailableModel[]> {
     const models = await vscode.lm.selectChatModels({ vendor: "copilot" });
@@ -37,7 +38,7 @@ export class CopilotProvider implements LlmProvider {
     const response = await selectedModel.sendRequest(
       [vscode.LanguageModelChatMessage.User(prompt)],
       {},
-      new vscode.CancellationTokenSource().token
+      (options.cancellationToken as vscode.CancellationToken | undefined) || this.fallbackCancellation.token
     );
     return {
       rawText: await readResponseText(response.text),

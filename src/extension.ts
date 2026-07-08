@@ -15,7 +15,7 @@ import { buildDailyBrief } from "./lib/report-daily";
 import { buildSingleMailReport } from "./lib/report-single-mail";
 import { buildThreadReport } from "./lib/report-thread";
 import { CopilotProvider } from "./lib/copilot-provider";
-import { type AvailableModel, type LlmProvider } from "./lib/llm-provider";
+import { type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./lib/llm-provider";
 import { renderEasyMailGuideHtml } from "./lib/guide-webview";
 import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, positiveNumber } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
@@ -214,10 +214,10 @@ class EasyMailApp {
     const prompt = `You are an email writing assistant. Polish the following draft reply: improve grammar, clarity, and tone while preserving the original intent and meaning. Keep the style concise, professional, and appropriate for internal workplace communication. Output only the improved reply text, nothing else. ${draftOutputInstruction(language)}\n\nDraft:\n${draftText}`;
     try {
       const raw = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Polish draft", cancellable: false },
-        async (progress) => {
+        { location: vscode.ProgressLocation.Notification, title: "Polish draft", cancellable: true },
+        async (progress, token) => {
           progress.report({ message: "Polishing reply draft..." });
-          return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "polish")).raw;
+          return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "polish")).raw;
         }
       );
       const result = raw.trim();
@@ -236,10 +236,10 @@ class EasyMailApp {
     const prompt = `You are an email writing assistant. Rewrite the following draft reply according to the user's instruction. Keep the style concise, professional, and appropriate for internal workplace communication unless the instruction says otherwise. Output only the rewritten reply text, nothing else. ${draftOutputInstruction(language)}\n\nInstruction: ${instruction}\n\nDraft:\n${draftText}`;
     try {
       const raw = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Refine draft", cancellable: false },
-        async (progress) => {
+        { location: vscode.ProgressLocation.Notification, title: "Refine draft", cancellable: true },
+        async (progress, token) => {
           progress.report({ message: "Refining reply draft..." });
-          return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "refine")).raw;
+          return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "refine")).raw;
         }
       );
       const result = raw.trim();
@@ -263,10 +263,10 @@ class EasyMailApp {
     try {
       const prompt = await this.buildDraftGenerationPrompt(targetItemId, targetSourceId, config.draftLanguage);
       const raw = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Generate draft", cancellable: false },
-        async (progress) => {
+        { location: vscode.ProgressLocation.Notification, title: "Generate draft", cancellable: true },
+        async (progress, token) => {
           progress.report({ message: "Generating reply draft..." });
-          return (await sendPromptToModel(this.analysisContext(), prompt, String(config.modelFamily || ""), "draftGenerate")).raw;
+          return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "draftGenerate")).raw;
         }
       );
       const result = extractDraftText(raw);
@@ -535,7 +535,7 @@ class EasyMailApp {
       labels.progress.analyze,
       labels.progress.detail,
       "analyzeNext",
-      async () => await this.analyzeBatchCore(batchSize),
+      async (token) => await this.analyzeBatchCore(batchSize, token),
       (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`
     );
   }
@@ -547,7 +547,7 @@ class EasyMailApp {
       labels.progress.analyze,
       labels.progress.detail,
       "analyzeAll",
-      async () => await this.analyzeBatchCore("allAllowed"),
+      async (token) => await this.analyzeBatchCore("allAllowed", token),
       (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`
     );
   }
@@ -559,24 +559,25 @@ class EasyMailApp {
       labels.progress.analyze,
       labels.progress.detail,
       "analyzeSelected",
-      async () => await this.analyzeBatchCore(mailIds),
+      async (token) => await this.analyzeBatchCore(mailIds, token),
       (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`
     );
   }
 
-  private analysisContext(): AnalysisContext {
+  private analysisContext(cancellationToken?: CancellationTokenLike): AnalysisContext {
     return {
       data: this.data,
       llmProvider: this.llmProvider,
       extensionPath: this.context.extensionPath,
       readConfig: () => this.readConfig(),
       log: (event, data) => this.log(event, data),
-      availableModelsCache: this.availableModelsCache
+      availableModelsCache: this.availableModelsCache,
+      cancellationToken
     };
   }
 
-  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number): Promise<{ batchSize: number }> {
-    return analyzeBatchCoreImpl(this.analysisContext(), selection);
+  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike): Promise<{ batchSize: number }> {
+    return analyzeBatchCoreImpl(this.analysisContext(cancellationToken), selection);
   }
 
   public async analyzeThread(threadId: string): Promise<void> {
@@ -586,13 +587,13 @@ class EasyMailApp {
       labels.progress.analyze,
       labels.progress.detail,
       "analyzeThread",
-      async () => await this.analyzeThreadCore(threadId),
+      async (token) => await this.analyzeThreadCore(threadId, token),
       (result) => `Thread analysis completed for ${result.subject}.`
     );
   }
 
-  private async analyzeThreadCore(threadId: string): Promise<{ subject: string }> {
-    const result = await analyzeThreadCoreImpl(this.analysisContext(), threadId);
+  private async analyzeThreadCore(threadId: string, cancellationToken?: CancellationTokenLike): Promise<{ subject: string }> {
+    const result = await analyzeThreadCoreImpl(this.analysisContext(cancellationToken), threadId);
     await this.syncNextActionsFromThreadAnalysis();
     return result;
   }
@@ -609,7 +610,7 @@ class EasyMailApp {
     label: string,
     detail: string,
     kind: string,
-    task: () => Promise<T>,
+    task: (cancellationToken: CancellationTokenLike) => Promise<T>,
     completionMessage?: (result: T) => string
   ): Promise<T> {
     if (this.busy) {
@@ -622,10 +623,10 @@ class EasyMailApp {
     await this.refresh();
     try {
       const result = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: label, cancellable: false },
-        async (progress) => {
+        { location: vscode.ProgressLocation.Notification, title: label, cancellable: true },
+        async (progress, token) => {
           progress.report({ message: detail });
-          return await task();
+          return await task(token);
         }
       );
       const elapsedMs = Date.now() - startedAtMs;
@@ -723,7 +724,7 @@ class EasyMailApp {
         labels.progress.translate,
         labels.progress.detail,
         "translate",
-        async () => await this.translateExistingAnalysis(nextLocale),
+        async (token) => await this.translateExistingAnalysis(nextLocale, token),
         (result) => `Easy Mail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`
       );
     } else {
@@ -888,8 +889,8 @@ class EasyMailApp {
     });
   }
 
-  private async translateExistingAnalysis(targetLocale: Locale): Promise<{ mailItems: number; threadItems: number }> {
-    return translateExistingAnalysisImpl(this.analysisContext(), targetLocale);
+  private async translateExistingAnalysis(targetLocale: Locale, cancellationToken?: CancellationTokenLike): Promise<{ mailItems: number; threadItems: number }> {
+    return translateExistingAnalysisImpl(this.analysisContext(cancellationToken), targetLocale);
   }
 
   private async ensureReportsExist(): Promise<void> {
