@@ -22,6 +22,7 @@ import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
 import { handleWebviewMessage, type MessageHandlerContext } from "./lib/message-handler";
+import { normalizeDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
 import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/process-runner";
 import { AppDataStore } from "./lib/app-data";
 import { DashboardProvider } from "./lib/dashboard-provider";
@@ -39,6 +40,11 @@ type BusyState = {
 
 type SecurityDecisionMap = Map<string, SecurityGateDecisionResult>;
 
+function configuredOutputLanguage(settings: vscode.WorkspaceConfiguration): Locale {
+  const inspected = settings.inspect<string>("outputLanguage");
+  const explicit = inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
+  return resolveOutputLanguage(explicit, vscode.env.language);
+}
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const app = new EasyMailApp(context);
@@ -934,7 +940,8 @@ class EasyMailApp {
       modelFamily: typeof storedConfig.modelFamily === "string" && storedConfig.modelFamily.trim()
         ? storedConfig.modelFamily.trim()
         : defaults.modelFamily,
-      outputLanguage: settings.get("outputLanguage", defaults.outputLanguage || "en-US"),
+      outputLanguage: configuredOutputLanguage(settings),
+      draftLanguage: normalizeDraftLanguage(settings.get("draftLanguage", defaults.draftLanguage || "auto")),
       autoAnalyzeMaxClassificationLevel: settings.get("autoAnalyzeMaxClassificationLevel", defaults.autoAnalyzeMaxClassificationLevel),
       mailStoreRetentionDays: settings.get("mailStoreRetentionDays", defaults.mailStoreRetentionDays),
       mailIndexRetentionDays: settings.get("mailIndexRetentionDays", defaults.mailIndexRetentionDays),

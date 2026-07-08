@@ -119,6 +119,22 @@
           "default": "en-US",
           "description": "Dashboard and analysis output language."
         },
+        "easyMail.draftLanguage": {
+          "type": "string",
+          "order": 6,
+          "enum": [
+            "auto",
+            "en",
+            "zh-CN"
+          ],
+          "enumItemLabels": [
+            "Auto",
+            "English",
+            "简体中文"
+          ],
+          "default": "auto",
+          "description": "Draft reply language. Auto follows the source mail or thread language."
+        },
         "easyMail.autoAnalyzeMaxClassificationLevel": {
           "type": "number",
           "order": 10,

@@ -5,6 +5,7 @@ import { applyAnalysisTranslation, buildAnalysisTranslationPrompt } from "./anal
 import { buildQueueState, ensureClassifications } from "./classification";
 import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "./config-utils";
 import { getLabels, buildCategoryLabels } from "./dashboard-labels";
+import { normalizeDraftLanguage, resolveDraftLanguage } from "./language-contract";
 import { selectConfiguredModel, type AvailableModel, type LlmProvider } from "./llm-provider";
 import { buildBatchDigestMarkdown, pruneMailIndex, type StoredMail } from "./mail-store";
 import { allowedCategoryIds, composeAnalysisPrompt } from "./prompt-config";
@@ -176,6 +177,7 @@ export async function analyzeBatchCore(
     replyTemplate,
     digestText: buildBatchDigestMarkdown([]),
     outputLanguage: String(config.outputLanguage || "en-US"),
+    draftLanguage: normalizeDraftLanguage(config.draftLanguage),
     promptConfig
   }));
   const chunkInputTokenBudget = Math.max(1, modelInputTokenBudget - promptOverheadTokens);
@@ -208,6 +210,7 @@ export async function analyzeBatchCore(
       replyTemplate,
       digestText,
       outputLanguage: String(config.outputLanguage || "en-US"),
+      draftLanguage: normalizeDraftLanguage(config.draftLanguage),
       promptConfig
     });
     await ctx.log("analyze:chunkStart", { chunk: index + 1, chunks: chunks.length, mails: chunk.length });
@@ -236,9 +239,8 @@ export async function analyzeBatchCore(
       replyTemplate
     );
     normalized.language = getLocaleFromConfig(config);
-    const draftNormalized = await ensureEnglishDraftReplies(ctx, normalized, configuredModel);
     merged = pruneAnalysisResult(
-      mergeAnalysisResults(merged, draftNormalized, allowedCategoryIds(promptConfig)),
+      mergeAnalysisResults(merged, normalized, allowedCategoryIds(promptConfig)),
       Number(config.analysisRetentionDays || 7),
       allowedCategoryIds(promptConfig)
     );
@@ -310,6 +312,9 @@ export async function analyzeThreadCore(
     analysisPrompt,
     outputSchemaPrompt,
     outputLanguage: String(config.outputLanguage || "en-US"),
+    draftLanguage: config.draftLanguage === "auto" || !config.draftLanguage
+      ? resolveDraftLanguage(config.draftLanguage, latestNonSelfThreadText(redactedThread))
+      : normalizeDraftLanguage(config.draftLanguage),
     thread: redactedThread
   });
   const configuredModel = typeof config.modelFamily === "string" ? config.modelFamily.trim() : "gpt-5.4";
@@ -317,24 +322,6 @@ export async function analyzeThreadCore(
   const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "threadAnalyze");
   let parsed = parseThreadAnalysisJson(raw, categoryIds);
   parsed.language = getLocaleFromConfig(config);
-  if (parsed.language === "en-US" && threadAnalysisContainsCjk(parsed)) {
-    try {
-      const translatedPrompt = buildAnalysisTranslationPrompt({
-        mail: emptyAnalysisResult("en-US"),
-        threads: parsed,
-        targetLanguage: "en-US"
-      });
-      const translatedRaw = await sendPromptToModel(ctx, translatedPrompt, configuredModel, "threadTranslate");
-      parsed = normalizeThreadAnalysis(applyAnalysisTranslation({
-        mail: emptyAnalysisResult("en-US"),
-        threads: parsed,
-        translated: JSON.parse(stripCodeFence(translatedRaw.raw.trim())),
-        targetLanguage: "en-US"
-      }).threads, categoryIds);
-    } catch (error) {
-      await ctx.log("threadAnalyze:translateFallbackFailed", { threadId, error: error instanceof Error ? error.message : String(error) });
-    }
-  }
   const current = await ctx.data.readThreadAnalysisResult();
   const merged = mergeThreadAnalysisResults(current, parsed, categoryIds);
   await ctx.data.writeThreadAnalysisResult(merged);
@@ -342,84 +329,11 @@ export async function analyzeThreadCore(
   return { subject: thread.subject || thread.threadId };
 }
 
-function emptyAnalysisResult(language: Locale) {
-  return {
-    generatedAt: "",
-    language,
-    overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 },
-    items: []
-  };
-}
-
-async function ensureEnglishDraftReplies(
-  ctx: AnalysisContext,
-  analysis: ReturnType<typeof normalizeAnalysis>,
-  configuredModel: string
-): Promise<ReturnType<typeof normalizeAnalysis>> {
-  const items = (analysis.items || []).filter((item) => containsCjk(`${item.draftReply || ""}\n${JSON.stringify(item.draftReplyParts || {})}`));
-  if (!items.length) {
-    return analysis;
-  }
-  const prompt = [
-    "Translate only the reply draft fields to English.",
-    "Return strict JSON only in this shape: {\"items\":[{\"mailId\":\"...\",\"draftReply\":\"...\",\"draftReplyParts\":{\"GREETING\":\"...\",\"MAIN_MESSAGE\":\"...\",\"REQUESTED_ACTION\":\"...\",\"CLOSING\":\"...\"}}]}.",
-    "Do not change categories, summaries, reasons, suggested actions, subjects, senders, or mail ids.",
-    "The translated draftReply and draftReplyParts must contain English text only and must not contain Chinese characters.",
-    "",
-    JSON.stringify({
-      items: items.map((item) => ({
-        mailId: item.mailId,
-        draftReply: item.draftReply,
-        draftReplyParts: item.draftReplyParts || {}
-      }))
-    }, null, 2)
-  ].join("\n");
-  try {
-    const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "draftTranslate");
-    return applyDraftReplyTranslations(analysis, JSON.parse(stripCodeFence(raw.trim())));
-  } catch (error) {
-    await ctx.log("draftTranslate:failed", { error: error instanceof Error ? error.message : String(error), items: items.map((item) => item.mailId) });
-    return analysis;
-  }
-}
-
-function applyDraftReplyTranslations(analysis: ReturnType<typeof normalizeAnalysis>, translated: unknown): ReturnType<typeof normalizeAnalysis> {
-  if (!translated || typeof translated !== "object" || !Array.isArray((translated as { items?: unknown[] }).items)) {
-    return analysis;
-  }
-  const byId = new Map((translated as { items: Array<Record<string, unknown>> }).items.map((item) => [String(item.mailId || ""), item]));
-  return {
-    ...analysis,
-    items: analysis.items.map((item) => {
-      const translatedItem = byId.get(item.mailId);
-      if (!translatedItem) return item;
-      const draftReply = typeof translatedItem.draftReply === "string" && translatedItem.draftReply.trim()
-        ? translatedItem.draftReply.trim()
-        : item.draftReply;
-      const rawParts = translatedItem.draftReplyParts;
-      const draftReplyParts = rawParts && typeof rawParts === "object" ? {
-        ...item.draftReplyParts,
-        ...Object.fromEntries(Object.entries(rawParts as Record<string, unknown>).filter(([, value]) => typeof value === "string"))
-      } : item.draftReplyParts;
-      return { ...item, draftReply, draftReplyParts };
-    })
-  };
-}
-
-function containsCjk(value: string): boolean {
-  return /[\u3400-\u9fff]/.test(value);
-}
-
-function threadAnalysisContainsCjk(threads: ReturnType<typeof parseThreadAnalysisJson>): boolean {
-  return containsCjk(JSON.stringify((threads.items || []).map((item) => ({
-    oneLineSummary: item.oneLineSummary,
-    currentStatus: item.currentStatus,
-    keyDecisions: item.keyDecisions,
-    openQuestions: item.openQuestions,
-    actionItems: item.actionItems.map((action) => action.task),
-    risks: item.risks.map((risk) => risk.description),
-    suggestedAction: item.suggestedAction
-  }))));
+function latestNonSelfThreadText(thread: { timeline?: Array<{ folder?: string; bodyDelta?: string; bodyClean?: string; bodyPreview?: string }> }): string {
+  const timeline = [...(thread.timeline || [])].reverse();
+  const message = timeline.find((item) => !String(item.folder || "").toLowerCase().includes("sent"))
+    || timeline[0];
+  return [message?.bodyDelta, message?.bodyClean, message?.bodyPreview].find((value) => String(value || "").trim()) || "";
 }
 
 export async function translateExistingAnalysis(

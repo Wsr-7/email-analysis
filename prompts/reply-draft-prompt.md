@@ -2,7 +2,6 @@ Reply draft generation rules:
 
 - Only create a draft when the recipient likely needs to reply, confirm, approve, decline, ask a question, or provide information.
 - Match the tone of the original thread: formal for external/executive mail, concise for internal team discussions.
-- Keep all reply draft content in English.
 - Do not include signatures, legal disclaimers, confidentiality footers, or sender-specific formatting — Outlook adds the user's signature automatically.
 - Prefer concise enterprise wording. One clear paragraph is better than three hedging ones.
 - If no reply is needed, set `draftReply` to an empty string and omit `draftReplyParts`.

@@ -26,29 +26,32 @@ test("buildThreadAnalysisPrompt includes prompts, output language, and strict JS
     analysisPrompt: "Analyze thread",
     outputSchemaPrompt: "Return JSON",
     outputLanguage: "zh-CN",
+    draftLanguage: "auto",
     thread: thread()
   });
 
   assert.match(prompt, /Base rules/);
   assert.match(prompt, /Analyze thread/);
   assert.match(prompt, /Return JSON/);
-  assert.match(prompt, /Output language:\nzh-CN/);
-  assert.match(prompt, /用中文输出所有自然语言 JSON 字符串/);
+  assert.match(prompt, /Language Contract/);
+  assert.match(prompt, /oneLineSummary, currentStatus, suggestedAction.*Simplified Chinese/s);
+  assert.match(prompt, /draftReply.*source thread language/s);
   assert.match(prompt, /"threadId": "conversation:conv-1"/);
   assert.doesNotMatch(prompt, /## Mail:/);
 });
 
-test("buildThreadAnalysisPrompt instructs English translation for natural-language thread fields", () => {
+test("buildThreadAnalysisPrompt can pin draft replies to English", () => {
   const prompt = buildThreadAnalysisPrompt({
     basePrompt: "Base rules",
     analysisPrompt: "Analyze thread",
     outputSchemaPrompt: "Return JSON",
     outputLanguage: "en-US",
+    draftLanguage: "en",
     thread: thread()
   });
 
-  assert.match(prompt, /Write every natural-language JSON string in English/);
-  assert.match(prompt, /Translate Chinese source content into English/);
+  assert.match(prompt, /oneLineSummary, currentStatus, suggestedAction.*English/s);
+  assert.match(prompt, /draftReply.*English/s);
 });
 
 test("buildThreadAnalysisPrompt injects today's date in the local timezone", () => {
@@ -57,6 +60,7 @@ test("buildThreadAnalysisPrompt injects today's date in the local timezone", () 
     analysisPrompt: "Analyze thread",
     outputSchemaPrompt: "Return JSON",
     outputLanguage: "en-US",
+    draftLanguage: "auto",
     thread: thread(),
     now: new Date(2026, 6, 8, 23, 30, 0)
   });

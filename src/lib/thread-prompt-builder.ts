@@ -1,4 +1,5 @@
 import { formatTodayLine } from "./config-utils";
+import { buildLanguageContract, normalizeDraftLanguage, type DraftLanguage } from "./language-contract";
 import type { ThreadRecord } from "./thread-schema";
 
 export interface ThreadPromptParts {
@@ -7,6 +8,7 @@ export interface ThreadPromptParts {
   analysisPrompt: string;
   thread: ThreadRecord;
   outputLanguage: string;
+  draftLanguage?: DraftLanguage;
   now?: Date;
 }
 
@@ -15,14 +17,13 @@ export function buildThreadAnalysisPrompt(parts: ThreadPromptParts): string {
   return [
     parts.basePrompt.trim(),
     formatTodayLine(parts.now),
-    "",
+    buildLanguageContract({
+      outputLanguage: parts.outputLanguage,
+      draftLanguage: normalizeDraftLanguage(parts.draftLanguage),
+      draftAutoDescription: "the source thread language",
+      analysisFields: "oneLineSummary, currentStatus, suggestedAction, questions, actions, risks, and status fields"
+    }),
     parts.analysisPrompt.trim(),
-    "",
-    "Output language:",
-    parts.outputLanguage || "en-US",
-    parts.outputLanguage === "en-US"
-      ? "Write every natural-language JSON string in English. Translate Chinese source content into English, including questions, statuses, actions, risks, and person-name display text where possible. Keep email addresses and exact IDs unchanged."
-      : "用中文输出所有自然语言 JSON 字符串。邮箱地址和精确 ID 保持不变。",
     "",
     parts.outputSchemaPrompt.trim(),
     "",

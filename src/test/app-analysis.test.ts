@@ -358,7 +358,7 @@ describe("analyzeBatchCore", () => {
     }
   });
 
-  it("translates generated draft replies to English when analysis returns Chinese draft fields", async () => {
+  it("does not run an English repair call for generated draft replies", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
       const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
@@ -393,13 +393,6 @@ describe("analyzeBatchCore", () => {
               confidence: 0.9,
               needsOriginalMailCheck: false
             }]
-          }),
-          JSON.stringify({
-            items: [{
-              mailId: "mail-001",
-              draftReply: "Hi, I will confirm.",
-              draftReplyParts: { GREETING: "Hi,", MAIN_MESSAGE: "I will confirm." }
-            }]
           })
         ]
       });
@@ -411,22 +404,23 @@ describe("analyzeBatchCore", () => {
         readConfig: async () => ({
           autoAnalyzeMaxClassificationLevel: 2,
           modelFamily: "mock-model",
-          outputLanguage: "en-US"
+          outputLanguage: "en-US",
+          draftLanguage: "auto"
         }),
         log: async () => {},
         availableModelsCache: null
       });
 
       const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
-      assert.equal(result.items[0].draftReply, "Hi, I will confirm.");
-      assert.equal(result.items[0].draftReplyParts?.MAIN_MESSAGE, "I will confirm.");
-      assert.equal(provider.prompts.length, 2);
+      assert.equal(result.items[0].draftReply, "您好\n\n我会确认。");
+      assert.equal(result.items[0].draftReplyParts?.MAIN_MESSAGE, "我会确认。");
+      assert.equal(provider.prompts.length, 1);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }
   });
 
-  it("translates English thread analysis fallback when model returns Chinese fields", async () => {
+  it("does not run a CJK fallback translation for thread analysis", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
       const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
@@ -505,19 +499,6 @@ describe("analyzeBatchCore", () => {
               confidence: 0.9,
               partialContext: false
             }]
-          }),
-          JSON.stringify({
-            mail: [],
-            threads: [{
-              threadId: "thread-1",
-              oneLineSummary: "Contract confirmation is needed.",
-              currentStatus: "Waiting for confirmation.",
-              keyDecisions: [],
-              openQuestions: ["Can it be approved?"],
-              actionItems: [],
-              risks: [],
-              suggestedAction: "Reply with confirmation."
-            }]
           })
         ]
       });
@@ -526,15 +507,15 @@ describe("analyzeBatchCore", () => {
         data,
         llmProvider: provider,
         extensionPath: process.cwd(),
-        readConfig: async () => ({ modelFamily: "mock-model", outputLanguage: "en-US", autoAnalyzeMaxClassificationLevel: 2 }),
+        readConfig: async () => ({ modelFamily: "mock-model", outputLanguage: "en-US", draftLanguage: "auto", autoAnalyzeMaxClassificationLevel: 2 }),
         log: async () => {},
         availableModelsCache: null
       }, "thread-1");
 
       const result = await data.readThreadAnalysisResult();
-      assert.equal(result.items[0].currentStatus, "Waiting for confirmation.");
-      assert.equal(result.items[0].openQuestions[0], "Can it be approved?");
-      assert.equal(provider.prompts.length, 2);
+      assert.equal(result.items[0].currentStatus, "等待确认。");
+      assert.equal(result.items[0].openQuestions[0], "是否批准？");
+      assert.equal(provider.prompts.length, 1);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

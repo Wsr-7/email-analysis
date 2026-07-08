@@ -57,6 +57,6 @@
       "priorityHint": "Use when context is insufficient"
     }
   ],
-  "replyDraftInstruction": "Draft replies must stay in English. Leave draftReply empty when no reply is needed.",
+  "replyDraftInstruction": "Leave draftReply empty when no reply is needed.",
   "importantSenders": []
 }

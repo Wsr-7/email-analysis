@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
+import { detectDraftLanguageFromText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
 
 describe("positiveNumber", () => {
   it("returns parsed number when positive", () => {
@@ -74,6 +75,32 @@ describe("getLocaleFromConfig", () => {
 
   it("defaults to en-US", () => {
     assert.equal(getLocaleFromConfig({}), "en-US");
+  });
+});
+
+describe("resolveOutputLanguage", () => {
+  it("uses an explicit output language before the VS Code UI language", () => {
+    assert.equal(resolveOutputLanguage("en-US", "zh-cn"), "en-US");
+    assert.equal(resolveOutputLanguage("zh-CN", "en"), "zh-CN");
+  });
+
+  it("falls back to the VS Code UI language when output language is not explicit", () => {
+    assert.equal(resolveOutputLanguage(undefined, "zh-cn"), "zh-CN");
+    assert.equal(resolveOutputLanguage(undefined, "en"), "en-US");
+  });
+});
+
+describe("draft language detection", () => {
+  it("detects English, Chinese, and mixed first-paragraph text", () => {
+    assert.equal(detectDraftLanguageFromText("Please confirm the contract by Friday."), "en");
+    assert.equal(detectDraftLanguageFromText("请在周五前确认合同。"), "zh-CN");
+    assert.equal(detectDraftLanguageFromText("请确认 contract status.\nPlease ignore this later English paragraph."), "zh-CN");
+  });
+
+  it("resolves explicit draft language before auto detection", () => {
+    assert.equal(resolveDraftLanguage("en", "请确认合同。"), "en");
+    assert.equal(resolveDraftLanguage("zh-CN", "Please confirm."), "zh-CN");
+    assert.equal(resolveDraftLanguage("auto", "请确认合同。"), "zh-CN");
   });
 });
 

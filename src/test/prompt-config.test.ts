@@ -16,6 +16,7 @@ test("composeAnalysisPrompt includes custom categories and language instruction"
     replyTemplate: "{{GREETING}}\n{{MAIN_MESSAGE}}\n{{REQUESTED_ACTION}}\n{{CLOSING}}",
     digestText: "Digest",
     outputLanguage: "zh-CN",
+    draftLanguage: "auto",
     promptConfig: config
   });
   assert.match(prompt, /vipCustomer/);
@@ -25,6 +26,25 @@ test("composeAnalysisPrompt includes custom categories and language instruction"
   assert.match(prompt, /Simplified Chinese/);
 });
 
+test("composeAnalysisPrompt injects one language contract for analysis and draft fields", () => {
+  const prompt = composeAnalysisPrompt({
+    basePrompt: "Base",
+    outputSchemaPrompt: "Schema",
+    replyDraftPrompt: "Fill draftReplyParts.",
+    replyTemplate: "",
+    digestText: "Digest",
+    outputLanguage: "zh-CN",
+    draftLanguage: "auto",
+    promptConfig: normalizePromptConfig({})
+  });
+
+  assert.match(prompt, /Language Contract/);
+  assert.match(prompt, /summary, reason, and suggestedAction.*Simplified Chinese/s);
+  assert.match(prompt, /draftReply.*source mail language/s);
+  assert.doesNotMatch(prompt, /Keep draftReply in English/);
+  assert.doesNotMatch(prompt, /Draft replies must stay in English/);
+});
+
 test("composeAnalysisPrompt injects today's date in the local timezone", () => {
   const config = normalizePromptConfig({});
   const prompt = composeAnalysisPrompt({
@@ -32,6 +52,7 @@ test("composeAnalysisPrompt injects today's date in the local timezone", () => {
     outputSchemaPrompt: "Schema",
     digestText: "Digest",
     outputLanguage: "en-US",
+    draftLanguage: "en",
     promptConfig: config,
     now: new Date(2026, 6, 8, 23, 30, 0)
   });

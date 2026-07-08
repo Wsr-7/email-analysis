@@ -1,4 +1,5 @@
 import { formatTodayLine } from "./config-utils";
+import { buildLanguageContract, normalizeDraftLanguage, type DraftLanguage } from "./language-contract";
 
 export interface PromptCategory {
   id: string;
@@ -73,7 +74,7 @@ export const DEFAULT_PROMPT_CONFIG: PromptConfig = {
       priorityHint: "Use when context is insufficient"
     }
   ],
-  replyDraftInstruction: "Draft replies must stay in English. Leave draftReply empty when no reply is needed.",
+  replyDraftInstruction: "Leave draftReply empty when no reply is needed.",
   importantSenders: []
 };
 
@@ -100,15 +101,19 @@ export function composeAnalysisPrompt(input: {
   replyTemplate?: string;
   digestText: string;
   outputLanguage: string;
+  draftLanguage?: DraftLanguage;
   promptConfig: PromptConfig;
   now?: Date;
 }): string {
-  const languageInstruction = input.outputLanguage === "en-US"
-    ? "Write summary, reason, and suggestedAction in English. Keep draftReply in English."
-    : "Write summary, reason, and suggestedAction in Simplified Chinese. Keep original mail excerpts and draftReply in English.";
   return [
     input.basePrompt.trim(),
     formatTodayLine(input.now),
+    buildLanguageContract({
+      outputLanguage: input.outputLanguage,
+      draftLanguage: normalizeDraftLanguage(input.draftLanguage),
+      draftAutoDescription: "the source mail language",
+      analysisFields: "summary, reason, and suggestedAction"
+    }),
     "Allowed categories:",
     renderCategories(input.promptConfig.categories),
     "Important sender/group rules:",
@@ -118,8 +123,6 @@ export function composeAnalysisPrompt(input: {
     input.replyDraftPrompt?.trim(),
     input.replyTemplate ? `Reply draft template:\n${input.replyTemplate.trim()}` : "",
     input.outputSchemaPrompt.trim(),
-    "Output language instruction:",
-    languageInstruction,
     input.digestText
   ].filter(Boolean).join("\n\n");
 }

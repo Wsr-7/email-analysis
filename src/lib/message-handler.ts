@@ -1,4 +1,5 @@
 import { positiveNumber, parseFolders, normalizeMailFolders, parseClassificationLevel } from "./config-utils";
+import { normalizeDraftLanguage } from "./language-contract";
 
 export interface MessageHandlerContext {
   log: (event: string, data: Record<string, unknown>) => Promise<void>;
@@ -340,6 +341,7 @@ export async function saveConfigFromMessage(
     folders: Object.prototype.hasOwnProperty.call(patch, "folders") ? normalizeMailFolders(patch.folders, current.folders || ["Inbox", "Sent Items"]) : normalizeMailFolders(current.folders, ["Inbox", "Sent Items"]),
     bodyExcerptChars: Object.prototype.hasOwnProperty.call(patch, "bodyExcerptChars") ? positiveNumber(patch.bodyExcerptChars, current.bodyExcerptChars || 1500) : current.bodyExcerptChars,
     outputLanguage: Object.prototype.hasOwnProperty.call(patch, "outputLanguage") ? (patch.outputLanguage === "zh-CN" ? "zh-CN" : "en-US") : current.outputLanguage,
+    draftLanguage: Object.prototype.hasOwnProperty.call(patch, "draftLanguage") ? normalizeDraftLanguage(patch.draftLanguage) : normalizeDraftLanguage(current.draftLanguage),
     modelFamily: Object.prototype.hasOwnProperty.call(patch, "modelFamily") ? String(patch.modelFamily || current.modelFamily || "gpt-5.4").trim() : current.modelFamily,
     autoAnalyzeMaxClassificationLevel: Object.prototype.hasOwnProperty.call(patch, "autoAnalyzeMaxClassificationLevel") ? parseClassificationLevel(patch.autoAnalyzeMaxClassificationLevel, Number(current.autoAnalyzeMaxClassificationLevel || 2)) : current.autoAnalyzeMaxClassificationLevel,
     mailStoreRetentionDays: Object.prototype.hasOwnProperty.call(patch, "mailStoreRetentionDays") ? positiveNumber(patch.mailStoreRetentionDays, current.mailStoreRetentionDays || 1) : current.mailStoreRetentionDays,
