@@ -88,15 +88,31 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
   Dim collected()
   Dim collectedCount
   collectedCount = 0
+  Dim folderCount
+  folderCount = 0
+  Dim folderFailureCount
+  folderFailureCount = 0
+  Dim folderFailures
+  folderFailures = ""
 
   Dim idx
   For idx = 0 To UBound(folderNames)
     Dim folderPath
     folderPath = Trim(folderNames(idx))
     If folderPath <> "" Then
-      CollectFolderItems ns, folderPath, CStr(target("range-mode")), CLng(target("max-items")), CLng(target("recent-hours")), CLng(target("body-chars")), OlderThanForFolder(target("older-than-map"), folderPath), collected, collectedCount
+      folderCount = folderCount + 1
+      If Not CollectFolderItems(ns, folderPath, CStr(target("range-mode")), CLng(target("max-items")), CLng(target("recent-hours")), CLng(target("body-chars")), OlderThanForFolder(target("older-than-map"), folderPath), collected, collectedCount) Then
+        folderFailureCount = folderFailureCount + 1
+        folderFailures = AppendDiagList(folderFailures, folderPath)
+      End If
     End If
   Next
+  If folderCount > 0 And folderFailureCount >= folderCount Then
+    Fail "All Outlook folders failed: " & folderFailures
+  End If
+  If folderFailureCount > 0 Then
+    WScript.Echo "FolderScanSummary: failed=" & folderFailureCount & "; total=" & folderCount & "; folders=" & folderFailures
+  End If
 
   Dim beforeGlobalCap
   beforeGlobalCap = collectedCount
@@ -111,11 +127,13 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
   WriteDigest outputPath, target, collected, collectedCount
 End Sub
 
-Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxItems, byVal recentHours, byVal bodyChars, byVal olderThan, byRef collected, byRef collectedCount)
+Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxItems, byVal recentHours, byVal bodyChars, byVal olderThan, byRef collected, byRef collectedCount)
+  CollectFolderItems = False
   Dim folder
   Set folder = ResolveFolder(ns, folderPath)
   If folder Is Nothing Then
-    Fail "Outlook folder not found: " & folderPath
+    WScript.Echo FolderScanError(folderPath, "Outlook folder not found")
+    Exit Function
   End If
 
   Dim timeProperty
@@ -138,7 +156,10 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
     On Error Resume Next
     Set restricted = items.Restrict("[" & timeProperty & "] < '" & FormatRestrictDate(ParseAnchorDate(olderThan)) & "'")
     If Err.Number <> 0 Then
-      Fail "Unable to restrict Outlook folder by " & timeProperty & ": " & folderPath & ". " & Err.Description
+      WScript.Echo FolderScanError(folderPath, "Unable to restrict Outlook folder by " & timeProperty & ": " & Err.Description)
+      Err.Clear
+      On Error GoTo 0
+      Exit Function
     End If
     On Error GoTo 0
     Set items = restricted
@@ -159,7 +180,10 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
   On Error Resume Next
   items.Sort "[" & timeProperty & "]", True
   If Err.Number <> 0 Then
-    Fail "Unable to sort Outlook folder by " & timeProperty & ": " & folderPath & ". " & Err.Description
+    WScript.Echo FolderScanError(folderPath, "Unable to sort Outlook folder by " & timeProperty & ": " & Err.Description)
+    Err.Clear
+    On Error GoTo 0
+    Exit Function
   End If
   On Error GoTo 0
 
@@ -174,7 +198,10 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
   Dim item
   Set item = items.GetFirst
   If Err.Number <> 0 Then
-    Fail "Unable to iterate Outlook folder: " & folderPath & ". " & Err.Description
+    WScript.Echo FolderScanError(folderPath, "Unable to iterate Outlook folder: " & Err.Description)
+    Err.Clear
+    On Error GoTo 0
+    Exit Function
   End If
   On Error GoTo 0
 
@@ -201,12 +228,37 @@ Sub CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxIte
     On Error Resume Next
     Set item = items.GetNext
     If Err.Number <> 0 Then
-      Fail "Unable to continue Outlook folder iteration: " & folderPath & ". " & Err.Description
+      WScript.Echo FolderScanError(folderPath, "Unable to continue Outlook folder iteration: " & Err.Description)
+      Err.Clear
+      On Error GoTo 0
+      CollectFolderItems = (addedInFolder > 0)
+      Exit Function
     End If
     On Error GoTo 0
   Loop
   WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; scanned=" & scanned & "; added=" & addedInFolder & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
-End Sub
+  CollectFolderItems = True
+End Function
+
+Function FolderScanError(byVal folderPath, byVal message)
+  FolderScanError = "FolderScan: folder=" & OneLine(folderPath) & "; error=" & OneLine(message)
+End Function
+
+Function AppendDiagList(byVal current, byVal value)
+  If Trim(CStr(current)) = "" Then
+    AppendDiagList = OneLine(value)
+  Else
+    AppendDiagList = current & "," & OneLine(value)
+  End If
+End Function
+
+Function OneLine(byVal value)
+  Dim text
+  text = Replace(CStr(value), vbCr, " ")
+  text = Replace(text, vbLf, " ")
+  text = Replace(text, ";", ",")
+  OneLine = Trim(text)
+End Function
 
 Function IsRecentHoursMode(byVal rangeMode)
   IsRecentHoursMode = (LCase(Trim(CStr(rangeMode))) = "recenthours")
@@ -360,6 +412,7 @@ Function ResolveFolder(byRef ns, byVal folderPath)
   root = Trim(parts(0))
 
   Dim folder
+  On Error Resume Next
   If LCase(root) = "inbox" Then
     Set folder = ns.GetDefaultFolder(6)
   ElseIf LCase(root) = "sent items" Then
@@ -369,6 +422,13 @@ Function ResolveFolder(byRef ns, byVal folderPath)
   Else
     Set folder = ns.Folders(root)
   End If
+  If Err.Number <> 0 Then
+    Err.Clear
+    Set ResolveFolder = Nothing
+    On Error GoTo 0
+    Exit Function
+  End If
+  On Error GoTo 0
 
   If folder Is Nothing Then
     Set ResolveFolder = Nothing

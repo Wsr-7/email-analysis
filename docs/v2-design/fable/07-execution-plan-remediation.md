@@ -339,10 +339,16 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Manual validation: 不涉及 Outlook/VBS；真实 Copilot 仍需观察含 prompt-injection 文本的邮件不会改变输出格式/分类规则/语言契约。
   - Commit: `97000b9`
 
-### [ ] R2.7b C-5b 单文件夹解析失败不再中止全部采集
+### [x] R2.7b C-5b 单文件夹解析失败不再中止全部采集
 
 - **做法**：`collect-outlook-mails.vbs` `CollectFolderItems` 对 `ResolveFolder` 失败 / `GetFirst`/`GetNext`/`Sort` 失败改为输出 `FolderScan: ...; error=...` 并 continue 其余文件夹；仅当全部文件夹都失败才 `Fail`。
 - **验收**：语法检查 + `--sample` 不回归；Handover 标注 needs user validation（配置一个不存在的文件夹名验证其余文件夹仍采集）。
+- **Completion Notes**:
+  - 改动文件：`scripts/collect-outlook-mails.vbs`。
+  - 实现：`CollectFolderItems` 从 `Sub` 改为返回 Boolean 的 `Function`；`ResolveFolder` 失败、older-than Restrict 失败、Sort 失败、GetFirst 失败、GetNext 失败均输出 `FolderScan: folder=...; error=...` 并返回失败（GetNext 在已添加部分记录时返回成功以保留部分结果）；外层按非空配置文件夹统计失败，仅 `folderFailureCount >= folderCount` 时 `Fail "All Outlook folders failed: ..."`，部分失败时输出 `FolderScanSummary: failed=...; total=...; folders=...` 后继续写 digest。
+  - `ResolveFolder` 根文件夹 lookup 加 `On Error Resume Next`，把缺失/异常统一转为 `Nothing`，避免单个坏配置冒泡中止。
+  - Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`cscript //nologo scripts/collect-outlook-mails.vbs --sample --output data/r2-7b-sample-digest.md` 通过（临时 sample 已删除）；`npm run compile` 零错误；`npm test` 354/354 全绿。
+  - Manual validation: **needs user validation on real Outlook**——配置 `Inbox;不存在的文件夹名` 应看到坏文件夹的 `FolderScan: ...; error=...`，同时 Inbox 仍采集并写入 digest；配置全坏文件夹应失败并提示 `All Outlook folders failed`。
 
 ### [ ] R2.7c C-7d 超长正文粗截后再归一化
 
@@ -531,3 +537,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.7a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -5` 最新为 `8c479d7`、`f46b18e`、`02ac24a`、`ce27eba`、`7b114e1`。按计划重新定位并阅读 05 矩阵 L-6 与 02 文档 L-6：邮件正文/线程 timeline 是不受信任输入，当前 `base-system.md`/`thread-base-system.md` 无防注入守则；`composeAnalysisPrompt()` 直接拼入 `digestText`，`buildThreadAnalysisPrompt()` 仅用 ```json fenced code 包 timeline payload。Claim R2.7a；边界：只加系统守则和 digest/timeline 明确定界符及测试，不做 UI URL 标注、不改 prompt schema、不进入 R2.7b。
 
 - **2026-07-09 · Codex（R2.7a completion）**：Action: base/thread base prompt 增加不可信输入守则；`composeAnalysisPrompt()` 和 `buildThreadAnalysisPrompt()` 分别用 `<easy-mail-digest-data>` 与 `<easy-mail-thread-timeline-json>` 定界不可信 payload；补 prompt 组装测试。Validated: `npm run compile` 零错误；`node --test out/test/prompt-config.test.js` 4/4 通过；`node --test out/test/thread-prompt-builder.test.js` 5/5 通过；`npm test` 354/354 全绿。Manual: 真实 Copilot 仍需观察 prompt injection 邮件不会改变输出格式/规则。Commit: `97000b9`。Next: R2.7b。
+
+- **2026-07-09 · Codex（R2.7b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；`git log --oneline -5` 最新为 `fd63cbb`、`97000b9`、`8c479d7`、`f46b18e`、`02ac24a`。按计划重新定位并阅读 05 矩阵 C-5b 与 01 文档 C-5：当前 `CollectFolderItems` 在 `ResolveFolder` 失败、older-than Restrict 失败、Sort 失败、GetFirst/GetNext 失败时仍 `Fail` 整次采集。Claim R2.7b；边界：只把单文件夹失败降级为诊断并继续其余文件夹，仅所有非空配置文件夹都失败才 Fail；不改 digest 输出格式、不做 DIAG JSON 协议、不进入 R2.7c。
+
+- **2026-07-09 · Codex（R2.7b completion，needs user validation on real Outlook）**：Action: `CollectFolderItems` 改为 Boolean 返回，单文件夹解析/Restrict/Sort/迭代失败输出 `FolderScan: ...; error=...` 并继续其余文件夹；外层仅所有非空配置文件夹失败时 Fail，部分失败输出 `FolderScanSummary`。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output data/r2-7b-sample-digest.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 354/354 全绿。Manual: 需真实 Outlook 验证坏文件夹不拖死好文件夹、全坏文件夹仍失败。Next: R2.7c。
