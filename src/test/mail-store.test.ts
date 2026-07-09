@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, normalizeMailStore, pruneMailIndex, pruneMailStore } from "../lib/mail-store";
+import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, normalizeMailStore, pruneMailIndex, pruneMailStore, stableMailId } from "../lib/mail-store";
 
 test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () => {
   const digest = {
@@ -10,6 +10,7 @@ test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () 
         mailId: "mail-001",
         internetMessageId: "<mail-001@example.com>",
         entryId: "entry-001",
+        storeId: "store-001",
         conversationId: "conv-001",
         conversationIndex: "01ABCDEF",
         subject: "Contract approval needed",
@@ -39,6 +40,7 @@ test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () 
   assert.equal(second.skipped, 1);
   assert.equal(second.store.items.length, 1);
   assert.equal(second.store.items[0].mailId, "internet:<mail-001@example.com>");
+  assert.equal(second.store.items[0].storeId, "store-001");
   assert.equal(second.store.items[0].conversationId, "conv-001");
   assert.equal(second.store.items[0].conversationIndex, "01ABCDEF");
   assert.equal(second.store.items[0].senderName, "Alice");
@@ -48,6 +50,74 @@ test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () 
   assert.equal(second.store.items[0].cc, "Legal <legal@example.com>");
   assert.equal(second.store.items[0].attachmentCount, 2);
   assert.deepEqual(second.store.items[0].attachmentNames, ["contract.pdf", "budget.xlsx"]);
+});
+
+test("mergeDigestIntoStore skips mail with impossible Outlook dates", () => {
+  const digest = {
+    metadata: { generatedAt: "2026-06-16 10:00:00", rangeMode: "recentHours", recentHours: 24, maxItems: 2, folders: ["Inbox"] },
+    items: [{
+      mailId: "mail-001",
+      internetMessageId: "<mail-001@example.com>",
+      entryId: "entry-001",
+      storeId: "",
+      conversationId: "",
+      conversationIndex: "",
+      subject: "Microsoft Outlook test message",
+      from: "Microsoft Outlook <test@example.com>",
+      senderName: "Microsoft Outlook",
+      senderEmail: "test@example.com",
+      receivedTime: "4501-01-01 00:00:00",
+      sentTime: "",
+      folder: "Inbox",
+      unread: "false",
+      importance: "normal",
+      toMe: "true",
+      ccMe: "false",
+      to: "Me <me@example.com>",
+      cc: "",
+      attachmentCount: 0,
+      attachmentNames: [],
+      bodyExcerpt: "Test"
+    }]
+  };
+
+  const merge = mergeDigestIntoStore(emptyMailStore(), digest);
+  const index = mergeDigestIntoIndex(emptyMailIndex(), digest);
+  assert.equal(merge.added, 0);
+  assert.equal(merge.skipped, 1);
+  assert.equal(merge.store.items.length, 0);
+  assert.equal(index.items.length, 0);
+});
+
+test("stableMailId fallback ignores body excerpt length changes", () => {
+  const base = {
+    mailId: "mail-001",
+    internetMessageId: "",
+    entryId: "",
+    storeId: "",
+    conversationId: "",
+    conversationIndex: "",
+    subject: "No ids edge case",
+    from: "Alice <alice@example.com>",
+    senderName: "Alice",
+    senderEmail: "alice@example.com",
+    receivedTime: "2026-06-16 09:00:00",
+    sentTime: "",
+    folder: "Inbox",
+    unread: "false",
+    importance: "normal",
+    toMe: "true",
+    ccMe: "false",
+    to: "Me <me@example.com>",
+    cc: "",
+    attachmentCount: 0,
+    attachmentNames: []
+  };
+
+  assert.equal(
+    stableMailId({ ...base, bodyExcerpt: "Short body" }),
+    stableMailId({ ...base, bodyExcerpt: "Short body with a longer pull because --body-chars changed" })
+  );
 });
 
 test("normalizeMailStore fills thread fields for old store json", () => {
@@ -76,6 +146,7 @@ test("normalizeMailStore fills thread fields for old store json", () => {
 
   assert.equal(store.items.length, 1);
   assert.equal(store.items[0].conversationId, "");
+  assert.equal(store.items[0].storeId, "");
   assert.equal(store.items[0].conversationIndex, "");
   assert.equal(store.items[0].senderName, "");
   assert.equal(store.items[0].senderEmail, "");

@@ -43,6 +43,11 @@ test("parseAnalysisJson preserves optional source and evidence fields", () => {
         reason: "Direct request in the mail body.",
         suggestedAction: "Send status update.",
         draftReply: "I will send the status update.",
+        draftReplyParts: {
+          GREETING: "Hi Alice,",
+          MAIN_MESSAGE: "I will send the status update.",
+          CLOSING: "Thanks,"
+        },
         confidence: 0.9,
         needsOriginalMailCheck: false,
         source: {
@@ -68,6 +73,8 @@ test("parseAnalysisJson preserves optional source and evidence fields", () => {
     entryId: "entry-001",
     folder: "Inbox"
   });
+  assert.equal(analysis.items[0].draftReplyParts?.GREETING, "Hi Alice,");
+  assert.equal(analysis.items[0].draftReplyParts?.MAIN_MESSAGE, "I will send the status update.");
   assert.deepEqual(analysis.items[0].evidence, [
     {
       sourceMailId: "mail-001",
@@ -99,4 +106,55 @@ test("parseAnalysisJson keeps old JSON compatible without source and evidence", 
 
   assert.equal(analysis.items[0].source, undefined);
   assert.equal(analysis.items[0].evidence, undefined);
+});
+
+test("parseAnalysisJson downgrades low-confidence non-uncertain categories", () => {
+  const analysis = parseAnalysisJson(JSON.stringify({
+    items: [
+      {
+        mailId: "mail-001",
+        category: "mustHandleToday",
+        priority: "P0",
+        subject: "Maybe urgent",
+        sender: "Alice",
+        receivedTime: "2026-06-16 09:12:00",
+        summary: "Possibly needs action.",
+        reason: "Ambiguous wording.",
+        suggestedAction: "Check original.",
+        draftReply: "",
+        confidence: 0.5,
+        needsOriginalMailCheck: false
+      }
+    ]
+  }));
+
+  assert.equal(analysis.items[0].category, "uncertain");
+  assert.equal(analysis.items[0].priority, "P2");
+  assert.equal(analysis.items[0].needsOriginalMailCheck, true);
+  assert.equal(analysis.overview.mustHandleToday, 0);
+});
+
+test("parseAnalysisJson clamps category priority mismatches and lowers confidence", () => {
+  const analysis = parseAnalysisJson(JSON.stringify({
+    items: [
+      {
+        mailId: "mail-001",
+        category: "notice",
+        priority: "P0",
+        subject: "Routine notice",
+        sender: "System",
+        receivedTime: "2026-06-16 09:12:00",
+        summary: "Routine notice.",
+        reason: "Informational only.",
+        suggestedAction: "No action.",
+        draftReply: "",
+        confidence: 0.95,
+        needsOriginalMailCheck: false
+      }
+    ]
+  }));
+
+  assert.equal(analysis.items[0].category, "notice");
+  assert.equal(analysis.items[0].priority, "P2");
+  assert.equal(analysis.items[0].confidence, 0.7);
 });

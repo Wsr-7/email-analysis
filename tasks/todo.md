@@ -219,3 +219,119 @@
 
 - Runtime log shows `pullMail:done` and `analyze:done` without `busy:end`; root is an awaited dashboard refresh inside task core.
 - Runtime log shows repeated sample data got `added:0, skipped:4, storeItems:0`; sample mode was incorrectly subject to historical index de-dup for demo reload.
+
+## Dashboard Regression Rework Round 2
+
+### Scope
+
+- [x] R2-1: Sample data busy/toast/dashboard progress must end without VS Code reload.
+- [x] R2-2: Analyze busy/toast/dashboard progress must end and analysed count must refresh without VS Code reload.
+- [x] R2-3: Ignore action must work from classified mail cards and move the item into Ignored.
+- [x] R2-4: Language switch must remain responsive after other fixes.
+- [x] R2-5: Analyze Thread button must respond, and thread timeline display must be ASC/chat-style.
+- [x] R2-6: Stat tiles must jump to and expand the corresponding category/thread panel.
+- [x] R2-7: Load Models control must be a compact action next to Analysis Model.
+- [x] R2-8: Dashboard should explain or avoid singleton mail threads in the thread category.
+
+### Working Notes
+
+- Runtime logs show `pullMail:done` / `analyze:done` before `busy:end`; one confirmed cause is awaiting VS Code information notifications inside progress tasks.
+- Fixes in this round must be sequential and verified point by point.
+- R2-1 fix: sample/pull completion notification is no longer awaited, so the progress task can reach `busy:end` immediately after pull completes.
+- R2-2 fix: single-mail analysis completion notification is no longer awaited; existing analysed count already comes from `analysis-result.json`, so the missing piece was the blocked final refresh.
+- R2-3 fix: ignore now records the target panel in webview state, shows a non-blocking ignored toast, refreshes, and reopens the Ignored panel after render.
+- R2-4 check: language toggle still only posts `saveConfig`; dashboard render reads cached models from disk and does not call Copilot model discovery.
+- R2-5 fix: thread analysis completion notification is no longer awaited, and timeline display now sorts by received/sent time ASC before using `conversationIndex` as a tie-breaker.
+- R2-6 fix: stat tile navigation now records/restores the target panel, opens details panels, updates the hash, scrolls, and focuses the panel with a visible outline.
+- R2-7 fix: Load Models is now a compact inline action beside the Analysis Model field title.
+- R2-8 fix: thread records with a single message remain in storage for future merging, but Dashboard thread stats/panel/linking only use threads with more than one message.
+
+## Dashboard Interaction Rework Round 3
+
+### Scope
+
+- [x] R3-1: Fix card-level dynamic button handlers for Ignore, Copy Draft, and Analyze Full Thread.
+- [x] R3-2: Remove low-value auto-allowed badge from pending cards.
+- [x] R3-3: Make Analyze Next explicit about batch size.
+- [x] R3-4: Simplify low-utility report/debug toolbar buttons.
+- [x] R3-5: Hide or guard Copy Draft when there is no draft reply.
+- [x] R3-6: Change language toggle to globe/text/chevron style.
+- [x] R3-7: Clarify thread analysis means whole-thread context, not the latest single mail only.
+
+### Working Notes
+
+- R3 root cause: card-level buttons embedded JS literals inside double-quoted `onclick` attributes, so dynamic ids/draft text broke the handler before messages reached the extension.
+- Thread analysis button now says full-thread analysis; it analyzes the thread timeline/context, not only the newest mail.
+
+## Dashboard Interaction Rework Round 4
+
+### Scope
+
+- [x] R4-1: Remove standalone Dashboard busy/progress row and show an inline spinner on the active toolbar button.
+- [x] R4-2: Ignore should not jump to or expand the Ignored panel after click.
+- [x] R4-3: Ignored category cards should not show another Ignore action.
+- [x] R4-4: Replace text copy buttons with an overlaid copy icon inside draft blocks for single-mail and thread drafts.
+
+### Working Notes
+
+- Progress remains visible in VS Code notification/toast; Dashboard now keeps the surface compact by showing spinner state inside the active button.
+- Ignore now only updates local ignored state and refreshes in place; it no longer opens the Ignored panel.
+
+## Dashboard Interaction Rework Round 5
+
+### Scope
+
+- [x] R5-1: Open the Easy Mail walkthrough automatically on first activation after install, and expose a Dashboard `?` button to reopen it.
+- [x] R5-2: Category/pending/thread panels should default to closed.
+- [x] R5-3: Normal toolbar actions must not restore a previous panel jump after refresh.
+- [x] R5-4: Localize the Analysis Model setting label.
+
+### Working Notes
+
+- Walkthrough is now both automatic-once via VS Code globalState and manually accessible from the Dashboard help button.
+- Panel jumps are now immediate-only for stat tile clicks; they are no longer stored and replayed after refresh.
+
+## Dashboard Interaction Rework Round 6
+
+### Scope
+
+- [x] R6-1: Preserve open category/thread panels across dashboard refresh without scrolling.
+- [x] R6-2: Make the Dashboard `?` help entry visibly open packaged help even when VS Code walkthrough command resolves without showing UI.
+
+### Working Notes
+
+- Open panel state is now a list of expanded `details.category` ids, restored only as expanded state, not as scroll position.
+- The walkthrough command logs as successful in this environment, but the user can still miss it visually; opening `user guide.md` gives a deterministic visible fallback.
+
+## Next UX Slice: Guide, Outlook Open, Reply Template, Translation
+
+### Scope
+
+- [x] G1: Replace the fragile walkthrough-only help path with a custom Easy Mail Guide webview.
+- [x] G2: Wire first activation and Dashboard `?` to the same visible Guide webview.
+- [x] G3: Verify compile/tests after Guide changes.
+- [x] O1: Add a minimal read-only Open in Outlook path for classic Outlook using stored item identifiers.
+- [x] R1: Add reply draft prompt/template support without changing Outlook send behavior.
+- [x] L1: Add a safe language-switch translation plan/slice for existing analysis results.
+
+### Working Notes
+
+- Native VS Code walkthrough contribution stays in `package.json`, but runtime help should not depend on whether VS Code visibly surfaces it.
+- Open in Outlook must remain read-only: display only, no send/delete/move/archive/mark-read writeback.
+- G1-G3 result: added `src/lib/guide-webview.ts`, an `easyMail.openGuide` command, a versioned first-run Guide panel, and a Dashboard `?` entry that opens the same panel. `npm test` passes.
+- O1 result: added `StoreId` collection/index preservation, a read-only `open-outlook-mail.vbs` display helper, and `Open in Outlook` buttons on analyzed mail cards. `npm test` passes.
+- R1 result: added `reply-draft-prompt.md`, user-editable `reply-template.md`, `draftReplyParts` schema support, template rendering, and an `Open Reply Template` command. `npm test` passes.
+- L1 result: language toggle now asks whether to translate existing analysis or switch UI only; translation updates display analysis fields, preserves categories/evidence/source/draft replies, and writes language metadata. `npm test` passes.
+
+## Small UX Adjustments
+
+### Scope
+
+- [x] Rename visible reply template references to `reply-template.md`.
+- [x] Show elapsed time for all `runWithBusy` long-running operations.
+- [x] Render thread Timeline above Thread Analysis.
+- [x] Swap Settings panel order so Allow Auto Analysis is left of Max Auto Classification.
+
+### Working Notes
+
+- Long-running operations covered by `runWithBusy`: fetch new mail, more history, sample data, mail analysis, thread analysis, reports, model loading, and translation.

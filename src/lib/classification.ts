@@ -1,4 +1,5 @@
 import type { AnalysisResult } from "./analysis-schema";
+import { parseClassificationLevel } from "./config-utils";
 import type { StoredMail } from "./mail-store";
 
 export interface MailClassification {
@@ -20,6 +21,7 @@ export interface AnalysisQueueState {
   blocked: StoredMail[];
   analysed: StoredMail[];
   allowed: StoredMail[];
+  ignoredPending: StoredMail[];
 }
 
 export function normalizeClassificationCache(input: unknown): ClassificationCache {
@@ -35,10 +37,18 @@ export function ensureClassifications(storeItems: StoredMail[], cache: Classific
   const byId = new Map(cache.items.map((item) => [item.mailId, item]));
   const next = [...cache.items];
   for (const mail of storeItems) {
-    if (!byId.has(mail.mailId)) {
+    const existing = byId.get(mail.mailId);
+    if (!existing) {
       const classification = classifyMail(mail);
       next.push(classification);
       byId.set(mail.mailId, classification);
+    } else if (existing.source === "default" && existing.reason === "keyword match") {
+      const refreshed = classifyMail(mail);
+      const index = next.findIndex((item) => item.mailId === mail.mailId);
+      if (index >= 0) {
+        next[index] = refreshed;
+      }
+      byId.set(mail.mailId, refreshed);
     }
   }
   return {
@@ -49,11 +59,13 @@ export function ensureClassifications(storeItems: StoredMail[], cache: Classific
 
 export function classifyMail(mail: StoredMail): MailClassification {
   const text = `${mail.folder}\n${mail.subject}\n${mail.bodyExcerpt}`.toLowerCase();
-  if (text.includes("high registered") || text.includes("highly restricted") || text.includes("secret")) {
-    return buildClassification(mail.mailId, 3, "HIGH REGISTERED", "keyword match");
+  const highKeyword = ["high registered", "highly restricted", "secret"].find((keyword) => text.includes(keyword));
+  if (highKeyword) {
+    return buildClassification(mail.mailId, 3, "HIGH REGISTERED", `keyword match: ${highKeyword}`);
   }
-  if (text.includes("registered") || text.includes("restricted") || text.includes("confidential") || text.includes("contract") || text.includes("budget")) {
-    return buildClassification(mail.mailId, 2, "REGISTERED", "keyword match");
+  const registeredKeyword = ["registered", "restricted", "confidential", "contract", "budget"].find((keyword) => text.includes(keyword));
+  if (registeredKeyword) {
+    return buildClassification(mail.mailId, 2, "REGISTERED", `keyword match: ${registeredKeyword}`);
   }
   if (mail.from.toLowerCase().includes("@") || mail.folder.toLowerCase().includes("inbox")) {
     return buildClassification(mail.mailId, 1, "INTERNAL", "default mail classification");
@@ -67,19 +79,21 @@ export function buildQueueState(
   ignoredIds: string[],
   classifications: ClassificationCache,
   autoAnalyzeEnabled: boolean,
-  maxAutoLevel: number
+  maxAutoLevel: unknown
 ): AnalysisQueueState {
   const analysedIds = new Set((analysis.items || []).map((item) => item.mailId));
   const ignored = new Set(ignoredIds || []);
   const classificationById = new Map(classifications.items.map((item) => [item.mailId, item]));
+  const allowedMaxLevel = parseClassificationLevel(maxAutoLevel, 2);
   const pending = storeItems.filter((item) => !analysedIds.has(item.mailId) && !ignored.has(item.mailId));
   const allowed = pending.filter((item) => {
     const classification = classificationById.get(item.mailId);
-    return autoAnalyzeEnabled && Number(classification?.level || 0) <= maxAutoLevel;
+    return Number(classification?.level || 0) <= allowedMaxLevel;
   });
   const blocked = pending.filter((item) => !allowed.includes(item));
   const analysed = storeItems.filter((item) => analysedIds.has(item.mailId) && !ignored.has(item.mailId));
-  return { pending, blocked, analysed, allowed };
+  const ignoredPending = storeItems.filter((item) => !analysedIds.has(item.mailId) && ignored.has(item.mailId));
+  return { pending, blocked, analysed, allowed, ignoredPending };
 }
 
 export function classificationFor(mailId: string, cache: ClassificationCache): MailClassification | undefined {

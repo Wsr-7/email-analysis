@@ -73,7 +73,12 @@ function findQuoteStart(lines: string[]): number {
 
 function isOriginalMessageSeparator(line: string): boolean {
   const value = line.trim();
-  return /^-+\s*Original Message\s*-+$/i.test(value) || /^-+\s*原始邮件\s*-+$/.test(value);
+  return /^-+\s*Original Message\s*-+$/i.test(value)
+    || /^-+\s*原始邮件\s*-+$/.test(value)
+    || /^-+\s*邮件原件\s*-+$/.test(value)
+    || /^_{5,}$/.test(value)
+    || /^On .+ wrote:$/i.test(value)
+    || /^在 .+ 写道[:：]$/.test(value);
 }
 
 function startsOutlookHeaderBlock(lines: string[], startIndex: number): boolean {
@@ -97,7 +102,7 @@ function startsOutlookHeaderBlock(lines: string[], startIndex: number): boolean 
     labels.add(label);
   }
 
-  return labels.has("sent") && (labels.has("to") || labels.has("subject"));
+  return labels.has("sent") || labels.has("to") || labels.has("subject");
 }
 
 function headerLabel(line: string): string {

@@ -6,6 +6,7 @@ export interface StoredMail {
   sourceMailId: string;
   internetMessageId: string;
   entryId: string;
+  storeId?: string;
   conversationId?: string;
   conversationIndex?: string;
   subject: string;
@@ -39,6 +40,7 @@ export interface MailIndexItem {
   sourceMailId: string;
   internetMessageId: string;
   entryId: string;
+  storeId?: string;
   receivedTime: string;
   folder: string;
   lastSeenAt: string;
@@ -111,6 +113,10 @@ export function mergeDigestIntoStore(store: MailStore, digest: DigestData, known
   const pulledAt = digest.metadata.generatedAt || new Date().toISOString();
 
   for (const digestItem of digest.items) {
+    if (!isAcceptableMailDate(String(digestItem.receivedTime || digestItem.sentTime || ""))) {
+      skipped += 1;
+      continue;
+    }
     const mail = digestItemToStoredMail(digestItem, pulledAt);
     if (existing.has(mail.mailId)) {
       skipped += 1;
@@ -137,12 +143,16 @@ export function mergeDigestIntoIndex(index: MailIndex, digest: DigestData): Mail
   const byId = new Map(index.items.map((item) => [item.mailId, item]));
   const seenAt = digest.metadata.generatedAt || new Date().toISOString();
   for (const digestItem of digest.items) {
+    if (!isAcceptableMailDate(String(digestItem.receivedTime || digestItem.sentTime || ""))) {
+      continue;
+    }
     const mail = digestItemToStoredMail(digestItem, seenAt);
     byId.set(mail.mailId, {
       mailId: mail.mailId,
       sourceMailId: mail.sourceMailId,
       internetMessageId: mail.internetMessageId,
       entryId: mail.entryId,
+      storeId: mail.storeId,
       receivedTime: mail.receivedTime,
       folder: mail.folder,
       lastSeenAt: seenAt
@@ -156,12 +166,18 @@ export function mergeDigestIntoIndex(index: MailIndex, digest: DigestData): Mail
   };
 }
 
+export function isAcceptableMailDate(value: string): boolean {
+  const year = Number(String(value || "").slice(0, 4));
+  return Number.isFinite(year) && year >= 1990 && year <= 2100;
+}
+
 export function digestItemToStoredMail(item: DigestItem, pulledAt: string): StoredMail {
   return {
     mailId: stableMailId(item),
     sourceMailId: item.mailId,
     internetMessageId: item.internetMessageId,
     entryId: item.entryId,
+    storeId: stringValue(item.storeId),
     conversationId: stringValue(item.conversationId),
     conversationIndex: stringValue(item.conversationIndex),
     subject: item.subject,
@@ -196,8 +212,7 @@ export function stableMailId(item: DigestItem): string {
     item.folder,
     item.receivedTime,
     item.from,
-    item.subject,
-    item.bodyExcerpt
+    item.subject
   ].join("\n");
   return `mail-${crypto.createHash("sha256").update(source).digest("hex").slice(0, 16)}`;
 }
@@ -300,6 +315,7 @@ function normalizeStoredMail(input: unknown): StoredMail | null {
     sourceMailId: String(input.sourceMailId || ""),
     internetMessageId: String(input.internetMessageId || ""),
     entryId: String(input.entryId || ""),
+    storeId: String(input.storeId || ""),
     conversationId: String(input.conversationId || ""),
     conversationIndex: String(input.conversationIndex || ""),
     subject: String(input.subject || ""),
@@ -336,6 +352,7 @@ function normalizeMailIndexItem(input: unknown): MailIndexItem | null {
     sourceMailId: String(input.sourceMailId || ""),
     internetMessageId: String(input.internetMessageId || ""),
     entryId: String(input.entryId || ""),
+    storeId: String(input.storeId || ""),
     receivedTime: String(input.receivedTime || ""),
     folder: String(input.folder || ""),
     lastSeenAt: String(input.lastSeenAt || "")

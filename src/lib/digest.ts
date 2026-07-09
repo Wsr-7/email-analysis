@@ -10,6 +10,7 @@ export interface DigestItem {
   mailId: string;
   internetMessageId: string;
   entryId: string;
+  storeId?: string;
   conversationId?: string;
   conversationIndex?: string;
   subject: string;
@@ -79,6 +80,7 @@ function parseMailSection(section: string): DigestItem | null {
     mailId: lines[0],
     internetMessageId: "",
     entryId: "",
+    storeId: "",
     conversationId: "",
     conversationIndex: "",
     subject: "",
@@ -103,6 +105,7 @@ function parseMailSection(section: string): DigestItem | null {
     assignIfPrefix(result, line, "Subject: ", "subject");
     assignIfPrefix(result, line, "InternetMessageId: ", "internetMessageId");
     assignIfPrefix(result, line, "EntryId: ", "entryId");
+    assignIfPrefix(result, line, "StoreId: ", "storeId");
     assignIfPrefix(result, line, "ConversationId: ", "conversationId");
     assignIfPrefix(result, line, "ConversationIndex: ", "conversationIndex");
     assignIfPrefix(result, line, "From: ", "from");

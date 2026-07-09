@@ -84,3 +84,34 @@ function buildOverview(items: AnalysisResult["items"]): AnalysisResult["overview
     notices: items.filter((item) => item.category === "notice").length
   };
 }
+
+export function filterVisibleThreadsForDashboard(threadStore: ThreadStore): ThreadStore {
+  return {
+    ...threadStore,
+    items: (threadStore.items || []).filter((thread) => Number(thread.messageCount || thread.timeline?.length || 0) > 1)
+  };
+}
+
+export function buildThreadLookup(threadStore: ThreadStore): Map<string, string> {
+  const lookup = new Map<string, string>();
+  for (const thread of threadStore.items || []) {
+    for (const mailId of thread.sourceMailIds || []) {
+      lookup.set(mailId, thread.threadId);
+    }
+    for (const message of thread.timeline || []) {
+      lookup.set(message.mailId, thread.threadId);
+    }
+  }
+  return lookup;
+}
+
+export function compareTimelineMessagesForDisplay(a: ThreadStore["items"][number]["timeline"][number], b: ThreadStore["items"][number]["timeline"][number]): number {
+  const byTime = String(a.receivedTime || a.sentTime || "").localeCompare(String(b.receivedTime || b.sentTime || ""));
+  if (byTime !== 0) {
+    return byTime;
+  }
+  if (a.conversationIndex && b.conversationIndex && a.conversationIndex !== b.conversationIndex) {
+    return a.conversationIndex.localeCompare(b.conversationIndex);
+  }
+  return a.mailId.localeCompare(b.mailId);
+}

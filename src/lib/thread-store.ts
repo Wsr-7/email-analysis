@@ -140,6 +140,7 @@ function normalizeThreadMessage(input: unknown): ThreadMessage | null {
     bodyDelta: String(input.bodyDelta || bodyPreview),
     bodyHash: String(input.bodyHash || ""),
     isDuplicateBody: Boolean(input.isDuplicateBody),
+    duplicateOfId: input.duplicateOfId ? String(input.duplicateOfId) : undefined,
     contentAvailable: Boolean(input.contentAvailable || bodyPreview),
     attachmentCount: positiveNumber(input.attachmentCount, 0),
     attachmentNames: stringArray(input.attachmentNames)

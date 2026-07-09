@@ -1,2 +1,5 @@
 - Dashboard analysis counts must come from `analysis-result.json`, not `mail-store`, because analyzed mails are removed from the raw queue after successful analysis.
 - Dashboard rendering should not block indefinitely on model discovery; use cached/timeout-bounded model listing for UI refreshes and reserve longer waits for actual analysis commands.
+- Do not `await vscode.window.showInformationMessage` inside a `runWithBusy` task body; it keeps the progress task open until the user dismisses the notification and leaves the Dashboard busy state stuck.
+- Do not embed dynamic JSON/string values inside double-quoted inline `onclick` attributes; use `data-*` attributes plus event delegation so mail ids, thread ids, and draft text cannot break button handlers.
+- Packaging preference: only build the normal release VSIX (`npm run package:vsix`). Do not build the dev VSIX unless the user explicitly asks for it.

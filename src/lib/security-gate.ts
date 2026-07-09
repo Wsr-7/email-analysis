@@ -1,4 +1,4 @@
-import type { MailClassification } from "./classification";
+import { classificationFor, type ClassificationCache, type MailClassification } from "./classification";
 import type { StoredMail } from "./mail-store";
 import type { ThreadRecord, ThreadSecuritySummary } from "./thread-schema";
 import type {
@@ -12,7 +12,7 @@ import type {
 } from "./security-types";
 
 const DEFAULT_MAX_AUTO_CLASSIFICATION_LEVEL = 1;
-const DEFAULT_MAX_MANUAL_CLASSIFICATION_LEVEL = 2;
+const DEFAULT_MAX_MANUAL_CLASSIFICATION_LEVEL = 3;
 
 export function buildMailGateDecision(
   mail: StoredMail | MailSecurityGateInput,
@@ -98,9 +98,6 @@ function decideMail(input: MailSecurityGateInput, settings: SecurityGateSettings
   } else if (input.classification.level > maxManualLevel(settings)) {
     decision = "block";
     reasons.push(`Classification level ${input.classification.level} exceeds manual maximum ${maxManualLevel(settings)}.`);
-  } else if (!settings.autoAnalyzeEnabled) {
-    decision = "manual_confirm";
-    reasons.push("Automatic analysis is disabled.");
   } else if (input.classification.level > maxAutoLevel(settings)) {
     decision = "manual_confirm";
     reasons.push(`Classification level ${input.classification.level} exceeds automatic maximum ${maxAutoLevel(settings)}.`);
@@ -245,4 +242,31 @@ function defaultClassification(mailId: string): MailClassification {
 
 function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
+}
+
+export function buildMailSecurityDecisionMap(
+  mails: StoredMail[],
+  classifications: ClassificationCache,
+  settings: SecurityGateSettings
+): Map<string, SecurityGateDecisionResult> {
+  const decisions = new Map<string, SecurityGateDecisionResult>();
+  for (const mail of mails) {
+    decisions.set(mail.mailId, buildMailGateDecision(mail, classificationFor(mail.mailId, classifications) || defaultClassification(mail.mailId), settings));
+  }
+  return decisions;
+}
+
+export function canAnalyzeMail(mail: StoredMail, decisions: Map<string, SecurityGateDecisionResult>, explicitSelection: boolean): boolean {
+  const decision = decisions.get(mail.mailId);
+  if (!decision) {
+    return true;
+  }
+  if (decision.decision === "block") {
+    return false;
+  }
+  return explicitSelection || decision.decision === "allow";
+}
+
+export function fallbackClassification(mailId: string): MailClassification {
+  return defaultClassification(mailId);
 }

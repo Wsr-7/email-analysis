@@ -20,6 +20,7 @@ Folders:
 Subject: Contract approval needed
 InternetMessageId: <mail-001@example.com>
 EntryId: entry-001
+StoreId: store-001
 From: Alice <alice@example.com>
 ReceivedTime: 2026-06-16 09:12:00
 Folder: Inbox/Customer
@@ -39,6 +40,7 @@ Please review and approve the contract.
   assert.equal(result.items[0].mailId, "mail-001");
   assert.equal(result.items[0].internetMessageId, "<mail-001@example.com>");
   assert.equal(result.items[0].entryId, "entry-001");
+  assert.equal(result.items[0].storeId, "store-001");
   assert.equal(result.items[0].subject, "Contract approval needed");
   assert.equal(result.items[0].conversationId, "");
   assert.equal(result.items[0].conversationIndex, "");
@@ -88,6 +90,7 @@ Please review and approve the contract.
 
   assert.equal(result.items.length, 1);
   assert.equal(result.items[0].conversationId, "conv-123");
+  assert.equal(result.items[0].storeId, "");
   assert.equal(result.items[0].conversationIndex, "01ABCDEF");
   assert.equal(result.items[0].sentTime, "2026-06-16 09:10:00");
   assert.equal(result.items[0].to, "Me <me@example.com>; Team <team@example.com>");

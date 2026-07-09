@@ -13,6 +13,24 @@ export const VALID_PRIORITIES = new Set(["P0", "P1", "P2", "P3"] as const);
 export type Category = string;
 export type Priority = "P0" | "P1" | "P2" | "P3";
 
+const PRIORITY_RANK: Record<Priority, number> = {
+  P0: 0,
+  P1: 1,
+  P2: 2,
+  P3: 3
+};
+
+const CATEGORY_PRIORITY_RANGE: Record<string, Priority[]> = {
+  importantSender: ["P0", "P1"],
+  mustHandleToday: ["P0", "P1"],
+  risk: ["P0", "P1"],
+  waitingForMe: ["P1", "P2"],
+  followUp: ["P2"],
+  notice: ["P2", "P3"],
+  ignored: ["P3"],
+  uncertain: ["P2", "P3"]
+};
+
 export interface AnalysisSource {
   mailId?: string;
   internetMessageId?: string;
@@ -26,6 +44,13 @@ export interface AnalysisEvidence {
   reason: string;
 }
 
+export interface DraftReplyParts {
+  GREETING?: string;
+  MAIN_MESSAGE?: string;
+  REQUESTED_ACTION?: string;
+  CLOSING?: string;
+}
+
 export interface AnalysisItem {
   mailId: string;
   category: Category;
@@ -37,6 +62,7 @@ export interface AnalysisItem {
   reason: string;
   suggestedAction: string;
   draftReply: string;
+  draftReplyParts?: DraftReplyParts;
   confidence: number;
   needsOriginalMailCheck: boolean;
   source?: AnalysisSource;
@@ -53,6 +79,7 @@ export interface AnalysisOverview {
 
 export interface AnalysisResult {
   generatedAt: string;
+  language?: string;
   overview: AnalysisOverview;
   items: AnalysisItem[];
 }
@@ -76,6 +103,7 @@ export function normalizeAnalysis(input: unknown, allowedCategories?: string[]):
 
   return {
     generatedAt: String((analysis as Record<string, unknown>).generatedAt || new Date().toISOString()),
+    language: String((analysis as Record<string, unknown>).language || ""),
     overview: normalizeOverview((analysis as Record<string, unknown>).overview, items),
     items
   };
@@ -95,12 +123,26 @@ function normalizeOverview(overview: unknown, items: AnalysisItem[]): AnalysisOv
 
 function normalizeItem(item: unknown, index: number, allowedCategories: Set<string>): AnalysisItem {
   const base = isObject(item) ? item : {};
-  const category = allowedCategories.has((base as Record<string, unknown>).category as Category)
+  let category = allowedCategories.has((base as Record<string, unknown>).category as Category)
     ? ((base as Record<string, unknown>).category as Category)
     : "uncertain";
-  const priority = VALID_PRIORITIES.has((base as Record<string, unknown>).priority as Priority)
+  let priority = VALID_PRIORITIES.has((base as Record<string, unknown>).priority as Priority)
     ? ((base as Record<string, unknown>).priority as Priority)
     : "P2";
+  const hasNumericConfidence = typeof (base as Record<string, unknown>).confidence === "number";
+  let confidence = hasNumericConfidence ? ((base as Record<string, unknown>).confidence as number) : 0;
+  let needsOriginalMailCheck = Boolean((base as Record<string, unknown>).needsOriginalMailCheck);
+  if (hasNumericConfidence && confidence < 0.7 && category !== "uncertain") {
+    category = "uncertain";
+    needsOriginalMailCheck = true;
+  }
+  const clampedPriority = clampPriorityForCategory(category, priority);
+  if (clampedPriority !== priority) {
+    priority = clampedPriority;
+    if (hasNumericConfidence) {
+      confidence = Math.min(confidence, 0.7);
+    }
+  }
 
   const normalized: AnalysisItem = {
     mailId: String((base as Record<string, unknown>).mailId || `mail-${String(index + 1).padStart(3, "0")}`),
@@ -113,8 +155,8 @@ function normalizeItem(item: unknown, index: number, allowedCategories: Set<stri
     reason: String((base as Record<string, unknown>).reason || ""),
     suggestedAction: String((base as Record<string, unknown>).suggestedAction || ""),
     draftReply: String((base as Record<string, unknown>).draftReply || ""),
-    confidence: typeof (base as Record<string, unknown>).confidence === "number" ? ((base as Record<string, unknown>).confidence as number) : 0,
-    needsOriginalMailCheck: Boolean((base as Record<string, unknown>).needsOriginalMailCheck)
+    confidence,
+    needsOriginalMailCheck
   };
 
   const source = normalizeSource((base as Record<string, unknown>).source);
@@ -127,7 +169,40 @@ function normalizeItem(item: unknown, index: number, allowedCategories: Set<stri
     normalized.evidence = evidence;
   }
 
+  const draftReplyParts = normalizeDraftReplyParts((base as Record<string, unknown>).draftReplyParts);
+  if (draftReplyParts) {
+    normalized.draftReplyParts = draftReplyParts;
+  }
+
   return normalized;
+}
+
+function clampPriorityForCategory(category: Category, priority: Priority): Priority {
+  const allowed = CATEGORY_PRIORITY_RANGE[category];
+  if (!allowed || allowed.includes(priority)) {
+    return priority;
+  }
+  return allowed.reduce((best, candidate) => {
+    const bestDistance = Math.abs(PRIORITY_RANK[best] - PRIORITY_RANK[priority]);
+    const candidateDistance = Math.abs(PRIORITY_RANK[candidate] - PRIORITY_RANK[priority]);
+    return candidateDistance < bestDistance ? candidate : best;
+  }, allowed[0]);
+}
+
+function normalizeDraftReplyParts(input: unknown): DraftReplyParts | undefined {
+  if (!isObject(input)) {
+    return undefined;
+  }
+
+  const result: DraftReplyParts = {};
+  for (const key of ["GREETING", "MAIN_MESSAGE", "REQUESTED_ACTION", "CLOSING"] as const) {
+    const value = input[key];
+    if (value !== undefined && value !== null && String(value)) {
+      result[key] = String(value);
+    }
+  }
+
+  return Object.keys(result).length ? result : undefined;
 }
 
 function normalizeSource(source: unknown): AnalysisSource | undefined {
@@ -183,4 +258,35 @@ function numberOr(value: unknown, fallback: number): number {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object";
+}
+
+export function mergeAnalysisResults(current: AnalysisResult, next: AnalysisResult, allowedCategories?: string[]): AnalysisResult {
+  const byId = new Map<string, AnalysisResult["items"][number]>();
+  for (const item of current.items || []) {
+    byId.set(item.mailId, item);
+  }
+  for (const item of next.items || []) {
+    byId.set(item.mailId, item);
+  }
+  const items = [...byId.values()];
+  return normalizeAnalysis({
+    generatedAt: new Date().toISOString(),
+    language: next.language || current.language || "",
+    overview: {},
+    items
+  }, allowedCategories);
+}
+
+export function pruneAnalysisResult(analysis: AnalysisResult, retentionDays: number, allowedCategories?: string[], now: Date = new Date()): AnalysisResult {
+  if (!Number.isFinite(retentionDays) || retentionDays <= 0) {
+    return analysis;
+  }
+  const cutoff = now.getTime() - retentionDays * 24 * 60 * 60 * 1000;
+  return normalizeAnalysis({
+    ...analysis,
+    items: analysis.items.filter((item) => {
+      const received = Date.parse(String(item.receivedTime || "").replace(" ", "T"));
+      return !Number.isFinite(received) || received >= cutoff;
+    })
+  }, allowedCategories);
 }

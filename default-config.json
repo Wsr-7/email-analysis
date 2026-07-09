@@ -3,17 +3,19 @@
   "recentHours": 24,
   "maxItems": 50,
   "folders": [
-    "Inbox"
+    "Inbox",
+    "Sent Items"
   ],
   "bodyExcerptChars": 1500,
   "sampleMode": false,
   "modelFamily": "gpt-5.4",
   "outputLanguage": "en-US",
-  "analysisBatchSize": 5,
-  "autoAnalyzeEnabled": true,
+  "draftLanguage": "auto",
   "autoAnalyzeMaxClassificationLevel": 2,
-  "mailStoreRetentionDays": 1,
+  "mailStoreRetentionDays": 7,
   "mailIndexRetentionDays": 7,
   "analysisRetentionDays": 7,
-  "importantSenders": []
+  "importantSenders": [],
+  "meetingDaysAhead": 2,
+  "collectorTimeoutSeconds": 120
 }

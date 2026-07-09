@@ -8,14 +8,14 @@ import {
 
 export interface MockProviderOptions {
   models?: AvailableModel[];
-  responses?: string[];
+  responses?: Array<string | Error>;
 }
 
 export class MockProvider implements LlmProvider {
   public readonly prompts: string[] = [];
   private responseIndex = 0;
   private readonly models: AvailableModel[];
-  private readonly responses: string[];
+  private readonly responses: Array<string | Error>;
 
   public constructor(options: MockProviderOptions = {}) {
     this.models = options.models || [
@@ -34,10 +34,13 @@ export class MockProvider implements LlmProvider {
       throw new Error("Select an available GitHub Copilot model before analyzing.");
     }
     this.prompts.push(prompt);
-    const rawText = this.responses[Math.min(this.responseIndex, this.responses.length - 1)] || "{}";
+    const response = this.responses[Math.min(this.responseIndex, this.responses.length - 1)] || "{}";
     this.responseIndex += 1;
+    if (response instanceof Error) {
+      throw response;
+    }
     return {
-      rawText,
+      rawText: response,
       model: { ...model },
       usedFallback: false
     };

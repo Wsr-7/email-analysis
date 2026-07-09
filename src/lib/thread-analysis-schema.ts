@@ -2,6 +2,7 @@ import { stripCodeFence, VALID_CATEGORIES, VALID_PRIORITIES, type Priority } fro
 
 export interface ThreadAnalysisResult {
   generatedAt: string;
+  language?: string;
   overview: ThreadAnalysisOverview;
   items: ThreadAnalysisItem[];
 }
@@ -70,6 +71,7 @@ export function normalizeThreadAnalysis(input: unknown, allowedCategories?: stri
 
   return {
     generatedAt: String(analysis.generatedAt || new Date().toISOString()),
+    language: String(analysis.language || ""),
     overview: normalizeOverview(analysis.overview, items),
     items
   };
@@ -181,4 +183,20 @@ function numberOr(value: unknown, fallback: number): number {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object";
+}
+
+export function mergeThreadAnalysisResults(current: ThreadAnalysisResult, next: ThreadAnalysisResult, allowedCategories?: string[]): ThreadAnalysisResult {
+  const byId = new Map<string, ThreadAnalysisResult["items"][number]>();
+  for (const item of current.items || []) {
+    byId.set(item.threadId, item);
+  }
+  for (const item of next.items || []) {
+    byId.set(item.threadId, item);
+  }
+  return normalizeThreadAnalysis({
+    generatedAt: new Date().toISOString(),
+    language: next.language || current.language || "",
+    overview: {},
+    items: [...byId.values()]
+  }, allowedCategories);
 }
