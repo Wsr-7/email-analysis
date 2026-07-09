@@ -428,11 +428,17 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 只覆盖 R2.7a 已包定界符的 batch/thread payload；draft/translation/JSON repair prompt boundary 是本轮 review 新发现但未列入 R2.8c 的后续规划项。
   - Commit: `2441695`
 
-### [ ] R2.8d GetNext 中途失败的"部分采集"不进失败汇总（R2.7b 缺陷，worker 与规划者交叉确认）
+### [x] R2.8d GetNext 中途失败的"部分采集"不进失败汇总（R2.7b 缺陷，worker 与规划者交叉确认）
 
 - **缺陷**：`collect-outlook-mails.vbs` `CollectFolderItems` 在 `GetNext` 中途失败时返回 `addedInFolder > 0`——已采到邮件即计为成功。后果：该文件夹"扫到一半断了"与"扫完了"对采集结果和 `FolderScanSummary` 完全不可区分，中断点之后未扫到的邮件成为无感知数据缺口（recentHours 降序模式下断得早会漏较旧的近期邮件）。现有 `FolderScan: error=` 诊断行只是日志，不构成失败信号。
 - **做法**：把"部分采集"作为独立状态计数：`CollectFromOutlook` 新增 `folderPartialCount`/`folderPartials` 列表；`CollectFolderItems` 返回值区分三态（如 "ok"/"partial"/"failed" 字符串，或保持 Boolean 成功 + byRef partial 标志，取实现最小者），`GetNext` 中途失败且 `addedInFolder > 0` 时计入 partial（不触发 all-fail）；`FolderScanSummary` 扩展为 `failed=N; partial=M; total=K; folders=...; partialFolders=...`，只要 failed+partial > 0 就输出。不改 digest 格式、不改整体成败语义。
 - **验收**：`cscript //nologo --help` 语法检查；`--sample` 不回归；Handover 标注 needs user validation（真机难以稳定构造 GetNext 中途失败，验收以代码审查 + 语法检查为主，真机留意 partial 行）。
+- Completion Notes:
+  - 改动文件：`scripts/collect-outlook-mails.vbs`（`CollectFolderItems` 返回 `"ok"`/`"failed"`/`"partial"`；`GetNext` 中途失败且已有新增记录时返回 partial；外层新增 `folderPartialCount`/`folderPartials` 并扩展 `FolderScanSummary`）。
+  - 验收结果：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output F:/agent-workspace/codex/.tmp/easy-mail-r2-8d-sample.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 360/360 全绿。
+  - Manual validation: **needs user validation on real Outlook**——真机难以稳定构造 GetNext 中途失败；后续真实大邮箱采集时需留意 stdout 是否出现 `FolderScanSummary: failed=...; partial=...`，partial folder 不应触发 all-fail，但应可见。
+  - Known issues: 本 step 未处理 reviewer 额外指出的 `folder.Items` 和单封 `BuildMailRecord` COM 异常；已在 handover 风险中保留，需后续规划。
+  - Commit: pending
 
 ### 复审确认无需行动的记录
 
@@ -645,3 +651,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.8c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；最新提交 `8e1d945`、`7e34367`。按计划重新定位 R2.8c 与 L-6：`composeAnalysisPrompt()` 直接把 `digestText` 放进 `<easy-mail-digest-data>`，`buildThreadAnalysisPrompt()` 直接把 `JSON.stringify(payload)` 放进 `<easy-mail-thread-timeline-json>`；JSON 不转义 `<`，payload 可伪造闭合 tag。Claim R2.8c；边界：只替换 payload 内 prompt delimiter literals 并补单测，不改 prompt schema、不扩展 draft/translation/repair boundary、不进入 R2.8d。
 
 - **2026-07-09 · Codex（R2.8c completion）**：Action: batch digest 与 thread timeline JSON 入 prompt 前统一替换 Easy Mail prompt delimiters，防止正文伪造闭合 tag 逃出 untrusted data 段；补 batch/thread 回归测试。Validated: `npm run compile` 零错误；定向 prompt 测试 11/11 通过；`npm test` 360/360 全绿。Manual: 真实 Copilot 仍需观察伪造 delimiter 邮件不会改变输出规则。Next: R2.8d。
+
+- **2026-07-09 · Codex（R2.8d completion，Milestone R2.8 complete）**：Action: `CollectFolderItems` 改三态返回，`GetNext` 中途失败且已有新增记录时计入 partial，`FolderScanSummary` 增加 `partial`/`partialFolders`。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 360/360 全绿。Manual: needs user validation on real Outlook，真实采集时留意 partial summary。Next: R2.8a-d 已完成；R3/R4 仍不得自行 claim。另有 R2.7 review 未覆盖新风险需规划者决定是否展开：draft/translation/JSON repair prompt boundary、overview stale count、fallback id 同秒碰撞、VBS `folder.Items`/`BuildMailRecord` COM 异常。

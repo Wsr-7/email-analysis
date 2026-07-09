@@ -94,6 +94,10 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
   folderFailureCount = 0
   Dim folderFailures
   folderFailures = ""
+  Dim folderPartialCount
+  folderPartialCount = 0
+  Dim folderPartials
+  folderPartials = ""
 
   Dim idx
   For idx = 0 To UBound(folderNames)
@@ -101,17 +105,22 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
     folderPath = Trim(folderNames(idx))
     If folderPath <> "" Then
       folderCount = folderCount + 1
-      If Not CollectFolderItems(ns, folderPath, CStr(target("range-mode")), CLng(target("max-items")), CLng(target("recent-hours")), CLng(target("body-chars")), OlderThanForFolder(target("older-than-map"), folderPath), collected, collectedCount) Then
+      Dim folderStatus
+      folderStatus = CollectFolderItems(ns, folderPath, CStr(target("range-mode")), CLng(target("max-items")), CLng(target("recent-hours")), CLng(target("body-chars")), OlderThanForFolder(target("older-than-map"), folderPath), collected, collectedCount)
+      If folderStatus = "failed" Then
         folderFailureCount = folderFailureCount + 1
         folderFailures = AppendDiagList(folderFailures, folderPath)
+      ElseIf folderStatus = "partial" Then
+        folderPartialCount = folderPartialCount + 1
+        folderPartials = AppendDiagList(folderPartials, folderPath)
       End If
     End If
   Next
   If folderCount > 0 And folderFailureCount >= folderCount Then
     Fail "All Outlook folders failed: " & folderFailures
   End If
-  If folderFailureCount > 0 Then
-    WScript.Echo "FolderScanSummary: failed=" & folderFailureCount & "; total=" & folderCount & "; folders=" & folderFailures
+  If folderFailureCount + folderPartialCount > 0 Then
+    WScript.Echo "FolderScanSummary: failed=" & folderFailureCount & "; partial=" & folderPartialCount & "; total=" & folderCount & "; folders=" & folderFailures & "; partialFolders=" & folderPartials
   End If
 
   Dim beforeGlobalCap
@@ -128,7 +137,7 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
 End Sub
 
 Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxItems, byVal recentHours, byVal bodyChars, byVal olderThan, byRef collected, byRef collectedCount)
-  CollectFolderItems = False
+  CollectFolderItems = "failed"
   Dim folder
   Set folder = ResolveFolder(ns, folderPath)
   If folder Is Nothing Then
@@ -231,13 +240,15 @@ Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal m
       WScript.Echo FolderScanError(folderPath, "Unable to continue Outlook folder iteration: " & Err.Description)
       Err.Clear
       On Error GoTo 0
-      CollectFolderItems = (addedInFolder > 0)
+      If addedInFolder > 0 Then
+        CollectFolderItems = "partial"
+      End If
       Exit Function
     End If
     On Error GoTo 0
   Loop
   WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; scanned=" & scanned & "; added=" & addedInFolder & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
-  CollectFolderItems = True
+  CollectFolderItems = "ok"
 End Function
 
 Function FolderScanError(byVal folderPath, byVal message)
