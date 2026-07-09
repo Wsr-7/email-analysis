@@ -306,7 +306,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Validation: `npm run compile` 零错误；`npm test` 346/346 全绿。
   - Manual validation: 不涉及 Outlook/VBS；真实 VS Code + Copilot 仍需验证会话中模型列表变化/重新登录后，已选模型失配时会刷新并优先使用刷新后的同 key 模型。
   - Known issues: `fallbackCancellation` 仍保留；provider 没有显式 dispose 生命周期，按计划视为一次性泄漏无实际影响。本 step 不引入 VS Code API mock。
-  - Commit: pending
+  - Commit: `4ac2537`
 
 ### [ ] R2.6e 语言检测 isIncomingMessage 的 BCC/DL 边界（R2.3 review fix 边界）
 
