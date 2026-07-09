@@ -362,10 +362,16 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Manual validation: 不强制依赖 Outlook；真实大正文邮件可观察采集不再因归一化超长 body 明显卡顿。
   - Commit: `9bfb109`
 
-### [ ] R2.7d L-8e stableMailId hash 源去掉 bodyExcerpt
+### [x] R2.7d L-8e stableMailId hash 源去掉 bodyExcerpt
 
 - **做法**：`mail-store.ts` `stableMailId` 兜底 hash 源改 `folder+receivedTime+from+subject`；接受无 InternetMessageId/EntryId 邮件的一次性重复（Completion Notes 说明影响面）。
 - **验收**：mail-store 单测更新；`npm test` 全绿。
+- **Completion Notes**:
+  - 改动文件：`src/lib/mail-store.ts`、`src/test/mail-store.test.ts`。
+  - 实现：`stableMailId` 在无 `internetMessageId`/`entryId` 时的 hash 源从 `folder+receivedTime+from+subject+bodyExcerpt` 改为 `folder+receivedTime+from+subject`，避免 `--body-chars` 变化导致同一封边缘邮件生成不同 fallback id。
+  - 影响面：仅影响同时缺失 `InternetMessageId` 与 `EntryId` 的邮件。未做 index 迁移，已存在旧 fallback id 的这类邮件可能在升级后出现一次性重复；后续同一 hash 规则会稳定去重。
+  - Tests: `npm run compile` 零错误；`node --test out/test/mail-store.test.js` 10/10 通过；`npm test` 355/355 全绿。
+  - Manual validation: 不涉及 Outlook/VBS；真实环境只需留意极少数无标准 ID 邮件升级后可能一次性重复。
 
 ### [ ] R2.7e B-2e + B-3 normalize 一致性钳制
 
@@ -552,3 +558,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.7c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `e881bc7`、`1864d6d`、`fd63cbb`、`97000b9`、`8c479d7`。按计划重新定位并阅读 05 矩阵 C-7d 与 01 文档 C-7：当前 `BuildMailRecord` 调 `TruncateText(SafeString(mail.Body), bodyChars)`，而 `TruncateText` 先 `NormalizeWhitespace(text)` 再精确截断，病态超长正文会先做多轮全量字符串拷贝。Claim R2.7c；边界：只在归一化前做 `Left(text, maxChars * 4)` 粗截，不改 digest 格式、不改正文归一化规则、不进入 R2.7d。
 
 - **2026-07-09 · Codex（R2.7c completion）**：Action: `TruncateText` 在 `NormalizeWhitespace` 前按 `maxChars * 4` 粗截，避免超长正文先全量归一化；未改 digest 格式。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output data/r2-7c-sample-digest.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 354/354 全绿。Manual: 可用真实超长正文邮件观察采集性能。Commit: `9bfb109`。Next: R2.7d。
+
+- **2026-07-09 · Codex（R2.7d pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 6]`；`git log --oneline -5` 最新为 `fa6e38d`、`9bfb109`、`e881bc7`、`1864d6d`、`fd63cbb`。按计划重新定位并阅读 05 矩阵 L-8e 与 02 文档 L-8：`src/lib/mail-store.ts:stableMailId` 在无 `InternetMessageId`/`EntryId` 时 hash 源为 `folder+receivedTime+from+subject+bodyExcerpt`，`--body-chars` 变化会让同邮件双 id。Claim R2.7d；边界：只去掉 fallback hash 源的 `bodyExcerpt` 并补 mail-store 单测；接受边缘无 ID 邮件一次性重复，不做 index 迁移、不进入 R2.7e。
+
+- **2026-07-09 · Codex（R2.7d completion）**：Action: `stableMailId` fallback hash 源去掉 `bodyExcerpt`，补无 `InternetMessageId`/`EntryId` 时 body 长度变化仍同 id 的 mail-store 单测；接受旧 fallback id 一次性重复，不做迁移。Validated: `npm run compile` 零错误；`node --test out/test/mail-store.test.js` 10/10 通过；`npm test` 355/355 全绿。Manual: 不涉及 Outlook/VBS。Next: R2.7e。

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, normalizeMailStore, pruneMailIndex, pruneMailStore } from "../lib/mail-store";
+import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, normalizeMailStore, pruneMailIndex, pruneMailStore, stableMailId } from "../lib/mail-store";
 
 test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () => {
   const digest = {
@@ -87,6 +87,37 @@ test("mergeDigestIntoStore skips mail with impossible Outlook dates", () => {
   assert.equal(merge.skipped, 1);
   assert.equal(merge.store.items.length, 0);
   assert.equal(index.items.length, 0);
+});
+
+test("stableMailId fallback ignores body excerpt length changes", () => {
+  const base = {
+    mailId: "mail-001",
+    internetMessageId: "",
+    entryId: "",
+    storeId: "",
+    conversationId: "",
+    conversationIndex: "",
+    subject: "No ids edge case",
+    from: "Alice <alice@example.com>",
+    senderName: "Alice",
+    senderEmail: "alice@example.com",
+    receivedTime: "2026-06-16 09:00:00",
+    sentTime: "",
+    folder: "Inbox",
+    unread: "false",
+    importance: "normal",
+    toMe: "true",
+    ccMe: "false",
+    to: "Me <me@example.com>",
+    cc: "",
+    attachmentCount: 0,
+    attachmentNames: []
+  };
+
+  assert.equal(
+    stableMailId({ ...base, bodyExcerpt: "Short body" }),
+    stableMailId({ ...base, bodyExcerpt: "Short body with a longer pull because --body-chars changed" })
+  );
 });
 
 test("normalizeMailStore fills thread fields for old store json", () => {

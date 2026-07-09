@@ -212,8 +212,7 @@ export function stableMailId(item: DigestItem): string {
     item.folder,
     item.receivedTime,
     item.from,
-    item.subject,
-    item.bodyExcerpt
+    item.subject
   ].join("\n");
   return `mail-${crypto.createHash("sha256").update(source).digest("hex").slice(0, 16)}`;
 }
