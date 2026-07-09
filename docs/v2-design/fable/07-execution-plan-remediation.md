@@ -402,7 +402,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`npm run compile` 零错误；`node --test out/test/config-utils.test.js` 32/32 通过；`npm test` 358/358 全绿。
   - Manual validation: 真实 VS Code 扩展宿主仍需验证旧 `easyMail.modelFamily` settings 值只迁移一次；用户随后在 dashboard 选择默认同名模型时不会再被 legacy settings 覆盖。
   - Known issues: 未清除旧 VS Code settings 孤儿键，依赖 `modelFamilyMigrated` 标记阻断重复迁移；这是本 step 的最小安全修复。
-  - Commit: pending
+  - Commit: `fd724e6`
 
 ### [ ] R2.8b isModelRefreshableErrorMessage 正则过宽 → 429 类错误被无退避地立即重发（R2.6d 缺陷）
 
