@@ -374,10 +374,16 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Manual validation: 不涉及 Outlook/VBS；真实环境只需留意极少数无标准 ID 邮件升级后可能一次性重复。
   - Commit: `82be440`
 
-### [ ] R2.7e B-2e + B-3 normalize 一致性钳制
+### [x] R2.7e B-2e + B-3 normalize 一致性钳制
 
 - **做法**：`analysis-schema.ts normalizeAnalysis`：① confidence < 0.7 且 category ≠ uncertain → 降级 uncertain + `needsOriginalMailCheck = true`；② 增加 category→priority 允许区间表（如 mustHandleToday→P0/P1，notice→P2/P3，从 prompt 类别定义推导），越界钳制到最近合法值并降 confidence。
 - **验收**：normalize 单测覆盖降级与钳制两条路径；`npm test` 全绿。不改 schema、不改 prompt 类别定义（那是 R3 B-1/B-2b 的事）。
+- **Completion Notes**:
+  - 改动文件：`src/lib/analysis-schema.ts`、`src/test/analysis-schema.test.ts`。
+  - 实现：`normalizeItem` 对显式 numeric `confidence < 0.7` 且非 `uncertain` 的项降级为 `uncertain` 并设置 `needsOriginalMailCheck = true`；新增 `CATEGORY_PRIORITY_RANGE`（importantSender/mustHandleToday/risk→P0/P1，waitingForMe→P1/P2，followUp→P2，notice→P2/P3，ignored→P3，uncertain→P2/P3），越界时钳制到最近合法 priority，并在模型显式提供 confidence 时将 confidence 降到不高于 0.7。
+  - 兼容性：旧 JSON 若缺失 `confidence` 字段，不触发低置信降级，保持既有解析兼容；custom allowed category 不在 range 表时不做 priority 钳制。
+  - Tests: `npm run compile` 零错误；`node --test out/test/analysis-schema.test.js` 5/5 通过；`npm test` 357/357 全绿。
+  - Manual validation: 不涉及 Outlook/VBS；真实 Copilot 输出中低置信项和 notice+P0 等越界组合会被本地 normalize 纠正。
 
 ---
 
@@ -563,3 +569,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.7d pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 6]`；`git log --oneline -5` 最新为 `fa6e38d`、`9bfb109`、`e881bc7`、`1864d6d`、`fd63cbb`。按计划重新定位并阅读 05 矩阵 L-8e 与 02 文档 L-8：`src/lib/mail-store.ts:stableMailId` 在无 `InternetMessageId`/`EntryId` 时 hash 源为 `folder+receivedTime+from+subject+bodyExcerpt`，`--body-chars` 变化会让同邮件双 id。Claim R2.7d；边界：只去掉 fallback hash 源的 `bodyExcerpt` 并补 mail-store 单测；接受边缘无 ID 邮件一次性重复，不做 index 迁移、不进入 R2.7e。
 
 - **2026-07-09 · Codex（R2.7d completion）**：Action: `stableMailId` fallback hash 源去掉 `bodyExcerpt`，补无 `InternetMessageId`/`EntryId` 时 body 长度变化仍同 id 的 mail-store 单测；接受旧 fallback id 一次性重复，不做迁移。Validated: `npm run compile` 零错误；`node --test out/test/mail-store.test.js` 10/10 通过；`npm test` 355/355 全绿。Manual: 不涉及 Outlook/VBS。Commit: `82be440`。Next: R2.7e。
+
+- **2026-07-09 · Codex（R2.7e pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 8]`；`git log --oneline -5` 最新为 `6fab0ca`、`82be440`、`fa6e38d`、`9bfb109`、`e881bc7`。按计划重新定位并阅读 05 矩阵 B-2e/B-3 与 03 文档 B-2/B-3：`analysis-schema.ts normalizeItem` 只做 category/priority 白名单，不执行 `confidence < 0.7` 降级，也不钳制 notice+P0 等 category×priority 越界组合。Claim R2.7e；边界：只在 normalize 阶段做一致性钳制并补单测，不改 schema、不改 prompt 类别定义、不做 dueDate/riskFlag/tag 结构化。
+
+- **2026-07-09 · Codex（R2.7e completion，Milestone R2.7 complete）**：Action: `normalizeItem` 增加低置信降级和 category→priority 允许区间钳制；保留缺失 confidence 的旧 JSON 兼容；补 normalize 单测。Validated: `npm run compile` 零错误；`node --test out/test/analysis-schema.test.js` 5/5 通过；`npm test` 357/357 全绿。Manual: 不涉及 Outlook/VBS。Next: R2.6/R2.7 已完成；R3/R4 仍不得自行 claim，进入 R3 前应统一执行真实 VS Code/Copilot/Outlook 验证项。
