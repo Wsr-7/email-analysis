@@ -465,6 +465,8 @@ window.addEventListener('message', function(e) {
     setPersistedState({ currentId: currentId });
   }
   if (msg && msg.type === 'updateDraft' && msg.itemId) {
+    draftState = { itemId: msg.itemId, draft: msg.text || '' };
+    setPersistedState({ draftState: draftState });
     var box = document.querySelector('.draft-box-editable[data-item-id="' + msg.itemId + '"]');
     if (box) { var ta = box.querySelector('.draft-textarea'); if (ta) ta.value = msg.text || ''; if (String(msg.text || '').trim()) showDraftActionButtons(box); }
   }

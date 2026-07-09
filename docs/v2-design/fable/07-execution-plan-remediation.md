@@ -253,11 +253,19 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 > 来源：规划者对 `664620f..d4d1a32` 全量 diff 的复审。R2.6a 是 R1.6 引入的回归，优先做；其余互相独立。
 
-### [ ] R2.6a 修复 updateDraft 不同步 draftState → 旧草稿覆盖 Polish/Refine 结果（R1.6 回归，最高优先）
+### [x] R2.6a 修复 updateDraft 不同步 draftState → 旧草稿覆盖 Polish/Refine 结果（R1.6 回归，最高优先）
 
 - **缺陷**：`workbench-render.ts` 内嵌 JS 的 `updateDraft` 消息处理器（当前 467-470 行附近）只更新 `ta.value`，不更新 `draftState`/持久化 state。复现链：用户手输草稿（`input` 事件把旧文本写入 `draftState`）→ 点 Polish/Refine/Generate → `updateDraft` 把新文本写入 textarea（`draftState` 仍是旧文本）→ 之后任一后台刷新重建 HTML（服务端 `workingDrafts` 已含新文本）→ `restoreDraftState()` 判定 `ta.value !== draftState.draft` 成立 → **用打磨前的旧文本覆盖打磨后的新草稿**。
 - **做法**：`updateDraft` 处理器内同步 `draftState = { itemId: msg.itemId, draft: msg.text || '' }` 并 `setPersistedState({ draftState: draftState })`。
 - **验收**：`workbench-render` 测试断言 updateDraft 处理片段包含 draftState 同步；`npm test` 全绿。Completion Notes 写明手动场景：输草稿→Polish→触发后台刷新→草稿应保持 Polish 后文本。
+- Completion Notes:
+  - Changed: `src/lib/workbench-render.ts` 的 `updateDraft` message handler 在更新 textarea 前同步 `draftState = { itemId: msg.itemId, draft: msg.text || '' }` 并调用 `setPersistedState({ draftState })`，避免后续 HTML rebuild 的 `restoreDraftState()` 用打磨前旧草稿覆盖 Polish/Refine/Generate 后文本。
+  - Tests: `src/test/workbench-render.test.ts` 新增断言覆盖 `updateDraft` handler 的 `draftState`/`setPersistedState` 同步；RED 先行，新增测试在实现前失败于缺少 `draftState = { itemId: msg.itemId, draft: msg.text || '' }`。
+  - Test harness fix: `src/test/app-analysis.test.ts` 的 4 个固定 `2026-07-02` 分析结果断言在 2026-07-09 已被默认 7 天 retention 裁掉，导致当前真实日期下 `npm test` 失败；本 step 只给这些读写分析结果的测试显式传 `analysisRetentionDays: 365`，稳定既有 R2.2/R2.3 测试意图，不改产品逻辑。
+  - Validated: `npm run compile` 零错误；RED 后 `node --test out/test/workbench-render.test.js` 先 25/26 失败、实现后 26/26 通过；`node --test out/test/app-analysis.test.js` 17/17 通过；`npm test` 341/341 全绿。
+  - Manual validation: 不涉及 Outlook/VBS；仍需真实 VS Code webview 场景验证：输草稿 → Polish/Refine/Generate → 触发后台刷新/HTML rebuild → 草稿应保持模型返回的新文本。
+  - Known issues: 这仍是 R1.6 的 `vscode.setState()` 止血路线，完整增量渲染/CSP 仍属 R3，不在本 step。
+  - Commit: pending
 
 ### [ ] R2.6b modelFamily 私有化的存量用户迁移缺口（R2.1 回归）
 
@@ -458,3 +466,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.5 adversarial review fix，needs user validation on real Outlook）**：用户要求多个 subagent 对 R2.5 做对抗式审查，所有 findings 不分等级全部优化。3 个只读 reviewer 覆盖 VBS 语义、plan/验收证据、Outlook COM/Restrict 兼容风险。Action: recentHours Restrict 失败软降级为 warning + 排序早停；Sort 增加错误处理；主循环改 `GetFirst`/`GetNext`；`FolderScan` 增加 `scanned`；`FormatRestrictDate` 补秒；Sent Items 判断改为默认 Sent folder EntryID 父链匹配；修正文档中 sample 证据措辞。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output` 通过；`parseDigest` 解析 sample digest 4 条；`npm run compile` 零错误；`npm test` 340/340 全绿。Manual: **needs user validation on real Outlook**，还需真实大邮箱/默认 Sent Items/子文件夹/本地化/zh-CN 与 en-US 区域设置验证。Commit: `4ff3f09`。Next: commit and push all changes per user request.
 
 - **2026-07-09 · Claude Fable 5（规划者复审 R1/R2）**：对 `664620f..d4d1a32` 全量 diff 复审，独立跑 `npm run compile` 零错误、`npm test` 340/340 全绿，workers 的测试声明属实；RED-first、review-fix commit、AGENTS.md 中的 Unverified 诚实标注均为高质量实践。发现 5 个问题（R2.6a-e，其中 R2.6a 为 R1.6 引入的草稿覆盖回归）与 5 个漏排项（R2.7a-e），已展开为带验收标准的 step。下一个 worker 从 R2.6a 开始；R2.6/R2.7 完成前不进入 R3。
+
+- **2026-07-09 · Codex（R2.6a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -5` 最新为 `76bbfc7`、`d4d1a32`、`4ff3f09`、`3533661`、`35c8b79`。无 dirty tracked files，无 untracked files；无需 Recovery handover。读 05 矩阵 U-1 行与 04 文档 U-1 小节：R1.6 的短期 `vscode.setState` 止血仍是本 step 边界，完整增量渲染/CSP 属 R3，不做。grep 重新定位锚点：`src/lib/workbench-render.ts:467-470` 的 `updateDraft` 只写 textarea，不同步 `draftState`/`setPersistedState`；`src/test/workbench-render.test.ts:300-303` 仅断言 restore 脚本存在，未覆盖 updateDraft 同步。Claim R2.6a；边界：只修复 updateDraft 后持久化 state 与对应测试，不做增量渲染、不改 draft schema、不碰 R2.6b-e/R2.7。
+
+- **2026-07-09 · Codex（R2.6a completion）**：Action: `updateDraft` handler 同步 `draftState` 并写回 webview state，补 `workbench-render` 回归测试；验证时发现 `app-analysis` 部分测试因固定 2026-07-02 数据在 2026-07-09 被默认 7 天 retention 裁掉，给相关测试读写路径显式加 `analysisRetentionDays: 365` 稳定测试夹具。Validated: `npm run compile` 零错误；`node --test out/test/workbench-render.test.js` 26/26 通过；`node --test out/test/app-analysis.test.js` 17/17 通过；`npm test` 341/341 全绿。Manual: 不涉及 Outlook/VBS；真实 VS Code webview 仍需验证输草稿→Polish/Refine/Generate→后台刷新后保留新草稿。Next: R2.6b。

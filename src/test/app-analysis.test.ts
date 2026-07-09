@@ -237,13 +237,14 @@ describe("analyzeBatchCore", () => {
         readConfig: async () => ({
           autoAnalyzeMaxClassificationLevel: 2,
           modelFamily: "mock-model",
-          outputLanguage: "en-US"
+          outputLanguage: "en-US",
+          analysisRetentionDays: 365
         }),
         log: async () => {},
         availableModelsCache: null
       }, "allAllowed");
 
-      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
+      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
       assert.deepEqual(result.items.map((item) => item.mailId).sort(), ["mail-001", "mail-003"]);
       assert.equal(provider.prompts.length, 4);
       assert.match(provider.prompts[2], /Fix this invalid JSON response/);
@@ -277,7 +278,8 @@ describe("analyzeBatchCore", () => {
           readConfig: async () => ({
             autoAnalyzeMaxClassificationLevel: 2,
             modelFamily: "mock-model",
-            outputLanguage: "en-US"
+            outputLanguage: "en-US",
+            analysisRetentionDays: 365
           }),
           log: async (event) => {
             if (event === "analyze:chunkDone") {
@@ -290,7 +292,7 @@ describe("analyzeBatchCore", () => {
         /cancelled/i
       );
 
-      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
+      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
       assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001"]);
       assert.equal(provider.prompts.length, 1);
     } finally {
@@ -332,7 +334,8 @@ describe("analyzeBatchCore", () => {
           readConfig: async () => ({
             autoAnalyzeMaxClassificationLevel: 2,
             modelFamily: "mock-model",
-            outputLanguage: "en-US"
+            outputLanguage: "en-US",
+            analysisRetentionDays: 365
           }),
           log: async () => {},
           availableModelsCache: null,
@@ -341,7 +344,7 @@ describe("analyzeBatchCore", () => {
         /cancelled/i
       );
 
-      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
+      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
       assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001"]);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
@@ -614,13 +617,14 @@ describe("analyzeBatchCore", () => {
           autoAnalyzeMaxClassificationLevel: 2,
           modelFamily: "mock-model",
           outputLanguage: "en-US",
-          draftLanguage: "auto"
+          draftLanguage: "auto",
+          analysisRetentionDays: 365
         }),
         log: async () => {},
         availableModelsCache: null
       });
 
-      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US" }));
+      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
       assert.equal(result.items[0].draftReply, "您好\n\n我会确认。");
       assert.equal(result.items[0].draftReplyParts?.MAIN_MESSAGE, "我会确认。");
       assert.equal(provider.prompts.length, 1);

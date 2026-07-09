@@ -304,6 +304,13 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("itemId: itemId, draft: target.value"));
   });
 
+  it("persists updateDraft messages so restored state does not overwrite generated drafts", () => {
+    const html = renderWorkbenchHtml(stubInput());
+    assert.ok(html.includes("msg.type === 'updateDraft'"));
+    assert.ok(html.includes("draftState = { itemId: msg.itemId, draft: msg.text || '' }"));
+    assert.ok(html.includes("setPersistedState({ draftState: draftState })"));
+  });
+
   it("does not include filterQueue or selectItem (no list column)", () => {
     const html = renderWorkbenchHtml(stubInput());
     assert.ok(!html.includes("filterQueue"));
