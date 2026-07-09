@@ -426,7 +426,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`npm run compile` 零错误；`node --test out/test/prompt-config.test.js out/test/thread-prompt-builder.test.js` 11/11 通过；`npm test` 360/360 全绿。
   - Manual validation: 真实 Copilot 仍需观察包含伪造 `</easy-mail-...>` 的邮件不会逃出数据段改变输出规则。
   - Known issues: 只覆盖 R2.7a 已包定界符的 batch/thread payload；draft/translation/JSON repair prompt boundary 是本轮 review 新发现但未列入 R2.8c 的后续规划项。
-  - Commit: pending
+  - Commit: `2441695`
 
 ### [ ] R2.8d GetNext 中途失败的"部分采集"不进失败汇总（R2.7b 缺陷，worker 与规划者交叉确认）
 
