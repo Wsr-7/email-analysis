@@ -404,11 +404,17 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 未清除旧 VS Code settings 孤儿键，依赖 `modelFamilyMigrated` 标记阻断重复迁移；这是本 step 的最小安全修复。
   - Commit: `fd724e6`
 
-### [ ] R2.8b isModelRefreshableErrorMessage 正则过宽 → 429 类错误被无退避地立即重发（R2.6d 缺陷）
+### [x] R2.8b isModelRefreshableErrorMessage 正则过宽 → 429 类错误被无退避地立即重发（R2.6d 缺陷）
 
 - **缺陷**：`llm-provider.ts` 的 `/model|language model|unavailable|not available|not found|no longer|invalid|auth|sign.?in|permission|access/` 会命中大量非"模型过期"错误——如 `"Rate limit exceeded for model gpt-x"`、`"Model is overloaded"` 都含 "model"。命中后 `copilot-provider.sendPrompt` **立即无退避**重发一次，再与外层 `sendPromptWithRetry` 的退避重试叠加：429 场景最坏请求数放大近一倍，且内层重试恰恰发生在最不该立即重发的时刻（消耗 premium requests 配额）。
 - **做法**：① `isRefreshableModelError` 先排除外层 retryable 模式（复用/对齐 `isRetryableLlmError` 的 `/429|too many requests|rate.?limit|quota|temporar|timeout/i`，命中即 return false，交给外层退避处理）；② 正则收窄为确属"所选模型已不存在/不可用"的语义：`/not found|no longer (available|supported)|unavailable|unknown model|model_not_supported|does not exist/i`；`auth`/`permission`/`invalid` 类刷新模型列表也无济于事，移出。
 - **验收**：单测：rate-limit 消息 → false；"model not found" → true；`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/llm-provider.ts`（rate-limit/quota/timeout/temporary 先排除，刷新模型列表只匹配 stale/missing model 语义）、`src/test/llm-provider.test.ts`（rate-limit/auth 负向与 model-not-found 正向断言）。
+  - 验收结果：`npm run compile` 零错误；`node --test out/test/llm-provider.test.js` 7/7 通过；`npm test` 358/358 全绿。
+  - Manual validation: 真实 VS Code + Copilot 仍需验证 429/quota 错误只走外层退避，不再先立即 refresh+resend。
+  - Known issues: 无。
+  - Commit: pending
 
 ### [ ] R2.8c 定界符可被邮件正文闭合逃逸（R2.7a 缺陷）
 
@@ -625,3 +631,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.7 adversarial review + R2.8a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -8` 最新为 `2c7226a`、`fcf79cb`、`6e9aef8`、`5d0ef65`、`cefa504`。R2.7 多 reviewer 已完成/部分因 session limit 中断后重启；已确认 R2.8 覆盖 modelFamily 迁移振荡、429 刷新误判、delimiter spoof、GetNext partial-scan。未覆盖但需后续规划的风险：draft/translation/JSON repair prompt boundary、overview stale count、fallback id 同秒碰撞、VBS `folder.Items`/`BuildMailRecord` COM 异常。Claim R2.8a；边界：只加 `modelFamilyMigrated` 一次性迁移标记与纯函数测试，不改模型列表 UI、不恢复 Settings contribution、不进入 R2.8b。
 
 - **2026-07-09 · Codex（R2.8a completion）**：Action: `shouldMigrateLegacyModelFamily` 增加一次性 `modelFamilyMigrated` 标记，迁移成功后写入私有 config；未清除旧 VS Code settings orphan key。Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 32/32 通过；`npm test` 358/358 全绿。Manual: 真实 VS Code 扩展宿主仍需验证旧 settings 只迁移一次且默认同名模型选择不再被覆盖。Next: R2.8b。
+
+- **2026-07-09 · Codex（R2.8b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；最新提交 `44a6a31`、`fd724e6`。按计划重新定位 R2.8b 与 L-8 相关说明：`src/lib/llm-provider.ts:isModelRefreshableErrorMessage` 把 `model/auth/sign in/permission/access` 等宽泛词都当作可刷新模型错误；`src/lib/app-analysis.ts:isRetryableLlmError` 已有 429/quota/timeout 退避路径。Claim R2.8b；边界：只收窄可刷新模型错误判断与单测，不改外层 retry/backoff，不进入 R2.8c。
+
+- **2026-07-09 · Codex（R2.8b completion）**：Action: `isModelRefreshableErrorMessage` 先排除 429/quota/timeout/temporary，再仅匹配 stale/missing model 语义；auth/permission/sign-in 不再触发内层立即 refresh+resend。Validated: `npm run compile` 零错误；`node --test out/test/llm-provider.test.js` 7/7 通过；`npm test` 358/358 全绿。Manual: 真实 VS Code + Copilot 仍需验证 429/quota 错误只走外层退避。Next: R2.8c。
