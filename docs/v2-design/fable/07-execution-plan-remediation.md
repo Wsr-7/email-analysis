@@ -308,17 +308,25 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: `fallbackCancellation` 仍保留；provider 没有显式 dispose 生命周期，按计划视为一次性泄漏无实际影响。本 step 不引入 VS Code API mock。
   - Commit: `4ac2537`
 
-### [ ] R2.6e 语言检测 isIncomingMessage 的 BCC/DL 边界（R2.3 review fix 边界）
+### [x] R2.6e 语言检测 isIncomingMessage 的 BCC/DL 边界（R2.3 review fix 边界）
 
 - **缺陷**：`language-contract.ts isIncomingMessage`：`toMe`/`ccMe` 字段存在但值为 `"false"` 时（BCC 收到、经通讯组 DL 收到的入站邮件，R1.2 修复后均如此）直接判为"本人消息"，folder 兜底被短路。
 - **做法**：简化为两级：`toMe || ccMe` 为 true → incoming；否则看 folder（含 "sent" → 本人，其余 → incoming）。删掉中间的字段存在性分支。
 - **验收**：单测：`{toMe:"false", ccMe:"false", folder:"Inbox"}` → incoming；`{toMe:"false", folder:"Sent Items"}` → 本人。
+- Completion Notes:
+  - Changed: `src/lib/language-contract.ts:isIncomingMessage` 删除 `message.toMe || message.ccMe` 字段存在性分支；`toMe`/`ccMe` 解析为 true 才直接判 incoming，否则统一按 folder 判断（Sent 为 self，其余为 incoming）。
+  - Tests: `src/test/config-utils.test.ts` 新增 BCC/DL 入站边界测试：最近 Sent 后面回看 `toMe:"false"`/`ccMe:"false"` 的 Inbox 应选 Inbox 文本；同时覆盖 `Sent Items` + `toMe:"false"` 仍是 self。
+  - RED: BCC/DL 测试实现前失败，实际返回最近 Sent 文本 `I will check.`。
+  - Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 30/30 通过；`npm test` 348/348 全绿。
+  - Manual validation: 不涉及 Outlook/VBS；真实 Copilot 仍建议验证 BCC/DL 收到的中文入站线程在 `draftLanguage:auto` 下生成中文草稿。
+  - Known issues: 未改变 CJK 阈值/首段启发式，仍按 R2.3 既定边界。
+  - Commit: pending
 
 ---
 
 ## 3.6 Milestone R2.7 — 漏排项补录（05 矩阵有方案但未排期的 S 级项，无需用户决策）
 
-> 复审确认：原 R1/R2 排期遗漏了以下 05 矩阵条目。另有两条已被顺带完成：**C-5a**（Sent Items 本地化）已由 R2.5 review fix 的 EntryID 父链匹配实质解决；**C-7b**（美式日期）已部分缓解（补秒 + recentHours Restrict 软失败 fallback），DASL 化并入 R3 的 C-3 讨论。C-7a（冒泡排序/ReDim）与 C-7c（跨 store StoreID）维持不排期（收益低/并入 P2.2）。
+> 复审确认：原 R1/R2 排期遗漏了以下 05 矩阵条目。另有两条已被顺带部分完成：**C-5a**（Sent Items 本地化）已由 R2.5 review fix 的 EntryID 父链匹配实质解决；**C-7b**（美式日期）已部分缓解（补秒 + recentHours Restrict 软失败 fallback），DASL 化并入 R3 的 C-3 讨论。C-7a（冒泡排序/ReDim）与 C-7c（跨 store StoreID）维持不排期（收益低/并入 P2.2）。
 
 ### [ ] R2.7a L-6 prompt injection 基础防御
 
@@ -505,3 +513,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.6d pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 6]`；`git log --oneline -5` 最新为 `ffbba4f`、`0f10042`、`f9859af`、`3cfdb8a`、`20ab9bf`。读 05 矩阵 L-8b 与 02 文档 L-8 小节，复核 R2.1 模型传递边界；当前 `src/lib/copilot-provider.ts` 首次 `listModels()` 后缓存 `nativeModels`/`availableModels`，`sendPrompt()` 仅在空缓存时重枚举，传入 `options.model` 失配会直接按旧缓存 `modelFamily` fallback。Claim R2.6d；边界：只在 `options.model` 失配时刷新一次模型列表再匹配，不改模型选择 UI、不改 provider 生命周期、不引入 VS Code API mock。
 
 - **2026-07-09 · Codex（R2.6d completion）**：Action: `CopilotProvider.sendPrompt()` 在传入 `options.model` 与缓存模型失配时刷新一次 `listModels()` 再重新按 `modelKey` 匹配，仍失配才 `modelFamily` fallback。Validated: `npm run compile` 零错误；源码核查确认刷新分支；`npm test` 346/346 全绿。Manual: 不涉及 Outlook/VBS；真实 VS Code + Copilot 仍需验证模型列表变化后的刷新行为。Next: R2.6e。
+
+- **2026-07-09 · Codex（R2.6e pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 8]`；`git log --oneline -5` 最新为 `c0710bf`、`4ac2537`、`ffbba4f`、`0f10042`、`f9859af`。读 05 矩阵 L-4/U-5、02 文档 L-4、04 文档 U-5、06 文档 Q2，以及 R2.3/R2.3 review handover；当前 `src/lib/language-contract.ts:isIncomingMessage` 在 `toMe || ccMe` 为 false 后又用 `if (message.toMe || message.ccMe) return false`，导致 `toMe:"false"`/`ccMe:"false"` 的 BCC/DL 入站邮件跳过 folder 兜底。Claim R2.6e；边界：只改 incoming/self 判定，不改语言检测阈值、不改 prompt 文案、不改 draftLanguage 配置。
+
+- **2026-07-09 · Codex（R2.6e completion，Milestone R2.6 complete）**：Action: `isIncomingMessage` 简化为 `toMe || ccMe` true 即 incoming，否则按 folder 判断；补 BCC/DL Inbox 与 Sent Items 边界测试。Validated: RED 先行；`npm run compile` 零错误；`node --test out/test/config-utils.test.js` 30/30 通过；`npm test` 348/348 全绿。Manual: 不涉及 Outlook/VBS；真实 Copilot 仍需验证 BCC/DL 中文入站线程的 `draftLanguage:auto`。Next: R2.7a（L-6 prompt injection 基础防御）；R3/R4 仍不得自行 claim。

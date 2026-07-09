@@ -129,6 +129,28 @@ describe("draft language detection", () => {
     assert.equal(text, "请确认合同。");
   });
 
+  it("treats false toMe and ccMe values in Inbox as incoming for BCC or DL messages", () => {
+    const text = latestNonSelfThreadText({
+      timeline: [
+        { folder: "Inbox", toMe: "false", ccMe: "false", bodyDelta: "请确认合同。" },
+        { folder: "Sent Items", toMe: "false", ccMe: "false", bodyDelta: "I will check." }
+      ]
+    });
+
+    assert.equal(text, "请确认合同。");
+  });
+
+  it("still treats false toMe values in Sent Items as self messages", () => {
+    const text = latestNonSelfThreadText({
+      timeline: [
+        { folder: "Inbox", toMe: "true", bodyDelta: "请确认合同。" },
+        { folder: "Sent Items", toMe: "false", ccMe: "false", bodyDelta: "I will check." }
+      ]
+    });
+
+    assert.equal(text, "请确认合同。");
+  });
+
   it("does not keep hardcoded English repair instructions in manual draft paths", () => {
     const source = fs.readFileSync(path.join(process.cwd(), "src", "extension.ts"), "utf8");
     assert.equal(source.includes("ensureEnglishDraftText"), false);

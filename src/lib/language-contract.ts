@@ -79,9 +79,6 @@ function isIncomingMessage(message: DraftLanguageSource): boolean {
   if (toMe || ccMe) {
     return true;
   }
-  if (message.toMe || message.ccMe) {
-    return false;
-  }
   return !String(message.folder || "").toLowerCase().includes("sent");
 }
 
