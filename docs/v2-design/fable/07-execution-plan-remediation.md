@@ -320,7 +320,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 30/30 通过；`npm test` 348/348 全绿。
   - Manual validation: 不涉及 Outlook/VBS；真实 Copilot 仍建议验证 BCC/DL 收到的中文入站线程在 `draftLanguage:auto` 下生成中文草稿。
   - Known issues: 未改变 CJK 阈值/首段启发式，仍按 R2.3 既定边界。
-  - Commit: pending
+  - Commit: `7b114e1`
 
 ---
 
