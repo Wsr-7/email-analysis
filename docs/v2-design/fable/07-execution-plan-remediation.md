@@ -360,6 +360,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 实现：`TruncateText` 在 `NormalizeWhitespace` 前增加 `If maxChars > 0 And Len(text) > maxChars * 4 Then text = Left(text, maxChars * 4)`，让所有正文截断路径先做粗截再归一化；未改 `NormalizeWhitespace` 规则、精确截断规则或 digest 格式。
   - Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`cscript //nologo scripts/collect-outlook-mails.vbs --sample --output data/r2-7c-sample-digest.md` 通过（临时 sample 已删除）；`npm run compile` 零错误；`npm test` 354/354 全绿。
   - Manual validation: 不强制依赖 Outlook；真实大正文邮件可观察采集不再因归一化超长 body 明显卡顿。
+  - Commit: `9bfb109`
 
 ### [ ] R2.7d L-8e stableMailId hash 源去掉 bodyExcerpt
 
@@ -550,4 +551,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-09 · Codex（R2.7c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `e881bc7`、`1864d6d`、`fd63cbb`、`97000b9`、`8c479d7`。按计划重新定位并阅读 05 矩阵 C-7d 与 01 文档 C-7：当前 `BuildMailRecord` 调 `TruncateText(SafeString(mail.Body), bodyChars)`，而 `TruncateText` 先 `NormalizeWhitespace(text)` 再精确截断，病态超长正文会先做多轮全量字符串拷贝。Claim R2.7c；边界：只在归一化前做 `Left(text, maxChars * 4)` 粗截，不改 digest 格式、不改正文归一化规则、不进入 R2.7d。
 
-- **2026-07-09 · Codex（R2.7c completion）**：Action: `TruncateText` 在 `NormalizeWhitespace` 前按 `maxChars * 4` 粗截，避免超长正文先全量归一化；未改 digest 格式。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output data/r2-7c-sample-digest.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 354/354 全绿。Manual: 可用真实超长正文邮件观察采集性能。Next: R2.7d。
+- **2026-07-09 · Codex（R2.7c completion）**：Action: `TruncateText` 在 `NormalizeWhitespace` 前按 `maxChars * 4` 粗截，避免超长正文先全量归一化；未改 digest 格式。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output data/r2-7c-sample-digest.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 354/354 全绿。Manual: 可用真实超长正文邮件观察采集性能。Commit: `9bfb109`。Next: R2.7d。
