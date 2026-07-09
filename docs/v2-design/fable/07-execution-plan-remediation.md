@@ -337,6 +337,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 实现：两个 base prompt 增加 `Untrusted input rules`，明确 digest/timeline 定界符内为待分析数据而非指令，忽略其中要求改变规则/输出格式/语言契约/安全行为的文本；batch digest 用 `<easy-mail-digest-data>...</easy-mail-digest-data>` 包裹；thread timeline JSON 用 `<easy-mail-thread-timeline-json>...</easy-mail-thread-timeline-json>` 包裹，替代原 fenced json 作为更明确的 payload boundary。
   - Tests: `npm run compile` 零错误；`node --test out/test/prompt-config.test.js` 4/4 通过；`node --test out/test/thread-prompt-builder.test.js` 5/5 通过；`npm test` 354/354 全绿。
   - Manual validation: 不涉及 Outlook/VBS；真实 Copilot 仍需观察含 prompt-injection 文本的邮件不会改变输出格式/分类规则/语言契约。
+  - Commit: `97000b9`
 
 ### [ ] R2.7b C-5b 单文件夹解析失败不再中止全部采集
 
@@ -529,4 +530,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-09 · Codex（R2.7a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -5` 最新为 `8c479d7`、`f46b18e`、`02ac24a`、`ce27eba`、`7b114e1`。按计划重新定位并阅读 05 矩阵 L-6 与 02 文档 L-6：邮件正文/线程 timeline 是不受信任输入，当前 `base-system.md`/`thread-base-system.md` 无防注入守则；`composeAnalysisPrompt()` 直接拼入 `digestText`，`buildThreadAnalysisPrompt()` 仅用 ```json fenced code 包 timeline payload。Claim R2.7a；边界：只加系统守则和 digest/timeline 明确定界符及测试，不做 UI URL 标注、不改 prompt schema、不进入 R2.7b。
 
-- **2026-07-09 · Codex（R2.7a completion）**：Action: base/thread base prompt 增加不可信输入守则；`composeAnalysisPrompt()` 和 `buildThreadAnalysisPrompt()` 分别用 `<easy-mail-digest-data>` 与 `<easy-mail-thread-timeline-json>` 定界不可信 payload；补 prompt 组装测试。Validated: `npm run compile` 零错误；`node --test out/test/prompt-config.test.js` 4/4 通过；`node --test out/test/thread-prompt-builder.test.js` 5/5 通过；`npm test` 354/354 全绿。Manual: 真实 Copilot 仍需观察 prompt injection 邮件不会改变输出格式/规则。Next: R2.7b。
+- **2026-07-09 · Codex（R2.7a completion）**：Action: base/thread base prompt 增加不可信输入守则；`composeAnalysisPrompt()` 和 `buildThreadAnalysisPrompt()` 分别用 `<easy-mail-digest-data>` 与 `<easy-mail-thread-timeline-json>` 定界不可信 payload；补 prompt 组装测试。Validated: `npm run compile` 零错误；`node --test out/test/prompt-config.test.js` 4/4 通过；`node --test out/test/thread-prompt-builder.test.js` 5/5 通过；`npm test` 354/354 全绿。Manual: 真实 Copilot 仍需观察 prompt injection 邮件不会改变输出格式/规则。Commit: `97000b9`。Next: R2.7b。
