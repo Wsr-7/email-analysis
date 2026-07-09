@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
 import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
 
 describe("positiveNumber", () => {
@@ -75,6 +75,20 @@ describe("getLocaleFromConfig", () => {
 
   it("defaults to en-US", () => {
     assert.equal(getLocaleFromConfig({}), "en-US");
+  });
+});
+
+describe("resolveModelFamily", () => {
+  it("uses private config before legacy settings and defaults", () => {
+    assert.equal(resolveModelFamily("stored-model", "legacy-model", "default-model"), "stored-model");
+  });
+
+  it("falls back from empty private config to legacy settings", () => {
+    assert.equal(resolveModelFamily(" ", " legacy-model ", "default-model"), "legacy-model");
+  });
+
+  it("falls back to the default model when neither stored nor legacy settings are set", () => {
+    assert.equal(resolveModelFamily(undefined, "", "default-model"), "default-model");
   });
 });
 

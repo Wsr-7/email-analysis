@@ -17,7 +17,7 @@ import { buildThreadReport } from "./lib/report-thread";
 import { CopilotProvider } from "./lib/copilot-provider";
 import { type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./lib/llm-provider";
 import { renderEasyMailGuideHtml } from "./lib/guide-webview";
-import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, positiveNumber } from "./lib/config-utils";
+import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, positiveNumber, resolveModelFamily } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
@@ -916,6 +916,12 @@ class EasyMailApp {
     const storedConfig = await this.data.readConfig();
     const settings = vscode.workspace.getConfiguration("easyMail");
     const defaultFolders = Array.isArray(defaults.folders) ? defaults.folders.map(String) : ["Inbox", "Sent Items"];
+    const storedModelFamily = typeof storedConfig.modelFamily === "string" ? storedConfig.modelFamily.trim() : "";
+    const legacySettingsModelFamily = settings.get("modelFamily", "");
+    const modelFamily = resolveModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily);
+    if (!storedModelFamily && typeof legacySettingsModelFamily === "string" && legacySettingsModelFamily.trim()) {
+      await this.data.writeConfig({ ...storedConfig, modelFamily });
+    }
     return {
       ...defaults,
       rangeMode: settings.get("rangeMode", defaults.rangeMode),
@@ -924,9 +930,7 @@ class EasyMailApp {
       folders: normalizeMailFolders(settings.get("folders", defaultFolders), defaultFolders),
       bodyExcerptChars: settings.get("bodyExcerptChars", defaults.bodyExcerptChars),
       sampleMode: settings.get("sampleMode", defaults.sampleMode),
-      modelFamily: typeof storedConfig.modelFamily === "string" && storedConfig.modelFamily.trim()
-        ? storedConfig.modelFamily.trim()
-        : defaults.modelFamily,
+      modelFamily,
       outputLanguage: configuredOutputLanguage(settings),
       draftLanguage: normalizeDraftLanguage(settings.get("draftLanguage", defaults.draftLanguage || "auto")),
       autoAnalyzeMaxClassificationLevel: settings.get("autoAnalyzeMaxClassificationLevel", defaults.autoAnalyzeMaxClassificationLevel),

@@ -36,6 +36,15 @@ export function getLocaleFromConfig(config: Record<string, unknown>): Locale {
   return config.outputLanguage === "zh-CN" ? "zh-CN" : "en-US";
 }
 
+export function resolveModelFamily(stored: unknown, settingsValue: unknown, defaultValue: unknown): string {
+  for (const value of [stored, settingsValue, defaultValue]) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
 export function parseClassificationLevel(value: unknown, fallback: number): number {
   const labels: Record<string, number> = {
     PUBLIC: 0,

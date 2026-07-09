@@ -267,11 +267,19 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 这仍是 R1.6 的 `vscode.setState()` 止血路线，完整增量渲染/CSP 仍属 R3，不在本 step。
   - Commit: `d1c3d7c`
 
-### [ ] R2.6b modelFamily 私有化的存量用户迁移缺口（R2.1 回归）
+### [x] R2.6b modelFamily 私有化的存量用户迁移缺口（R2.1 回归）
 
 - **缺陷**：R2.1 把 `modelFamily` 改为只读私有 `easy-mail.config.json`，但老用户已写入 VS Code settings.json 的 `easyMail.modelFamily` 值被静默忽略——升级后模型选择重置为默认 `gpt-5.4`，且 settings.json 里留下孤儿键。
 - **做法**：`extension.ts readConfig()` 的 modelFamily 解析链改为 `storedConfig.modelFamily || settings.get("modelFamily", "") || defaults.modelFamily`（unregistered 键仍可读）；命中 settings 回落时一次性写回私有 config（迁移完成后不再依赖 settings 值）。建议抽纯函数 `resolveModelFamily(stored, settingsValue, defaultValue)` 进 `config-utils.ts` 以便单测。
 - **验收**：纯函数单测覆盖三级回落；`npm test` 全绿。
+- Completion Notes:
+  - Changed: `src/lib/config-utils.ts` 新增 `resolveModelFamily(stored, settingsValue, defaultValue)`，按私有 config → legacy VS Code setting → default 的顺序取第一个非空 trim 后字符串。
+  - Changed: `src/extension.ts readConfig()` 使用该解析链；当私有 `easy-mail.config.json` 还没有 `modelFamily`、但旧 `settings.get("modelFamily")` 有值时，一次性写回私有 config。未恢复 `package.json` settings contribution，未改 Load Models/model list 选择流程。
+  - Tests: `src/test/config-utils.test.ts` 覆盖私有值优先、旧 settings 回落、default 回落三条路径。
+  - Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 28/28 通过；`npm test` 344/344 全绿。
+  - Manual validation: 不涉及 Outlook/VBS；建议在真实 VS Code 扩展宿主用旧 `settings.json` 里存在 `easyMail.modelFamily`、私有 config 不存在/为空的用户态验证一次：启动后模型选择值保持旧值，并写入 `easy-mail.config.json`。
+  - Known issues: 旧 VS Code settings.json 里的孤儿 `easyMail.modelFamily` 键不自动删除；这是有意保持最小迁移，不再依赖该值。
+  - Commit: pending
 
 ### [ ] R2.6c chunk 传输错误未隔离（R2.2 语义缺口）
 
@@ -470,3 +478,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.6a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -5` 最新为 `76bbfc7`、`d4d1a32`、`4ff3f09`、`3533661`、`35c8b79`。无 dirty tracked files，无 untracked files；无需 Recovery handover。读 05 矩阵 U-1 行与 04 文档 U-1 小节：R1.6 的短期 `vscode.setState` 止血仍是本 step 边界，完整增量渲染/CSP 属 R3，不做。grep 重新定位锚点：`src/lib/workbench-render.ts:467-470` 的 `updateDraft` 只写 textarea，不同步 `draftState`/`setPersistedState`；`src/test/workbench-render.test.ts:300-303` 仅断言 restore 脚本存在，未覆盖 updateDraft 同步。Claim R2.6a；边界：只修复 updateDraft 后持久化 state 与对应测试，不做增量渲染、不改 draft schema、不碰 R2.6b-e/R2.7。
 
 - **2026-07-09 · Codex（R2.6a completion）**：Action: `updateDraft` handler 同步 `draftState` 并写回 webview state，补 `workbench-render` 回归测试；验证时发现 `app-analysis` 部分测试因固定 2026-07-02 数据在 2026-07-09 被默认 7 天 retention 裁掉，给相关测试读写路径显式加 `analysisRetentionDays: 365` 稳定测试夹具。Validated: `npm run compile` 零错误；`node --test out/test/workbench-render.test.js` 26/26 通过；`node --test out/test/app-analysis.test.js` 17/17 通过；`npm test` 341/341 全绿。Manual: 不涉及 Outlook/VBS；真实 VS Code webview 仍需验证输草稿→Polish/Refine/Generate→后台刷新后保留新草稿。Next: R2.6b。
+
+- **2026-07-09 · Codex（R2.6b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；`git log --oneline -5` 最新为 `20ab9bf`、`d1c3d7c`、`76bbfc7`、`d4d1a32`、`4ff3f09`。读 05 矩阵 L-8b 与 02 文档 L-8 小节，复核 R2.1/R2.6b 关联：R2.1 删除的是 VS Code Settings 面板静态 `easyMail.modelFamily`，运行时 Load Models/model list 选择流程仍保留；当前缺口只在 `extension.ts readConfig()`，它只读 `storedConfig.modelFamily || defaults.modelFamily`，会忽略旧 `settings.get("modelFamily")`。grep 锚点：`src/extension.ts:922-932 readConfig`、`src/extension.ts:951-961 updateSettings`、`src/lib/config-utils.ts`、`src/test/config-utils.test.ts`。Claim R2.6b；边界：只做旧 settings 值一次性迁移到私有 config，不恢复 manifest contribution、不改模型列表加载、不做 R2.6d provider cache 刷新。
+
+- **2026-07-09 · Codex（R2.6b completion）**：Action: 新增 `resolveModelFamily` 纯函数并接入 `EasyMailApp.readConfig()`，私有 config 为空时读取旧 `settings.get("modelFamily")` 并一次性写入 `easy-mail.config.json`；未恢复静态 Settings contribution，未改运行时模型列表。Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 28/28 通过；`npm test` 344/344 全绿。Manual: 不涉及 Outlook/VBS；真实 VS Code 扩展宿主仍需验证旧 settings 值迁移到私有 config。Next: R2.6c。
