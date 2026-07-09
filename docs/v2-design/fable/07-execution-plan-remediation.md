@@ -388,6 +388,36 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 ---
 
+## 3.7 Milestone R2.8 — Fable 二次复审修复批（2026-07-09 对 R2.6/R2.7 成果复审产出）
+
+> 来源：规划者对 `76bbfc7..6e9aef8` 全量 diff 的复审（独立复核 `npm run compile` 零错误、`npm test` 357/357 全绿）。R2.6a/c/e、R2.7a-e 主体实现全部确认正确；以下 3 项是本轮引入或未闭合的缺陷，修完即达到"仅剩人工验证"状态。
+
+### [ ] R2.8a modelFamily 迁移非一次性 → 用户选中默认同名模型会被 legacy 值反复覆盖（R2.6b 缺陷，优先）
+
+- **缺陷**：`shouldMigrateLegacyModelFamily` 的第三条件 `storedValue === defaultModel && legacyValue !== defaultModel` 会**反复**触发：legacy settings 键从不清除、也无迁移完成标记。复现链：老用户 settings.json 有 `easyMail.modelFamily: "X"`（X ≠ "gpt-5.4"）→ 首次迁移正常 → 用户之后在 dashboard 选中 id/family 恰为 `gpt-5.4` 的模型（`renderModelOptions` 的 option value = `model.id || model.family`，与默认串同名完全可能）→ 下一次 `readConfig()` 判定 stored===default 再次"迁移"→ 用户选择被 X 覆盖，且每次 readConfig 都重写私有 config 文件。用户永远无法保持选中该模型。
+- **做法**：迁移改一次性——私有 config 增加 `modelFamilyMigrated: true` 标记，`shouldMigrateLegacyModelFamily` 增加 `migrated` 参数，已标记则永不再迁移；首次迁移时把标记与 modelFamily 一起 `writeConfig`。可选加分项：迁移成功后 try/catch 尝试 `settings.update("modelFamily", undefined, Global)` 清除孤儿键（unregistered 键 update 可能抛错，必须 catch 吞掉）。
+- **验收**：纯函数单测：已标记时 stored===default 且 legacy≠default → 不迁移；未标记时现有用例全部保持。`npm test` 全绿。
+
+### [ ] R2.8b isModelRefreshableErrorMessage 正则过宽 → 429 类错误被无退避地立即重发（R2.6d 缺陷）
+
+- **缺陷**：`llm-provider.ts` 的 `/model|language model|unavailable|not available|not found|no longer|invalid|auth|sign.?in|permission|access/` 会命中大量非"模型过期"错误——如 `"Rate limit exceeded for model gpt-x"`、`"Model is overloaded"` 都含 "model"。命中后 `copilot-provider.sendPrompt` **立即无退避**重发一次，再与外层 `sendPromptWithRetry` 的退避重试叠加：429 场景最坏请求数放大近一倍，且内层重试恰恰发生在最不该立即重发的时刻（消耗 premium requests 配额）。
+- **做法**：① `isRefreshableModelError` 先排除外层 retryable 模式（复用/对齐 `isRetryableLlmError` 的 `/429|too many requests|rate.?limit|quota|temporar|timeout/i`，命中即 return false，交给外层退避处理）；② 正则收窄为确属"所选模型已不存在/不可用"的语义：`/not found|no longer (available|supported)|unavailable|unknown model|model_not_supported|does not exist/i`；`auth`/`permission`/`invalid` 类刷新模型列表也无济于事，移出。
+- **验收**：单测：rate-limit 消息 → false；"model not found" → true；`npm test` 全绿。
+
+### [ ] R2.8c 定界符可被邮件正文闭合逃逸（R2.7a 缺陷）
+
+- **缺陷**：邮件正文只要包含字面量 `</easy-mail-digest-data>`（或线程路径的 `</easy-mail-thread-timeline-json>`）即可提前闭合数据段，其后内容脱离"untrusted data"声明的保护——注入防御被一行正文绕过。
+- **做法**：`composeAnalysisPrompt` / `buildThreadAnalysisPrompt` 在包裹前对 digestText / `JSON.stringify(payload)` 做一次替换，把出现的两个定界符字面量改写为无害形式（如 `[easy-mail-delimiter-removed]`）；导出小工具函数便于两处复用与单测。
+- **验收**：单测：digest 正文含闭合定界符 → 组装后 prompt 中定界符仅出现成对的一次；`npm test` 全绿。
+
+### 复审确认无需行动的记录
+
+- R2.7e 的 `confidence` 缺失不降级是 worker 的自觉保守选择，Completion Notes 已写明兼容性理由，接受。
+- R2.7b 的 `GetNext` 中途失败按"已有产出即成功"处理，配套 `FolderScan: error=` 诊断行，接受。
+- vsix 打包提交（`8c479d7`/`6e9aef8`）符合仓库 `releases/` 既有惯例，接受。
+
+---
+
 ## 4. Milestone R3 / R4 占位（worker 不得自行 claim）
 
 以下条目需用户确认设计（涉及 schema、UI 结构、采集格式变更），确认后由规划者展开为带验收标准的 step：
@@ -413,6 +443,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
 - 2026-07-08 · **Milestone R1 全部 7 个 step 完成并提交**（R1.1-R1.7）。R1.2/R1.3 需真实 Outlook 验证；R1.6 需用户手动验证草稿保留场景（见各自 Completion Notes）。下一步：R2（效率与语言，前置 R1 已满足）或用户先做真机验证。R3/R4 需用户确认设计后才能 claim，worker 不得自行展开。
 - 2026-07-09 · **规划者复审 R1/R2 完成**（diff `664620f..d4d1a32`，`npm run compile` + `npm test` 340/340 独立复核通过）。产出两个新批次：**R2.6 复审修复批**（R2.6a 草稿覆盖回归为最高优先）与 **R2.7 漏排补录批**（L-6/C-5b/C-7d/L-8e/B-2e+B-3）。C-5a 确认已被 R2.5 review fix 顺带解决，C-7b 部分缓解。用户真机验证 R1.2/R1.3/R1.6/R2.5 时**建议先做 R2.6a**，否则草稿保留场景的验证结果会被该回归污染。
+- 2026-07-09 · **规划者二次复审 R2.6/R2.7 完成**（diff `76bbfc7..6e9aef8`，独立复核 357/357 全绿）。R2.6a/c/e、R2.7a-e 确认修复正确；产出 **R2.8 批次**（3 项：R2.8a modelFamily 迁移振荡、R2.8b 可刷新错误正则过宽致 429 无退避重发、R2.8c 定界符逃逸）。**R2.8 完成后 R1/R2 即达"仅剩人工验证"状态**，人工验证清单见各 step 的 needs user validation 标注（R1.2/R1.3/R1.6/R2.4/R2.5/R2.6a/R2.7b）。
 
 ---
 
@@ -574,3 +605,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.7e pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 8]`；`git log --oneline -5` 最新为 `6fab0ca`、`82be440`、`fa6e38d`、`9bfb109`、`e881bc7`。按计划重新定位并阅读 05 矩阵 B-2e/B-3 与 03 文档 B-2/B-3：`analysis-schema.ts normalizeItem` 只做 category/priority 白名单，不执行 `confidence < 0.7` 降级，也不钳制 notice+P0 等 category×priority 越界组合。Claim R2.7e；边界：只在 normalize 阶段做一致性钳制并补单测，不改 schema、不改 prompt 类别定义、不做 dueDate/riskFlag/tag 结构化。
 
 - **2026-07-09 · Codex（R2.7e completion，Milestone R2.7 complete）**：Action: `normalizeItem` 增加低置信降级和 category→priority 允许区间钳制；保留缺失 confidence 的旧 JSON 兼容；补 normalize 单测。Validated: `npm run compile` 零错误；`node --test out/test/analysis-schema.test.js` 5/5 通过；`npm test` 357/357 全绿。Manual: 不涉及 Outlook/VBS。Commit: `cefa504`。Next: R2.6/R2.7 已完成；R3/R4 仍不得自行 claim，进入 R3 前应统一执行真实 VS Code/Copilot/Outlook 验证项。
+
+- **2026-07-09 · Claude Fable 5（规划者二次复审 R2.6/R2.7）**：对 `76bbfc7..6e9aef8` 全量 diff 复审，独立跑 `npm run compile` 零错误、`npm test` 357/357 全绿。R2.6a（updateDraft 同步 draftState）、R2.6c（chunk 传输错误隔离 + 取消 rethrow）、R2.6e（本地化 Sent 文件夹名单，超出原验收范围的加分实现）、R2.7a-e 全部确认正确。发现 3 个缺陷展开为 R2.8a-c（详见 3.7 节，含复现链与验收标准），其中 R2.8a 会导致用户模型选择被反复覆盖、R2.8b 会放大 429 场景配额消耗、R2.8c 使注入防御可被一行正文绕过。下一个 worker 从 R2.8a 开始，三项互相独立、均为 S 级。R2.8 完成前不进入人工验证。
