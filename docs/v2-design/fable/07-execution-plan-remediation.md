@@ -265,7 +265,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Validated: `npm run compile` 零错误；RED 后 `node --test out/test/workbench-render.test.js` 先 25/26 失败、实现后 26/26 通过；`node --test out/test/app-analysis.test.js` 17/17 通过；`npm test` 341/341 全绿。
   - Manual validation: 不涉及 Outlook/VBS；仍需真实 VS Code webview 场景验证：输草稿 → Polish/Refine/Generate → 触发后台刷新/HTML rebuild → 草稿应保持模型返回的新文本。
   - Known issues: 这仍是 R1.6 的 `vscode.setState()` 止血路线，完整增量渲染/CSP 仍属 R3，不在本 step。
-  - Commit: pending
+  - Commit: `d1c3d7c`
 
 ### [ ] R2.6b modelFamily 私有化的存量用户迁移缺口（R2.1 回归）
 
