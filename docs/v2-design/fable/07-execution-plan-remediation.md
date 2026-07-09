@@ -293,7 +293,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Validated: `npm run compile` 零错误；`node --test out/test/app-analysis.test.js` 19/19 通过；`npm test` 346/346 全绿。
   - Manual validation: 不涉及 Outlook/VBS；真实 VS Code + Copilot 大批量分析仍建议观察中间 chunk 网络/429/content-filter 类失败时前后成功 chunk 是否保留。
   - Known issues: 仍保持串行 chunk，不做并行分析；retry 策略不变。
-  - Commit: pending
+  - Commit: `0f10042`
 
 ### [ ] R2.6d CopilotProvider 模型缓存过期不刷新（R2.1 边界）
 
