@@ -45,6 +45,19 @@ export function resolveModelFamily(stored: unknown, settingsValue: unknown, defa
   return "";
 }
 
+export function shouldMigrateLegacyModelFamily(stored: unknown, settingsValue: unknown, defaultValue: unknown, configExisted: boolean): boolean {
+  const storedValue = typeof stored === "string" ? stored.trim() : "";
+  const legacyValue = typeof settingsValue === "string" ? settingsValue.trim() : "";
+  const defaultModel = typeof defaultValue === "string" ? defaultValue.trim() : "";
+  if (!legacyValue) {
+    return false;
+  }
+  if (!storedValue) {
+    return true;
+  }
+  return !configExisted || (storedValue === defaultModel && legacyValue !== defaultModel);
+}
+
 export function parseClassificationLevel(value: unknown, fallback: number): number {
   const labels: Record<string, number> = {
     PUBLIC: 0,

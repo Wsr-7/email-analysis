@@ -17,7 +17,7 @@ import { buildThreadReport } from "./lib/report-thread";
 import { CopilotProvider } from "./lib/copilot-provider";
 import { type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./lib/llm-provider";
 import { renderEasyMailGuideHtml } from "./lib/guide-webview";
-import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, positiveNumber, resolveModelFamily } from "./lib/config-utils";
+import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
@@ -911,6 +911,7 @@ class EasyMailApp {
   }
 
   private async readConfig(): Promise<Record<string, any>> {
+    const configExisted = fs.existsSync(this.data.getConfigPath());
     await this.data.ensureConfig();
     const defaults = await this.data.readDefaults();
     const storedConfig = await this.data.readConfig();
@@ -918,8 +919,11 @@ class EasyMailApp {
     const defaultFolders = Array.isArray(defaults.folders) ? defaults.folders.map(String) : ["Inbox", "Sent Items"];
     const storedModelFamily = typeof storedConfig.modelFamily === "string" ? storedConfig.modelFamily.trim() : "";
     const legacySettingsModelFamily = settings.get("modelFamily", "");
-    const modelFamily = resolveModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily);
-    if (!storedModelFamily && typeof legacySettingsModelFamily === "string" && legacySettingsModelFamily.trim()) {
+    const shouldMigrateModelFamily = shouldMigrateLegacyModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily, configExisted);
+    const modelFamily = shouldMigrateModelFamily
+      ? String(legacySettingsModelFamily || "").trim()
+      : resolveModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily);
+    if (shouldMigrateModelFamily) {
       await this.data.writeConfig({ ...storedConfig, modelFamily });
     }
     return {

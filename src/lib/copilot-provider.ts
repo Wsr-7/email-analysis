@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import {
   normalizeAvailableModel,
-  modelKey,
-  selectConfiguredModelIndex,
+  resolveModelSelection,
+  isModelRefreshableErrorMessage,
   type AvailableModel,
   type LlmProvider,
   type LlmRequestOptions,
@@ -25,14 +25,24 @@ export class CopilotProvider implements LlmProvider {
     if (!this.nativeModels.length) {
       await this.listModels();
     }
-    let modelIndex = options.model
-      ? this.availableModels.findIndex((model) => modelKey(model) === modelKey(options.model as AvailableModel))
-      : selectConfiguredModelIndex(this.availableModels, options.modelFamily);
-    if (options.model && modelIndex < 0) {
+    let selection = resolveModelSelection(this.availableModels, options.modelFamily, options.model);
+    if (options.model && selection.selectedIndex < 0) {
       await this.listModels();
-      modelIndex = this.availableModels.findIndex((model) => modelKey(model) === modelKey(options.model as AvailableModel));
+      selection = resolveModelSelection(this.availableModels, options.modelFamily, options.model);
     }
-    const selectedModelIndex = modelIndex >= 0 ? modelIndex : selectConfiguredModelIndex(this.availableModels, options.modelFamily);
+    try {
+      return await this.sendSelectedPrompt(prompt, options, selection.selectedIndex, selection.usedFallback);
+    } catch (error) {
+      if (!isRefreshableModelError(error, options.cancellationToken)) {
+        throw error;
+      }
+      await this.listModels();
+      selection = resolveModelSelection(this.availableModels, options.modelFamily, options.model);
+      return this.sendSelectedPrompt(prompt, options, selection.selectedIndex, selection.usedFallback);
+    }
+  }
+
+  private async sendSelectedPrompt(prompt: string, options: LlmRequestOptions, selectedModelIndex: number, usedFallback: boolean): Promise<LlmResponse> {
     const selectedModel = selectedModelIndex >= 0 ? this.nativeModels[selectedModelIndex] : undefined;
     const selectedAvailableModel = selectedModelIndex >= 0 ? this.availableModels[selectedModelIndex] : undefined;
     if (!selectedModel || !selectedAvailableModel) {
@@ -47,7 +57,7 @@ export class CopilotProvider implements LlmProvider {
     return {
       rawText: await readResponseText(response.text),
       model: selectedAvailableModel,
-      usedFallback: false
+      usedFallback
     };
   }
 }
@@ -62,4 +72,23 @@ async function readResponseText(stream: AsyncIterable<unknown>): Promise<string>
     }
   }
   return full;
+}
+
+function isRefreshableModelError(error: unknown, cancellationToken: LlmRequestOptions["cancellationToken"]): boolean {
+  if (cancellationToken?.isCancellationRequested || isCancellationError(error)) {
+    return false;
+  }
+  return isModelRefreshableErrorMessage(errorMessage(error));
+}
+
+function isCancellationError(error: unknown): boolean {
+  const text = errorMessage(error).toLowerCase();
+  return /cancelled|canceled|cancellation/.test(text);
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error || "");
 }

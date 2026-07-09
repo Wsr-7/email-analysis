@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
 import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
 
 describe("positiveNumber", () => {
@@ -90,6 +90,13 @@ describe("resolveModelFamily", () => {
   it("falls back to the default model when neither stored nor legacy settings are set", () => {
     assert.equal(resolveModelFamily(undefined, "", "default-model"), "default-model");
   });
+
+  it("migrates legacy settings when ensureConfig created a default private config", () => {
+    assert.equal(shouldMigrateLegacyModelFamily("gpt-5.4", "legacy-model", "gpt-5.4", false), true);
+    assert.equal(shouldMigrateLegacyModelFamily("gpt-5.4", "legacy-model", "gpt-5.4", true), true);
+    assert.equal(shouldMigrateLegacyModelFamily("stored-model", "legacy-model", "gpt-5.4", true), false);
+    assert.equal(shouldMigrateLegacyModelFamily("gpt-5.4", "", "gpt-5.4", false), false);
+  });
 });
 
 describe("resolveOutputLanguage", () => {
@@ -145,6 +152,18 @@ describe("draft language detection", () => {
       timeline: [
         { folder: "Inbox", toMe: "true", bodyDelta: "请确认合同。" },
         { folder: "Sent Items", toMe: "false", ccMe: "false", bodyDelta: "I will check." }
+      ]
+    });
+
+    assert.equal(text, "请确认合同。");
+  });
+
+  it("treats localized Sent folders as self messages", () => {
+    const text = latestNonSelfThreadText({
+      timeline: [
+        { folder: "Inbox", toMe: "true", bodyDelta: "请确认合同。" },
+        { folder: "邮箱/已发送邮件", toMe: "false", ccMe: "false", bodyDelta: "I will check." },
+        { folder: "邮箱/寄件備份", toMe: "false", ccMe: "false", bodyDelta: "I already replied." }
       ]
     });
 

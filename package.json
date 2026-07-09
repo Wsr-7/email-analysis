@@ -239,8 +239,8 @@
           },
           {
             "id": "easyMail.configure",
-            "title": "Configure Mail Range and Model",
-            "description": "Click Settings File to edit VS Code Settings. VS Code Settings are the single source of truth; the dashboard refreshes when settings change.",
+            "title": "Configure Mail Range",
+            "description": "Click Settings File to edit mail range, folders, retention, and security settings. Use Load Models and the Analysis Model dropdown in the dashboard for model selection.",
             "completionEvents": [
               "onCommand:easyMail.openSettings"
             ]

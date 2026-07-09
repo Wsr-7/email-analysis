@@ -79,10 +79,34 @@ function isIncomingMessage(message: DraftLanguageSource): boolean {
   if (toMe || ccMe) {
     return true;
   }
-  return !String(message.folder || "").toLowerCase().includes("sent");
+  return !isSentFolderName(message.folder);
 }
 
 function booleanText(value: unknown): boolean {
   const normalized = String(value || "").trim().toLowerCase();
   return normalized === "true" || normalized === "yes" || normalized === "1";
+}
+
+const SENT_FOLDER_NAMES = new Set([
+  "sent",
+  "sent items",
+  "sent mail",
+  "sent messages",
+  "已发送",
+  "已发送邮件",
+  "已发送项目",
+  "已傳送",
+  "已傳送郵件",
+  "已傳送的郵件",
+  "寄件备份",
+  "寄件備份",
+  "寄件匣"
+]);
+
+function isSentFolderName(value: unknown): boolean {
+  const parts = String(value || "")
+    .split(/[\\/]/)
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+  return parts.some((part) => SENT_FOLDER_NAMES.has(part) || /\bsent\b/.test(part));
 }

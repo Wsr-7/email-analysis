@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatModelLabel, modelKey, normalizeAvailableModel, selectConfiguredModel, selectConfiguredModelIndex } from "../lib/llm-provider";
+import { formatModelLabel, isModelRefreshableErrorMessage, modelKey, normalizeAvailableModel, resolveModelSelection, selectConfiguredModel, selectConfiguredModelIndex } from "../lib/llm-provider";
 import { MockProvider } from "../lib/mock-provider";
 
 const models = [
@@ -20,6 +20,23 @@ test("selectConfiguredModel matches id, family, name, vendor, and full label", (
 test("formatModelLabel and modelKey keep model identity stable", () => {
   assert.equal(formatModelLabel(models[0]), "copilot / gpt-5-mini / copilot-utility / GPT-5 mini");
   assert.equal(modelKey(models[0]), "copilot\u0000gpt-5-mini\u0000copilot-utility\u0000GPT-5 mini");
+});
+
+test("resolveModelSelection prefers the requested model and marks fallback when it is missing", () => {
+  assert.deepEqual(resolveModelSelection(models, "gpt-4o-mini", models[0]), {
+    selectedIndex: 0,
+    usedFallback: false
+  });
+  assert.deepEqual(resolveModelSelection(models, "gpt-4o-mini", { vendor: "copilot", family: "missing", id: "missing", name: "Missing" }), {
+    selectedIndex: 1,
+    usedFallback: true
+  });
+});
+
+test("isModelRefreshableErrorMessage matches stale model and auth failures", () => {
+  assert.equal(isModelRefreshableErrorMessage("Language model is no longer available"), true);
+  assert.equal(isModelRefreshableErrorMessage("Authentication required: sign in to GitHub Copilot"), true);
+  assert.equal(isModelRefreshableErrorMessage("JSON parse failed"), false);
 });
 
 test("normalizeAvailableModel tolerates missing model fields", () => {
