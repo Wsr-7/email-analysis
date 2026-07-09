@@ -253,6 +253,112 @@ describe("analyzeBatchCore", () => {
     }
   });
 
+  it("keeps successful chunks when one chunk fails during model transport", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [1, 2, 3].map((index) => ({ ...mail(index), bodyExcerpt: "x".repeat(2400) }))
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }]);
+
+      const events: string[] = [];
+      const provider = new MockProvider({
+        responses: [
+          analysisResponse("mail-001"),
+          new Error("429 too many requests"),
+          analysisResponse("mail-003")
+        ]
+      });
+
+      const result = await analyzeBatchCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({
+          autoAnalyzeMaxClassificationLevel: 2,
+          modelFamily: "mock-model",
+          outputLanguage: "en-US",
+          analysisRetentionDays: 365
+        }),
+        log: async (event) => { events.push(event); },
+        availableModelsCache: null,
+        retryDelaysMs: []
+      }, "allAllowed");
+
+      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
+      assert.equal(result.batchSize, 2);
+      assert.deepEqual(analysis.items.map((item) => item.mailId).sort(), ["mail-001", "mail-003"]);
+      assert.equal(provider.prompts.length, 3);
+      assert.ok(events.includes("analyze:chunkSkipped"));
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects cancellation during model transport instead of skipping the chunk", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        lastPullAt: "2026-07-02T00:00:00.000Z",
+        items: [1, 2].map((index) => ({ ...mail(index), bodyExcerpt: "x".repeat(2400) }))
+      });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }]);
+
+      const token = { isCancellationRequested: false };
+      const provider = new MockProvider({
+        responses: [analysisResponse("mail-001"), new Error("Easy Mail task cancelled.")]
+      });
+      let calls = 0;
+
+      await assert.rejects(
+        () => analyzeBatchCore({
+          data,
+          llmProvider: {
+            listModels: () => provider.listModels(),
+            sendPrompt: async (prompt, options) => {
+              calls += 1;
+              if (calls === 2) {
+                token.isCancellationRequested = true;
+              }
+              return await provider.sendPrompt(prompt, options);
+            }
+          },
+          extensionPath: process.cwd(),
+          readConfig: async () => ({
+            autoAnalyzeMaxClassificationLevel: 2,
+            modelFamily: "mock-model",
+            outputLanguage: "en-US",
+            analysisRetentionDays: 365
+          }),
+          log: async () => {},
+          availableModelsCache: null,
+          cancellationToken: token,
+          retryDelaysMs: []
+        }, "allAllowed"),
+        /cancelled/i
+      );
+
+      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
+      assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001"]);
+      assert.equal(provider.prompts.length, 2);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
   it("rejects cancellation between chunks and preserves completed results", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {

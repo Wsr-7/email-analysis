@@ -281,11 +281,19 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 旧 VS Code settings.json 里的孤儿 `easyMail.modelFamily` 键不自动删除；这是有意保持最小迁移，不再依赖该值。
   - Commit: `3cfdb8a`
 
-### [ ] R2.6c chunk 传输错误未隔离（R2.2 语义缺口）
+### [x] R2.6c chunk 传输错误未隔离（R2.2 语义缺口）
 
 - **缺陷**：`app-analysis.ts analyzeBatchCore` chunk 循环中，`sendPromptToModel` 抛错（重试耗尽的 429、网络错、content filter 拒绝）直接中止整个循环，剩余 chunk 不再执行——"每 chunk 独立成败"目前只对 JSON 解析失败成立。
 - **做法**：chunk 内的 `sendPromptToModel` 调用纳入与解析失败相同的 skip 逻辑（`skippedChunks+1` + `analyze:chunkSkipped` + continue）；**取消错误必须 rethrow**（复用 `cancelledError` 消息判定或标记错误类型）；已有的 `analyzedCount === 0 → throw` 兜底保留，覆盖"全部 chunk 都因传输失败"的场景。
 - **验收**：MockProvider 集成测试：chunk 2 的 provider 抛非取消 Error → chunk 1/3 结果落盘、返回 batchSize 正确；取消 Error 仍向上 reject。
+- Completion Notes:
+  - Changed: `src/lib/app-analysis.ts` 的 batch chunk loop 将 `sendPromptToModel` 包进 per-chunk `try/catch`；非取消错误记录 `analyze:chunkSkipped` 并继续后续 chunk，取消 token 已触发或错误消息为 cancelled 时继续向上抛。
+  - Tests: `src/test/app-analysis.test.ts` 新增 2 个集成测试：chunk 2 抛 `Error("429 too many requests")` 时 chunk 1/3 结果落盘且返回 `batchSize: 2`；chunk 2 抛 cancelled 且 token 被标记时仍 reject，并保留已完成 chunk。
+  - RED: 新增非取消传输错误测试在实现前失败，错误为 `429 too many requests` 直接中止。
+  - Validated: `npm run compile` 零错误；`node --test out/test/app-analysis.test.js` 19/19 通过；`npm test` 346/346 全绿。
+  - Manual validation: 不涉及 Outlook/VBS；真实 VS Code + Copilot 大批量分析仍建议观察中间 chunk 网络/429/content-filter 类失败时前后成功 chunk 是否保留。
+  - Known issues: 仍保持串行 chunk，不做并行分析；retry 策略不变。
+  - Commit: pending
 
 ### [ ] R2.6d CopilotProvider 模型缓存过期不刷新（R2.1 边界）
 
@@ -482,3 +490,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.6b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；`git log --oneline -5` 最新为 `20ab9bf`、`d1c3d7c`、`76bbfc7`、`d4d1a32`、`4ff3f09`。读 05 矩阵 L-8b 与 02 文档 L-8 小节，复核 R2.1/R2.6b 关联：R2.1 删除的是 VS Code Settings 面板静态 `easyMail.modelFamily`，运行时 Load Models/model list 选择流程仍保留；当前缺口只在 `extension.ts readConfig()`，它只读 `storedConfig.modelFamily || defaults.modelFamily`，会忽略旧 `settings.get("modelFamily")`。grep 锚点：`src/extension.ts:922-932 readConfig`、`src/extension.ts:951-961 updateSettings`、`src/lib/config-utils.ts`、`src/test/config-utils.test.ts`。Claim R2.6b；边界：只做旧 settings 值一次性迁移到私有 config，不恢复 manifest contribution、不改模型列表加载、不做 R2.6d provider cache 刷新。
 
 - **2026-07-09 · Codex（R2.6b completion）**：Action: 新增 `resolveModelFamily` 纯函数并接入 `EasyMailApp.readConfig()`，私有 config 为空时读取旧 `settings.get("modelFamily")` 并一次性写入 `easy-mail.config.json`；未恢复静态 Settings contribution，未改运行时模型列表。Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 28/28 通过；`npm test` 344/344 全绿。Manual: 不涉及 Outlook/VBS；真实 VS Code 扩展宿主仍需验证旧 settings 值迁移到私有 config。Next: R2.6c。
+
+- **2026-07-09 · Codex（R2.6c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `f9859af`、`3cfdb8a`、`20ab9bf`、`d1c3d7c`、`76bbfc7`。读 05 矩阵 L-3 行与 02 文档 L-3 小节：chunk 应独立成败、独立 merge/persist；R2.2 已覆盖 JSON parse/repair 失败隔离，但 `src/lib/app-analysis.ts:287` 的 `sendPromptToModel` 抛非取消错误仍会直接中止循环。grep 锚点：`analyzeBatchCore` chunk loop、`chunkSkipped`、`cancelledError`、`MockProvider` Error response 支持、`src/test/app-analysis.test.ts` 现有 chunk/cancel 测试。Claim R2.6c；边界：只隔离非取消传输错误，不改 retry 策略、不改并发、不改 token 预算。
+
+- **2026-07-09 · Codex（R2.6c completion）**：Action: `analyzeBatchCore` 对每个 chunk 的 `sendPromptToModel` 非取消错误执行 skip-and-continue，与 JSON parse/repair failure 同一 `analyze:chunkSkipped` 语义；取消仍 reject。Validated: RED 先行；`npm run compile` 零错误；`node --test out/test/app-analysis.test.js` 19/19 通过；`npm test` 346/346 全绿。Manual: 不涉及 Outlook/VBS；真实 VS Code + Copilot 大批量分析仍需观察中间 chunk 传输失败时部分成功持久化。Next: R2.6d。

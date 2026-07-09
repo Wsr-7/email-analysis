@@ -123,6 +123,10 @@ function cancelledError(): Error {
   return new Error("Easy Mail task cancelled.");
 }
 
+function isCancellationError(error: unknown): boolean {
+  return error instanceof Error && /cancelled/i.test(error.message);
+}
+
 export function splitByTokenBudget(
   mails: StoredMail[],
   maxInputTokens: number,
@@ -284,7 +288,21 @@ export async function analyzeBatchCore(
       promptConfig
     });
     await ctx.log("analyze:chunkStart", { chunk: index + 1, chunks: chunks.length, mails: chunk.length });
-    const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "analyze");
+    let raw: string;
+    try {
+      raw = (await sendPromptToModel(ctx, prompt, configuredModel, "analyze")).raw;
+    } catch (error) {
+      if (ctx.cancellationToken?.isCancellationRequested || isCancellationError(error)) {
+        throw error;
+      }
+      skippedChunks += 1;
+      await ctx.log("analyze:chunkSkipped", {
+        chunk: index + 1,
+        chunks: chunks.length,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      continue;
+    }
     await ctx.log("analyze:response", { chunk: index + 1, chunks: chunks.length, rawLength: raw.length });
     let analysis: ReturnType<typeof parseAnalysisJson>;
     try {
