@@ -25,9 +25,13 @@ export class CopilotProvider implements LlmProvider {
     if (!this.nativeModels.length) {
       await this.listModels();
     }
-    const modelIndex = options.model
+    let modelIndex = options.model
       ? this.availableModels.findIndex((model) => modelKey(model) === modelKey(options.model as AvailableModel))
       : selectConfiguredModelIndex(this.availableModels, options.modelFamily);
+    if (options.model && modelIndex < 0) {
+      await this.listModels();
+      modelIndex = this.availableModels.findIndex((model) => modelKey(model) === modelKey(options.model as AvailableModel));
+    }
     const selectedModelIndex = modelIndex >= 0 ? modelIndex : selectConfiguredModelIndex(this.availableModels, options.modelFamily);
     const selectedModel = selectedModelIndex >= 0 ? this.nativeModels[selectedModelIndex] : undefined;
     const selectedAvailableModel = selectedModelIndex >= 0 ? this.availableModels[selectedModelIndex] : undefined;
