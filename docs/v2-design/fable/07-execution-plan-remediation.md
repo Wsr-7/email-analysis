@@ -349,6 +349,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - `ResolveFolder` 根文件夹 lookup 加 `On Error Resume Next`，把缺失/异常统一转为 `Nothing`，避免单个坏配置冒泡中止。
   - Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`cscript //nologo scripts/collect-outlook-mails.vbs --sample --output data/r2-7b-sample-digest.md` 通过（临时 sample 已删除）；`npm run compile` 零错误；`npm test` 354/354 全绿。
   - Manual validation: **needs user validation on real Outlook**——配置 `Inbox;不存在的文件夹名` 应看到坏文件夹的 `FolderScan: ...; error=...`，同时 Inbox 仍采集并写入 digest；配置全坏文件夹应失败并提示 `All Outlook folders failed`。
+  - Commit: `1864d6d`
 
 ### [ ] R2.7c C-7d 超长正文粗截后再归一化
 
@@ -540,4 +541,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-09 · Codex（R2.7b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；`git log --oneline -5` 最新为 `fd63cbb`、`97000b9`、`8c479d7`、`f46b18e`、`02ac24a`。按计划重新定位并阅读 05 矩阵 C-5b 与 01 文档 C-5：当前 `CollectFolderItems` 在 `ResolveFolder` 失败、older-than Restrict 失败、Sort 失败、GetFirst/GetNext 失败时仍 `Fail` 整次采集。Claim R2.7b；边界：只把单文件夹失败降级为诊断并继续其余文件夹，仅所有非空配置文件夹都失败才 Fail；不改 digest 输出格式、不做 DIAG JSON 协议、不进入 R2.7c。
 
-- **2026-07-09 · Codex（R2.7b completion，needs user validation on real Outlook）**：Action: `CollectFolderItems` 改为 Boolean 返回，单文件夹解析/Restrict/Sort/迭代失败输出 `FolderScan: ...; error=...` 并继续其余文件夹；外层仅所有非空配置文件夹失败时 Fail，部分失败输出 `FolderScanSummary`。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output data/r2-7b-sample-digest.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 354/354 全绿。Manual: 需真实 Outlook 验证坏文件夹不拖死好文件夹、全坏文件夹仍失败。Next: R2.7c。
+- **2026-07-09 · Codex（R2.7b completion，needs user validation on real Outlook）**：Action: `CollectFolderItems` 改为 Boolean 返回，单文件夹解析/Restrict/Sort/迭代失败输出 `FolderScan: ...; error=...` 并继续其余文件夹；外层仅所有非空配置文件夹失败时 Fail，部分失败输出 `FolderScanSummary`。Validated: `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output data/r2-7b-sample-digest.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 354/354 全绿。Manual: 需真实 Outlook 验证坏文件夹不拖死好文件夹、全坏文件夹仍失败。Commit: `1864d6d`。Next: R2.7c。
