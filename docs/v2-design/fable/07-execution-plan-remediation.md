@@ -438,7 +438,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output F:/agent-workspace/codex/.tmp/easy-mail-r2-8d-sample.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 360/360 全绿。
   - Manual validation: **needs user validation on real Outlook**——真机难以稳定构造 GetNext 中途失败；后续真实大邮箱采集时需留意 stdout 是否出现 `FolderScanSummary: failed=...; partial=...`，partial folder 不应触发 all-fail，但应可见。
   - Known issues: 本 step 未处理 reviewer 额外指出的 `folder.Items` 和单封 `BuildMailRecord` COM 异常；已在 handover 风险中保留，需后续规划。
-  - Commit: pending
+  - Commit: `886a89c`
 
 ### 复审确认无需行动的记录
 
