@@ -416,11 +416,17 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 无。
   - Commit: `7e34367`
 
-### [ ] R2.8c 定界符可被邮件正文闭合逃逸（R2.7a 缺陷）
+### [x] R2.8c 定界符可被邮件正文闭合逃逸（R2.7a 缺陷）
 
 - **缺陷**：邮件正文只要包含字面量 `</easy-mail-digest-data>`（或线程路径的 `</easy-mail-thread-timeline-json>`）即可提前闭合数据段，其后内容脱离"untrusted data"声明的保护——注入防御被一行正文绕过。
 - **做法**：`composeAnalysisPrompt` / `buildThreadAnalysisPrompt` 在包裹前对 digestText / `JSON.stringify(payload)` 做一次替换，把出现的两个定界符字面量改写为无害形式（如 `[easy-mail-delimiter-removed]`）；导出小工具函数便于两处复用与单测。
 - **验收**：单测：digest 正文含闭合定界符 → 组装后 prompt 中定界符仅出现成对的一次；`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/prompt-config.ts`（新增导出 `escapePromptDelimiters` 并用于 digest payload）、`src/lib/thread-prompt-builder.ts`（timeline JSON 入 prompt 前复用 delimiter 清理）、`src/test/prompt-config.test.ts`、`src/test/thread-prompt-builder.test.ts`。
+  - 验收结果：`npm run compile` 零错误；`node --test out/test/prompt-config.test.js out/test/thread-prompt-builder.test.js` 11/11 通过；`npm test` 360/360 全绿。
+  - Manual validation: 真实 Copilot 仍需观察包含伪造 `</easy-mail-...>` 的邮件不会逃出数据段改变输出规则。
+  - Known issues: 只覆盖 R2.7a 已包定界符的 batch/thread payload；draft/translation/JSON repair prompt boundary 是本轮 review 新发现但未列入 R2.8c 的后续规划项。
+  - Commit: pending
 
 ### [ ] R2.8d GetNext 中途失败的"部分采集"不进失败汇总（R2.7b 缺陷，worker 与规划者交叉确认）
 
@@ -635,3 +641,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.8b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；最新提交 `44a6a31`、`fd724e6`。按计划重新定位 R2.8b 与 L-8 相关说明：`src/lib/llm-provider.ts:isModelRefreshableErrorMessage` 把 `model/auth/sign in/permission/access` 等宽泛词都当作可刷新模型错误；`src/lib/app-analysis.ts:isRetryableLlmError` 已有 429/quota/timeout 退避路径。Claim R2.8b；边界：只收窄可刷新模型错误判断与单测，不改外层 retry/backoff，不进入 R2.8c。
 
 - **2026-07-09 · Codex（R2.8b completion）**：Action: `isModelRefreshableErrorMessage` 先排除 429/quota/timeout/temporary，再仅匹配 stale/missing model 语义；auth/permission/sign-in 不再触发内层立即 refresh+resend。Validated: `npm run compile` 零错误；`node --test out/test/llm-provider.test.js` 7/7 通过；`npm test` 358/358 全绿。Manual: 真实 VS Code + Copilot 仍需验证 429/quota 错误只走外层退避。Next: R2.8c。
+
+- **2026-07-09 · Codex（R2.8c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；最新提交 `8e1d945`、`7e34367`。按计划重新定位 R2.8c 与 L-6：`composeAnalysisPrompt()` 直接把 `digestText` 放进 `<easy-mail-digest-data>`，`buildThreadAnalysisPrompt()` 直接把 `JSON.stringify(payload)` 放进 `<easy-mail-thread-timeline-json>`；JSON 不转义 `<`，payload 可伪造闭合 tag。Claim R2.8c；边界：只替换 payload 内 prompt delimiter literals 并补单测，不改 prompt schema、不扩展 draft/translation/repair boundary、不进入 R2.8d。
+
+- **2026-07-09 · Codex（R2.8c completion）**：Action: batch digest 与 thread timeline JSON 入 prompt 前统一替换 Easy Mail prompt delimiters，防止正文伪造闭合 tag 逃出 untrusted data 段；补 batch/thread 回归测试。Validated: `npm run compile` 零错误；定向 prompt 测试 11/11 通过；`npm test` 360/360 全绿。Manual: 真实 Copilot 仍需观察伪造 delimiter 邮件不会改变输出规则。Next: R2.8d。
