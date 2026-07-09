@@ -767,6 +767,9 @@ Function ImportanceLabel(byVal value)
 End Function
 
 Function TruncateText(byVal text, byVal maxChars)
+  If maxChars > 0 And Len(text) > maxChars * 4 Then
+    text = Left(text, maxChars * 4)
+  End If
   Dim cleaned
   cleaned = NormalizeWhitespace(text)
   If Len(cleaned) <= maxChars Then
