@@ -390,7 +390,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 ## 3.7 Milestone R2.8 — Fable 二次复审修复批（2026-07-09 对 R2.6/R2.7 成果复审产出）
 
-> 来源：规划者对 `76bbfc7..6e9aef8` 全量 diff 的复审（独立复核 `npm run compile` 零错误、`npm test` 357/357 全绿）。R2.6a/c/e、R2.7a-e 主体实现全部确认正确；以下 3 项是本轮引入或未闭合的缺陷，修完即达到"仅剩人工验证"状态。
+> 来源：规划者对 `76bbfc7..6e9aef8` 全量 diff 的复审（独立复核 `npm run compile` 零错误、`npm test` 357/357 全绿）。R2.6a/c/e、R2.7a-e 主体实现全部确认正确；以下 4 项（R2.8a-c 规划者复审产出，R2.8d 由 worker 复核发现、规划者采纳）是本轮引入或未闭合的缺陷，修完即达到"仅剩人工验证"状态。
 
 ### [ ] R2.8a modelFamily 迁移非一次性 → 用户选中默认同名模型会被 legacy 值反复覆盖（R2.6b 缺陷，优先）
 
@@ -410,10 +410,16 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 - **做法**：`composeAnalysisPrompt` / `buildThreadAnalysisPrompt` 在包裹前对 digestText / `JSON.stringify(payload)` 做一次替换，把出现的两个定界符字面量改写为无害形式（如 `[easy-mail-delimiter-removed]`）；导出小工具函数便于两处复用与单测。
 - **验收**：单测：digest 正文含闭合定界符 → 组装后 prompt 中定界符仅出现成对的一次；`npm test` 全绿。
 
+### [ ] R2.8d GetNext 中途失败的"部分采集"不进失败汇总（R2.7b 缺陷，worker 与规划者交叉确认）
+
+- **缺陷**：`collect-outlook-mails.vbs` `CollectFolderItems` 在 `GetNext` 中途失败时返回 `addedInFolder > 0`——已采到邮件即计为成功。后果：该文件夹"扫到一半断了"与"扫完了"对采集结果和 `FolderScanSummary` 完全不可区分，中断点之后未扫到的邮件成为无感知数据缺口（recentHours 降序模式下断得早会漏较旧的近期邮件）。现有 `FolderScan: error=` 诊断行只是日志，不构成失败信号。
+- **做法**：把"部分采集"作为独立状态计数：`CollectFromOutlook` 新增 `folderPartialCount`/`folderPartials` 列表；`CollectFolderItems` 返回值区分三态（如 "ok"/"partial"/"failed" 字符串，或保持 Boolean 成功 + byRef partial 标志，取实现最小者），`GetNext` 中途失败且 `addedInFolder > 0` 时计入 partial（不触发 all-fail）；`FolderScanSummary` 扩展为 `failed=N; partial=M; total=K; folders=...; partialFolders=...`，只要 failed+partial > 0 就输出。不改 digest 格式、不改整体成败语义。
+- **验收**：`cscript //nologo --help` 语法检查；`--sample` 不回归；Handover 标注 needs user validation（真机难以稳定构造 GetNext 中途失败，验收以代码审查 + 语法检查为主，真机留意 partial 行）。
+
 ### 复审确认无需行动的记录
 
 - R2.7e 的 `confidence` 缺失不降级是 worker 的自觉保守选择，Completion Notes 已写明兼容性理由，接受。
-- R2.7b 的 `GetNext` 中途失败按"已有产出即成功"处理，配套 `FolderScan: error=` 诊断行，接受。
+- ~~R2.7b 的 `GetNext` 中途失败按"已有产出即成功"处理，配套 `FolderScan: error=` 诊断行，接受。~~ **2026-07-09 修订**：worker 复核指出"部分采集不进失败汇总"是无感知数据缺口，规划者采纳，升级为 R2.8d。
 - vsix 打包提交（`8c479d7`/`6e9aef8`）符合仓库 `releases/` 既有惯例，接受。
 
 ---
@@ -607,3 +613,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.7e completion，Milestone R2.7 complete）**：Action: `normalizeItem` 增加低置信降级和 category→priority 允许区间钳制；保留缺失 confidence 的旧 JSON 兼容；补 normalize 单测。Validated: `npm run compile` 零错误；`node --test out/test/analysis-schema.test.js` 5/5 通过；`npm test` 357/357 全绿。Manual: 不涉及 Outlook/VBS。Commit: `cefa504`。Next: R2.6/R2.7 已完成；R3/R4 仍不得自行 claim，进入 R3 前应统一执行真实 VS Code/Copilot/Outlook 验证项。
 
 - **2026-07-09 · Claude Fable 5（规划者二次复审 R2.6/R2.7）**：对 `76bbfc7..6e9aef8` 全量 diff 复审，独立跑 `npm run compile` 零错误、`npm test` 357/357 全绿。R2.6a（updateDraft 同步 draftState）、R2.6c（chunk 传输错误隔离 + 取消 rethrow）、R2.6e（本地化 Sent 文件夹名单，超出原验收范围的加分实现）、R2.7a-e 全部确认正确。发现 3 个缺陷展开为 R2.8a-c（详见 3.7 节，含复现链与验收标准），其中 R2.8a 会导致用户模型选择被反复覆盖、R2.8b 会放大 429 场景配额消耗、R2.8c 使注入防御可被一行正文绕过。下一个 worker 从 R2.8a 开始，三项互相独立、均为 S 级。R2.8 完成前不进入人工验证。
+
+- **2026-07-09 · Claude Fable 5（规划者，R2.8 扩充）**：worker 复核提出两个风险点，与规划者二次复审交叉比对：定界符逃逸与 R2.8c 完全重合（无需新增）；`GetNext` 中途失败计为成功一项，规划者原判"接受"（理由：有 error 诊断行），worker 指出"部分采集不进失败汇总 = 无感知数据缺口"更准确，采纳并升级为 **R2.8d**（三态返回 + FolderScanSummary 增加 partial 计数）。R2.8 现共 4 项（a-d），互相独立。下一个 worker 从 R2.8a 开始。
