@@ -384,6 +384,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 兼容性：旧 JSON 若缺失 `confidence` 字段，不触发低置信降级，保持既有解析兼容；custom allowed category 不在 range 表时不做 priority 钳制。
   - Tests: `npm run compile` 零错误；`node --test out/test/analysis-schema.test.js` 5/5 通过；`npm test` 357/357 全绿。
   - Manual validation: 不涉及 Outlook/VBS；真实 Copilot 输出中低置信项和 notice+P0 等越界组合会被本地 normalize 纠正。
+  - Commit: `cefa504`
 
 ---
 
@@ -572,4 +573,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-09 · Codex（R2.7e pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 8]`；`git log --oneline -5` 最新为 `6fab0ca`、`82be440`、`fa6e38d`、`9bfb109`、`e881bc7`。按计划重新定位并阅读 05 矩阵 B-2e/B-3 与 03 文档 B-2/B-3：`analysis-schema.ts normalizeItem` 只做 category/priority 白名单，不执行 `confidence < 0.7` 降级，也不钳制 notice+P0 等 category×priority 越界组合。Claim R2.7e；边界：只在 normalize 阶段做一致性钳制并补单测，不改 schema、不改 prompt 类别定义、不做 dueDate/riskFlag/tag 结构化。
 
-- **2026-07-09 · Codex（R2.7e completion，Milestone R2.7 complete）**：Action: `normalizeItem` 增加低置信降级和 category→priority 允许区间钳制；保留缺失 confidence 的旧 JSON 兼容；补 normalize 单测。Validated: `npm run compile` 零错误；`node --test out/test/analysis-schema.test.js` 5/5 通过；`npm test` 357/357 全绿。Manual: 不涉及 Outlook/VBS。Next: R2.6/R2.7 已完成；R3/R4 仍不得自行 claim，进入 R3 前应统一执行真实 VS Code/Copilot/Outlook 验证项。
+- **2026-07-09 · Codex（R2.7e completion，Milestone R2.7 complete）**：Action: `normalizeItem` 增加低置信降级和 category→priority 允许区间钳制；保留缺失 confidence 的旧 JSON 兼容；补 normalize 单测。Validated: `npm run compile` 零错误；`node --test out/test/analysis-schema.test.js` 5/5 通过；`npm test` 357/357 全绿。Manual: 不涉及 Outlook/VBS。Commit: `cefa504`。Next: R2.6/R2.7 已完成；R3/R4 仍不得自行 claim，进入 R3 前应统一执行真实 VS Code/Copilot/Outlook 验证项。
