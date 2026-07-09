@@ -919,12 +919,18 @@ class EasyMailApp {
     const defaultFolders = Array.isArray(defaults.folders) ? defaults.folders.map(String) : ["Inbox", "Sent Items"];
     const storedModelFamily = typeof storedConfig.modelFamily === "string" ? storedConfig.modelFamily.trim() : "";
     const legacySettingsModelFamily = settings.get("modelFamily", "");
-    const shouldMigrateModelFamily = shouldMigrateLegacyModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily, configExisted);
+    const shouldMigrateModelFamily = shouldMigrateLegacyModelFamily(
+      storedModelFamily,
+      legacySettingsModelFamily,
+      defaults.modelFamily,
+      configExisted,
+      storedConfig.modelFamilyMigrated === true
+    );
     const modelFamily = shouldMigrateModelFamily
       ? String(legacySettingsModelFamily || "").trim()
       : resolveModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily);
     if (shouldMigrateModelFamily) {
-      await this.data.writeConfig({ ...storedConfig, modelFamily });
+      await this.data.writeConfig({ ...storedConfig, modelFamily, modelFamilyMigrated: true });
     }
     return {
       ...defaults,

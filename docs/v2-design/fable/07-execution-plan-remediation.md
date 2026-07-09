@@ -392,11 +392,17 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 > 来源：规划者对 `76bbfc7..6e9aef8` 全量 diff 的复审（独立复核 `npm run compile` 零错误、`npm test` 357/357 全绿）。R2.6a/c/e、R2.7a-e 主体实现全部确认正确；以下 4 项（R2.8a-c 规划者复审产出，R2.8d 由 worker 复核发现、规划者采纳）是本轮引入或未闭合的缺陷，修完即达到"仅剩人工验证"状态。
 
-### [ ] R2.8a modelFamily 迁移非一次性 → 用户选中默认同名模型会被 legacy 值反复覆盖（R2.6b 缺陷，优先）
+### [x] R2.8a modelFamily 迁移非一次性 → 用户选中默认同名模型会被 legacy 值反复覆盖（R2.6b 缺陷，优先）
 
 - **缺陷**：`shouldMigrateLegacyModelFamily` 的第三条件 `storedValue === defaultModel && legacyValue !== defaultModel` 会**反复**触发：legacy settings 键从不清除、也无迁移完成标记。复现链：老用户 settings.json 有 `easyMail.modelFamily: "X"`（X ≠ "gpt-5.4"）→ 首次迁移正常 → 用户之后在 dashboard 选中 id/family 恰为 `gpt-5.4` 的模型（`renderModelOptions` 的 option value = `model.id || model.family`，与默认串同名完全可能）→ 下一次 `readConfig()` 判定 stored===default 再次"迁移"→ 用户选择被 X 覆盖，且每次 readConfig 都重写私有 config 文件。用户永远无法保持选中该模型。
 - **做法**：迁移改一次性——私有 config 增加 `modelFamilyMigrated: true` 标记，`shouldMigrateLegacyModelFamily` 增加 `migrated` 参数，已标记则永不再迁移；首次迁移时把标记与 modelFamily 一起 `writeConfig`。可选加分项：迁移成功后 try/catch 尝试 `settings.update("modelFamily", undefined, Global)` 清除孤儿键（unregistered 键 update 可能抛错，必须 catch 吞掉）。
 - **验收**：纯函数单测：已标记时 stored===default 且 legacy≠default → 不迁移；未标记时现有用例全部保持。`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/config-utils.ts`（`shouldMigrateLegacyModelFamily` 增加 `migrated` 参数，已迁移则直接 false）、`src/extension.ts`（迁移时写入 `modelFamilyMigrated: true`，后续 readConfig 传入标记）、`src/test/config-utils.test.ts`（补已标记不再迁移用例）。
+  - 验收结果：`npm run compile` 零错误；`node --test out/test/config-utils.test.js` 32/32 通过；`npm test` 358/358 全绿。
+  - Manual validation: 真实 VS Code 扩展宿主仍需验证旧 `easyMail.modelFamily` settings 值只迁移一次；用户随后在 dashboard 选择默认同名模型时不会再被 legacy settings 覆盖。
+  - Known issues: 未清除旧 VS Code settings 孤儿键，依赖 `modelFamilyMigrated` 标记阻断重复迁移；这是本 step 的最小安全修复。
+  - Commit: pending
 
 ### [ ] R2.8b isModelRefreshableErrorMessage 正则过宽 → 429 类错误被无退避地立即重发（R2.6d 缺陷）
 
@@ -615,3 +621,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Claude Fable 5（规划者二次复审 R2.6/R2.7）**：对 `76bbfc7..6e9aef8` 全量 diff 复审，独立跑 `npm run compile` 零错误、`npm test` 357/357 全绿。R2.6a（updateDraft 同步 draftState）、R2.6c（chunk 传输错误隔离 + 取消 rethrow）、R2.6e（本地化 Sent 文件夹名单，超出原验收范围的加分实现）、R2.7a-e 全部确认正确。发现 3 个缺陷展开为 R2.8a-c（详见 3.7 节，含复现链与验收标准），其中 R2.8a 会导致用户模型选择被反复覆盖、R2.8b 会放大 429 场景配额消耗、R2.8c 使注入防御可被一行正文绕过。下一个 worker 从 R2.8a 开始，三项互相独立、均为 S 级。R2.8 完成前不进入人工验证。
 
 - **2026-07-09 · Claude Fable 5（规划者，R2.8 扩充）**：worker 复核提出两个风险点，与规划者二次复审交叉比对：定界符逃逸与 R2.8c 完全重合（无需新增）；`GetNext` 中途失败计为成功一项，规划者原判"接受"（理由：有 error 诊断行），worker 指出"部分采集不进失败汇总 = 无感知数据缺口"更准确，采纳并升级为 **R2.8d**（三态返回 + FolderScanSummary 增加 partial 计数）。R2.8 现共 4 项（a-d），互相独立。下一个 worker 从 R2.8a 开始。
+
+- **2026-07-09 · Codex（R2.7 adversarial review + R2.8a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -8` 最新为 `2c7226a`、`fcf79cb`、`6e9aef8`、`5d0ef65`、`cefa504`。R2.7 多 reviewer 已完成/部分因 session limit 中断后重启；已确认 R2.8 覆盖 modelFamily 迁移振荡、429 刷新误判、delimiter spoof、GetNext partial-scan。未覆盖但需后续规划的风险：draft/translation/JSON repair prompt boundary、overview stale count、fallback id 同秒碰撞、VBS `folder.Items`/`BuildMailRecord` COM 异常。Claim R2.8a；边界：只加 `modelFamilyMigrated` 一次性迁移标记与纯函数测试，不改模型列表 UI、不恢复 Settings contribution、不进入 R2.8b。
+
+- **2026-07-09 · Codex（R2.8a completion）**：Action: `shouldMigrateLegacyModelFamily` 增加一次性 `modelFamilyMigrated` 标记，迁移成功后写入私有 config；未清除旧 VS Code settings orphan key。Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 32/32 通过；`npm test` 358/358 全绿。Manual: 真实 VS Code 扩展宿主仍需验证旧 settings 只迁移一次且默认同名模型选择不再被覆盖。Next: R2.8b。

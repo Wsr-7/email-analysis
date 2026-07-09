@@ -45,10 +45,13 @@ export function resolveModelFamily(stored: unknown, settingsValue: unknown, defa
   return "";
 }
 
-export function shouldMigrateLegacyModelFamily(stored: unknown, settingsValue: unknown, defaultValue: unknown, configExisted: boolean): boolean {
+export function shouldMigrateLegacyModelFamily(stored: unknown, settingsValue: unknown, defaultValue: unknown, configExisted: boolean, migrated = false): boolean {
   const storedValue = typeof stored === "string" ? stored.trim() : "";
   const legacyValue = typeof settingsValue === "string" ? settingsValue.trim() : "";
   const defaultModel = typeof defaultValue === "string" ? defaultValue.trim() : "";
+  if (migrated) {
+    return false;
+  }
   if (!legacyValue) {
     return false;
   }

@@ -97,6 +97,10 @@ describe("resolveModelFamily", () => {
     assert.equal(shouldMigrateLegacyModelFamily("stored-model", "legacy-model", "gpt-5.4", true), false);
     assert.equal(shouldMigrateLegacyModelFamily("gpt-5.4", "", "gpt-5.4", false), false);
   });
+
+  it("does not re-migrate legacy settings after migration was marked complete", () => {
+    assert.equal(shouldMigrateLegacyModelFamily("gpt-5.4", "legacy-model", "gpt-5.4", true, true), false);
+  });
 });
 
 describe("resolveOutputLanguage", () => {
