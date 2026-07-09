@@ -279,7 +279,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 28/28 通过；`npm test` 344/344 全绿。
   - Manual validation: 不涉及 Outlook/VBS；建议在真实 VS Code 扩展宿主用旧 `settings.json` 里存在 `easyMail.modelFamily`、私有 config 不存在/为空的用户态验证一次：启动后模型选择值保持旧值，并写入 `easy-mail.config.json`。
   - Known issues: 旧 VS Code settings.json 里的孤儿 `easyMail.modelFamily` 键不自动删除；这是有意保持最小迁移，不再依赖该值。
-  - Commit: pending
+  - Commit: `3cfdb8a`
 
 ### [ ] R2.6c chunk 传输错误未隔离（R2.2 语义缺口）
 
