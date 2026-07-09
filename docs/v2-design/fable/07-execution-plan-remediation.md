@@ -414,7 +414,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`npm run compile` 零错误；`node --test out/test/llm-provider.test.js` 7/7 通过；`npm test` 358/358 全绿。
   - Manual validation: 真实 VS Code + Copilot 仍需验证 429/quota 错误只走外层退避，不再先立即 refresh+resend。
   - Known issues: 无。
-  - Commit: pending
+  - Commit: `7e34367`
 
 ### [ ] R2.8c 定界符可被邮件正文闭合逃逸（R2.7a 缺陷）
 
