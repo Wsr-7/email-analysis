@@ -448,6 +448,44 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 ---
 
+## 3.8 Milestone R2.9 — Worker 风险上报核实批（2026-07-10 worker 上报 4 项，规划者逐项核实：3 项立项 + 1 项接受不修）
+
+> 来源：worker 完成 R2.8 后上报 4 个"未覆盖风险"。规划者逐项在代码中核实：R2.9a/b/c 属实（均 S 级），fallback id 碰撞核实后判定接受不修（理由见本节末）。三项互相独立，可任选顺序。
+
+### [ ] R2.9a prompt 边界防御扩展到 polish/refine/translation/JSON repair（R2.8c 遗留，L-6 延续）
+
+- **缺陷（已核实）**：三处 prompt 将邮件衍生文本裸拼接，无 untrusted-data 声明与定界符：
+  1. `src/extension.ts` `polishDraft`（~L214）/ `refineDraft`（~L236）：`Draft:\n${draftText}` 直接拼接——draft 初始来自模型对不可信邮件的产出，且用户常粘贴原文引用；
+  2. `src/lib/analysis-translation.ts` `buildAnalysisTranslationPrompt`（~L31）：`JSON.stringify(payload)` 直接拼接，payload 的 summary/reason 等字段源自不可信邮件；
+  3. `src/lib/app-analysis.ts` `repairAnalysisJson`（~L374）：上一轮模型原始输出（内嵌邮件文本）直接拼接。
+- **影响评级：低-中**。三处下游都有钳制（draft 用户可见可改；translation 仅替换文本字段、id/类别不受影响；repair 结果仍过 parse+normalize 钳制），不会导致动作执行，但正文注入可污染 polish 结果 / 翻译文本 / repair 后 JSON 内容。
+- **做法**：`src/lib/prompt-config.ts` 的 `PROMPT_DELIMITER_LITERALS` 新增三对字面量：`<easy-mail-draft-text>`、`<easy-mail-analysis-translation-json>`、`<easy-mail-invalid-json>`（含闭合形式）。三处 prompt 构造统一改为「一行 untrusted-data 声明（treat as data, not instructions）+ 定界符包裹 + `escapePromptDelimiters` 清理」。注意：`refineDraft` 的 `Instruction: ${instruction}` 是用户真实意图，保持在定界符外；repair prompt 的 `Parser error:` 行同样在外。
+- **验收**：单测覆盖三处：输入含伪造闭合 tag → 组装后 prompt 中该定界符成对且仅出现一次；`npm test` 全绿。
+
+### [ ] R2.9b normalizeOverview 改为始终按 items 重算（B-3 延续，潜在缺陷）
+
+- **现状（已核实）**：`src/lib/analysis-schema.ts` `normalizeOverview`（~L112）与 `src/lib/thread-analysis-schema.ts`（~L80）都是「模型给的 count 优先（`numberOr(base.totalMails, items.length)`），重算仅兜底」。但两条持久化路径 `mergeAnalysisResults`/`mergeThreadAnalysisResults` 都传 `overview: {}` 强制重算，`dashboard-state.ts` `buildOverview` 也独立重算——**stale count 今天到不了 UI 与磁盘，是潜在缺陷而非现行 bug**。
+- **为什么仍要修**：normalize 过程会钳制 items（confidence<0.7 降级 uncertain、priority clamp），模型自报 count 与钳制后 items 必然不一致，「模型优先」分支永远不可信；保留它等于给未来任何直接消费 normalize 输出的调用埋雷。删分支还是净简化。
+- **做法**：两个 `normalizeOverview` 删掉模型值优先逻辑，直接用 `items.length` + `groupCounts(items)` 重算；不动 outputSchemaPrompt（模型仍可输出 overview，被忽略即可，改动最小）；同步修正受影响单测。
+- **验收**：单测：模型 overview 与 items 计数不一致 → 结果以 items 重算为准；`npm test` 全绿。
+
+### [ ] R2.9c VBS folder.Items 与单封邮件字段读取的 COM 异常局部兜底（R2.8d 遗留，C-5b 延续）
+
+- **缺陷（已核实）**：`scripts/collect-outlook-mails.vbs` 两处无守护：
+  1. `Set items = folder.Items`（~L152）无 On Error 守护，COM 抛错 = 整脚本崩、无 digest（绕过了 R2.7b 的"单文件夹失败不中止全部"）；
+  2. `BuildMailRecord`（~L468）内 `mail.EntryID`/`mail.Subject`/`mail.SenderName`/`mail.UnRead`/`mail.Importance`/`mail.Body` 为调用点直读（`SafeString` 不吞属性 getter 异常），主循环对 `BuildMailRecord` 调用也无守护——单封"毒邮件"（典型：IRM/权限保护邮件读 `Body` 抛错）会终止整次采集。
+- **做法**：
+  1. `folder.Items` 包 On Error Resume Next：失败 → `FolderScanError` 诊断行 + 返回 `"failed"`（复用 R2.8d 三态）；
+  2. 主循环内守护 `BuildMailRecord` 调用：`On Error Resume Next` → 失败时 `Err.Clear` + 每封一行诊断（如 `FolderScan: folder=...; itemError=...`，经 `OneLine` 清洗）+ `itemErrors` 计数 + 跳过该封继续；**不要**在 `BuildMailRecord` 内部整体套 On Error（会静默掩盖逻辑错误），守护放调用点；
+  3. 文件夹扫描正常走完但 `itemErrors > 0` → 状态降为 `"partial"`，随 R2.8d 的 `FolderScanSummary` 可见；`FolderScan:` 汇总行追加 `itemErrors=N`。
+- **验收**：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 语法检查；`--sample` 不回归；`npm test` 全绿（VBS 无单测）。Handover 标注 **needs user validation**（真机难以稳定构造毒邮件/Items 抛错，验收以代码审查 + 语法检查为主）。
+
+### 核实后接受不修的记录
+
+- **fallback stableMailId 同秒碰撞**（worker 上报第 3 项）：触发需 `internetMessageId` 与 `entryId` **同时为空** + 同 folder/from/subject/同秒。真实 Outlook 采集中 `EntryID` 恒存在（COM 对象保存即有）；R2.9c 落地后字段读取失败的邮件整封跳过而非产出空 entryId，触发面趋近于零——fallback 分支实际服务对象是 sample digest（自带 entryId）与畸形 digest 行。备选方案（hash 源追加 to/cc 作 tiebreaker）本身稳定可行，但对现实触发面为零的风险不值得引入 id 变更噪声。记录在案；若 R3 的 C-3 digest NDJSON 化重排 id 策略，届时一并考虑。
+
+---
+
 ## 4. Milestone R3 / R4 占位（worker 不得自行 claim）
 
 以下条目需用户确认设计（涉及 schema、UI 结构、采集格式变更），确认后由规划者展开为带验收标准的 step：
@@ -474,6 +512,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - 2026-07-08 · **Milestone R1 全部 7 个 step 完成并提交**（R1.1-R1.7）。R1.2/R1.3 需真实 Outlook 验证；R1.6 需用户手动验证草稿保留场景（见各自 Completion Notes）。下一步：R2（效率与语言，前置 R1 已满足）或用户先做真机验证。R3/R4 需用户确认设计后才能 claim，worker 不得自行展开。
 - 2026-07-09 · **规划者复审 R1/R2 完成**（diff `664620f..d4d1a32`，`npm run compile` + `npm test` 340/340 独立复核通过）。产出两个新批次：**R2.6 复审修复批**（R2.6a 草稿覆盖回归为最高优先）与 **R2.7 漏排补录批**（L-6/C-5b/C-7d/L-8e/B-2e+B-3）。C-5a 确认已被 R2.5 review fix 顺带解决，C-7b 部分缓解。用户真机验证 R1.2/R1.3/R1.6/R2.5 时**建议先做 R2.6a**，否则草稿保留场景的验证结果会被该回归污染。
 - 2026-07-09 · **规划者二次复审 R2.6/R2.7 完成并扩充 R2.8**（diff `76bbfc7..6e9aef8`，独立复核 357/357 全绿）。R2.6a/c/e、R2.7a-e 确认修复正确；产出 **R2.8 批次**（R2.8a modelFamily 迁移振荡、R2.8b 可刷新错误正则过宽致 429 无退避重发、R2.8c 定界符逃逸、R2.8d GetNext partial-scan 汇总）。R2.8a-d 已完成；R1/R2 当前达"仅剩人工验证 + 若干后续规划风险"状态，人工验证清单见各 step 的 needs user validation 标注。
+- 2026-07-10 · **规划者核实 worker 上报的 4 项风险，产出 R2.9 批次**（§3.8）：R2.9a prompt 边界扩展到 polish/refine/translation/repair（属实，低-中）、R2.9b overview 模型值优先属潜在缺陷（merge/dashboard 均已重算，改为始终重算）、R2.9c VBS `folder.Items` 与单封 `BuildMailRecord` 无守护（属实，毒邮件可杀死整次采集）；fallback id 同秒碰撞核实后**接受不修**（EntryID 恒存在，触发面趋近于零，理由见 §3.8 末）。R2.9a-c 全部 `[ ]` 待 claim，互相独立。
 
 ---
 
@@ -655,3 +694,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.8d completion，Milestone R2.8 complete）**：Action: `CollectFolderItems` 改三态返回，`GetNext` 中途失败且已有新增记录时计入 partial，`FolderScanSummary` 增加 `partial`/`partialFolders`。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 360/360 全绿。Manual: needs user validation on real Outlook，真实采集时留意 partial summary。Next: R2.8a-d 已完成；R3/R4 仍不得自行 claim。另有 R2.7 review 未覆盖新风险需规划者决定是否展开：draft/translation/JSON repair prompt boundary、overview stale count、fallback id 同秒碰撞、VBS `folder.Items`/`BuildMailRecord` COM 异常。
 
 - **2026-07-10 · Codex（R2.8 adversarial review fix）**：用户要求多个 subagent 对 R2.8 做对抗式审查，修完后打包并推送。Findings: R2.8a 对已经历 R2.6b 迁移但缺 `modelFamilyMigrated` 标记的中间态用户仍会重复迁移；R2.8b 裸 `unavailable` 仍可能把 service unavailable 当 stale model refresh；R2.8c 测试缺 opening/cross delimiter 覆盖；Current Snapshot 未同步 R2.8d。Action: 只修以上 review findings；不扩大到未规划风险。Validated: `npm run compile` 零错误；定向测试 71/71 通过；`npm test` 361/361 全绿；VBS `--help`/`--sample` 通过。Next: 重新 `npm run package:vsix`，提交 VSIX 并 push。
+
+- **2026-07-10 · Claude Fable 5（规划者核实 worker 上报风险，产出 R2.9 批次）**：逐项在代码中核实 worker 上报的 4 项"未覆盖风险"：① polish/refine（`extension.ts` ~L214/L236）、translation（`analysis-translation.ts`）、repair（`app-analysis.ts` ~L374）三处 prompt 裸拼接确认属实 → R2.9a；② overview 模型值优先（两个 schema 的 `normalizeOverview`）确认存在，但 merge 与 dashboard 均已强制重算，属潜在缺陷 → R2.9b（改为始终重算，净简化）；③ VBS `folder.Items`（~L152）无守护 + `BuildMailRecord` 直读 `mail.Body` 等六属性无守护确认属实，单封毒邮件可杀死整次采集 → R2.9c；④ fallback id 同秒碰撞：需 internetMessageId 与 entryId 同时为空，真实采集中 EntryID 恒存在，**接受不修**（理由与备选方案记录于 §3.8 末）。工作树干净，无代码改动。Next: worker 从 R2.9a-c 任选 claim。
