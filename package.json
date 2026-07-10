@@ -43,6 +43,7 @@
     "media/**",
     "LICENSE",
     "README.md",
+    "README_zh.md",
     "user guide.md",
     "setup.md",
     "AGENTS.md",
