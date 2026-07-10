@@ -160,7 +160,7 @@ class EasyMailApp {
 
     const panel = vscode.window.createWebviewPanel(
       "easyMail.guide",
-      "Easy Mail - User Guide",
+      "EasyMail - User Guide",
       vscode.ViewColumn.One,
       { enableScripts: true, retainContextWhenHidden: true }
     );
@@ -537,7 +537,7 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeNext",
       async (token) => await this.analyzeBatchCore(batchSize, token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
       true
     );
   }
@@ -550,7 +550,7 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeAll",
       async (token) => await this.analyzeBatchCore("allAllowed", token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
       true
     );
   }
@@ -563,7 +563,7 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeSelected",
       async (token) => await this.analyzeBatchCore(mailIds, token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
       true
     );
   }
@@ -620,7 +620,7 @@ class EasyMailApp {
     cancellable = false
   ): Promise<T> {
     if (this.busy) {
-      throw new Error(`Another Easy Mail task is already running: ${this.busy.label}`);
+      throw new Error(`Another EasyMail task is already running: ${this.busy.label}`);
     }
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
@@ -674,7 +674,7 @@ class EasyMailApp {
       labels.progress.detail,
       "reports",
       async () => await this.generateReportsCore(),
-      () => "Easy Mail reports generated."
+      () => "EasyMail reports generated."
     );
     await openTextDocument(this.data.getDailyBriefPath());
   }
@@ -687,7 +687,7 @@ class EasyMailApp {
       labels.progress.detail,
       "loadModels",
       async () => await this.loadAvailableModels(),
-      () => "Easy Mail Copilot models loaded."
+      () => "EasyMail Copilot models loaded."
     );
   }
 
@@ -731,7 +731,7 @@ class EasyMailApp {
         labels.progress.detail,
         "translate",
         async (token) => await this.translateExistingAnalysis(nextLocale, token),
-        (result) => `Easy Mail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
+        (result) => `EasyMail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
         true
       );
     } else {
@@ -770,7 +770,7 @@ class EasyMailApp {
   public async openMailInOutlook(mailId: string): Promise<void> {
     const target = await this.findOutlookOpenTarget(mailId);
     if (!target?.entryId) {
-      await vscode.window.showWarningMessage("Easy Mail cannot open this mail in Outlook because its EntryID is no longer available in the local index.");
+      await vscode.window.showWarningMessage("EasyMail cannot open this mail in Outlook because its EntryID is no longer available in the local index.");
       return;
     }
 
@@ -788,7 +788,7 @@ class EasyMailApp {
   public async composeOutlookMail(mode: string, draftText: string, itemId: string): Promise<void> {
     const target = await this.findOutlookOpenTarget(itemId);
     if (!target?.entryId) {
-      await vscode.window.showWarningMessage("Easy Mail cannot open Outlook compose because the mail EntryID is no longer available.");
+      await vscode.window.showWarningMessage("EasyMail cannot open Outlook compose because the mail EntryID is no longer available.");
       return;
     }
     const scriptPath = await this.findScript("compose-outlook-mail.vbs");

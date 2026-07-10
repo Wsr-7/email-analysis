@@ -341,7 +341,7 @@ describe("analyzeBatchCore", () => {
 
       const token = { isCancellationRequested: false };
       const provider = new MockProvider({
-        responses: [analysisResponse("mail-001"), new Error("Easy Mail task cancelled.")]
+        responses: [analysisResponse("mail-001"), new Error("EasyMail task cancelled.")]
       });
       let calls = 0;
 

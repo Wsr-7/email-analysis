@@ -1,6 +1,6 @@
-# Easy Mail
+# EasyMail
 
-**Easy Mail** is a VS Code extension that turns classic desktop Outlook into a locally-analyzed, AI-triaged inbox. It collects mail and calendar data via VBScript COM automation, analyzes it with GitHub Copilot through the VS Code Language Model API, and presents a triage dashboard — all without sending data to any service other than Copilot itself.
+**EasyMail** is a VS Code extension that turns classic desktop Outlook into a locally-analyzed, AI-triaged inbox. It collects mail and calendar data via VBScript COM automation, analyzes it with GitHub Copilot through the VS Code Language Model API, and presents a triage dashboard — all without sending data to any service other than Copilot itself.
 
 [简体中文](./README_zh.md)
 
@@ -55,9 +55,9 @@ Or build from source — see [Development](#development) below.
 
 ## Quick start
 
-1. Open the Easy Mail view from the Activity Bar.
-2. No Outlook yet? Run **Easy Mail: Generate Sample Digest** to try the flow with fake data.
-3. Run **Easy Mail: Fetch New Mail** to pull recent mail from Outlook.
+1. Open the EasyMail view from the Activity Bar.
+2. No Outlook yet? Run **EasyMail: Generate Sample Digest** to try the flow with fake data.
+3. Run **EasyMail: Fetch New Mail** to pull recent mail from Outlook.
 4. Pick an **Analysis Model** in the sidebar, then run **Analyze Next Batch** (or **Analyze All Allowed**).
 5. Review triaged mail in the sidebar queue; open an item to read, draft a reply, or take action in the workbench.
 

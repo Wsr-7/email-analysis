@@ -357,6 +357,6 @@ export async function saveConfigFromMessage(
   }
   await ctx.updateSettings(next);
   if (!message.silent) {
-    ctx.showInfo("Easy Mail settings saved to VS Code Settings.");
+    ctx.showInfo("EasyMail settings saved to VS Code Settings.");
   }
 }

@@ -1,6 +1,6 @@
 ## Project Overview
 
-Easy Mail is a VS Code extension that collects emails and meetings from classic Outlook via VBScript COM automation, analyzes them with GitHub Copilot (via the VS Code Language Model API), and displays results in a two-panel UI (sidebar + workbench). It runs entirely locally — no cloud services beyond Copilot.
+EasyMail is a VS Code extension that collects emails and meetings from classic Outlook via VBScript COM automation, analyzes them with GitHub Copilot (via the VS Code Language Model API), and displays results in a two-panel UI (sidebar + workbench). It runs entirely locally — no cloud services beyond Copilot.
 
 The data pipeline:
 

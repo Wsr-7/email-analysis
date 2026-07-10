@@ -120,7 +120,7 @@ function throwIfCancelled(token?: CancellationTokenLike): void {
 }
 
 function cancelledError(): Error {
-  return new Error("Easy Mail task cancelled.");
+  return new Error("EasyMail task cancelled.");
 }
 
 function isCancellationError(error: unknown): boolean {

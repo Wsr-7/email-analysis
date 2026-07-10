@@ -1,6 +1,6 @@
 {
   "name": "easy-mail",
-  "displayName": "Easy Mail",
+  "displayName": "EasyMail",
   "description": "Local Outlook digest collection, Copilot analysis, and dashboard for classic Outlook.",
   "version": "0.2.0",
   "publisher": "Wsr-7",
@@ -51,7 +51,7 @@
   ],
   "contributes": {
     "configuration": {
-      "title": "Easy Mail",
+      "title": "EasyMail",
       "properties": {
         "easyMail.rangeMode": {
           "type": "string",
@@ -224,13 +224,13 @@
     "walkthroughs": [
       {
         "id": "easyMail.gettingStarted",
-        "title": "Get Started with Easy Mail",
+        "title": "Get Started with EasyMail",
         "description": "Collect local Outlook mail, review pending items, and analyze with GitHub Copilot.",
         "steps": [
           {
             "id": "easyMail.openDashboard",
             "title": "Open the Dashboard",
-            "description": "Open the Easy Mail view from the Activity Bar. Use the language button in the top-right corner to switch between English and Simplified Chinese.",
+            "description": "Open the EasyMail view from the Activity Bar. Use the language button in the top-right corner to switch between English and Simplified Chinese.",
             "media": {
               "markdown": "readme.md"
             },
@@ -269,83 +269,83 @@
     "commands": [
       {
         "command": "easyMail.pullMail",
-        "title": "Easy Mail: Fetch New Mail"
+        "title": "EasyMail: Fetch New Mail"
       },
       {
         "command": "easyMail.loadMore",
-        "title": "Easy Mail: More History"
+        "title": "EasyMail: More History"
       },
       {
         "command": "easyMail.generateSampleDigest",
-        "title": "Easy Mail: Generate Sample Digest"
+        "title": "EasyMail: Generate Sample Digest"
       },
       {
         "command": "easyMail.analyze",
-        "title": "Easy Mail: Analyze Next Batch with Copilot"
+        "title": "EasyMail: Analyze Next Batch with Copilot"
       },
       {
         "command": "easyMail.analyzeThread",
-        "title": "Easy Mail: Analyze Thread with Copilot"
+        "title": "EasyMail: Analyze Thread with Copilot"
       },
       {
         "command": "easyMail.analyzeAllAllowed",
-        "title": "Easy Mail: Analyze All Allowed with Copilot"
+        "title": "EasyMail: Analyze All Allowed with Copilot"
       },
       {
         "command": "easyMail.loadModels",
-        "title": "Easy Mail: Load Copilot Models"
+        "title": "EasyMail: Load Copilot Models"
       },
       {
         "command": "easyMail.refreshDashboard",
-        "title": "Easy Mail: Refresh Dashboard"
+        "title": "EasyMail: Refresh Dashboard"
       },
       {
         "command": "easyMail.openDigest",
-        "title": "Easy Mail: Open Digest"
+        "title": "EasyMail: Open Digest"
       },
       {
         "command": "easyMail.openSummary",
-        "title": "Easy Mail: Open Summary"
+        "title": "EasyMail: Open Summary"
       },
       {
         "command": "easyMail.generateReports",
-        "title": "Easy Mail: Generate Reports"
+        "title": "EasyMail: Generate Reports"
       },
       {
         "command": "easyMail.openDailyBrief",
-        "title": "Easy Mail: Open Daily Brief"
+        "title": "EasyMail: Open Daily Brief"
       },
       {
         "command": "easyMail.openThreadReport",
-        "title": "Easy Mail: Open Thread Report"
+        "title": "EasyMail: Open Thread Report"
       },
       {
         "command": "easyMail.openSingleMailReport",
-        "title": "Easy Mail: Open Single Mail Report"
+        "title": "EasyMail: Open Single Mail Report"
       },
       {
         "command": "easyMail.openSettings",
-        "title": "Easy Mail: Open Settings"
+        "title": "EasyMail: Open Settings"
       },
       {
         "command": "easyMail.openGuide",
-        "title": "Easy Mail: Open User Guide"
+        "title": "EasyMail: Open User Guide"
       },
       {
         "command": "easyMail.openReplyTemplate",
-        "title": "Easy Mail: Open Reply Template"
+        "title": "EasyMail: Open Reply Template"
       },
       {
         "command": "easyMail.openPromptConfig",
-        "title": "Easy Mail: Open Prompt Config"
+        "title": "EasyMail: Open Prompt Config"
       },
       {
         "command": "easyMail.clearLocalCache",
-        "title": "Easy Mail: Clear Local Cache"
+        "title": "EasyMail: Clear Local Cache"
       },
       {
         "command": "easyMail.openWorkbench",
-        "title": "Easy Mail: Open Workbench"
+        "title": "EasyMail: Open Workbench"
       }
     ]
   },

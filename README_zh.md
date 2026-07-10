@@ -1,6 +1,6 @@
-# Easy Mail
+# EasyMail
 
-**Easy Mail** 是一个 VS Code 插件，把本地 classic Outlook 变成一个由 AI 分诊的收件箱：通过 VBScript COM 自动化采集邮件与日程，用 GitHub Copilot（VS Code Language Model API）在本地分析，再用一个分诊看板展示结果 —— 除了发送给 Copilot 模型的摘录之外，数据不会离开你的机器。
+**EasyMail** 是一个 VS Code 插件，把本地 classic Outlook 变成一个由 AI 分诊的收件箱：通过 VBScript COM 自动化采集邮件与日程，用 GitHub Copilot（VS Code Language Model API）在本地分析，再用一个分诊看板展示结果 —— 除了发送给 Copilot 模型的摘录之外，数据不会离开你的机器。
 
 [English](./README.md)
 
@@ -55,9 +55,9 @@ code --install-extension releases/easy-mail-0.2.0.vsix
 
 ## 快速开始
 
-1. 从 Activity Bar 打开 Easy Mail 视图。
-2. 还没有 Outlook？先执行 **Easy Mail: Generate Sample Digest** 用演示数据体验整个流程。
-3. 执行 **Easy Mail: Fetch New Mail** 从 Outlook 拉取最近邮件。
+1. 从 Activity Bar 打开 EasyMail 视图。
+2. 还没有 Outlook？先执行 **EasyMail: Generate Sample Digest** 用演示数据体验整个流程。
+3. 执行 **EasyMail: Fetch New Mail** 从 Outlook 拉取最近邮件。
 4. 在侧边栏选择一个 **Analysis Model**，然后执行 **Analyze Next Batch**（或 **Analyze All Allowed**）。
 5. 在侧边栏队列中查看分诊结果，点开某一项在 workbench 中阅读、生成草稿或执行操作。
 
