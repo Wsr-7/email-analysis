@@ -467,7 +467,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`npm run compile` 零错误；定向测试 `node --test out/test/draft-prompt.test.js out/test/analysis-translation.test.js out/test/app-analysis.test.js out/test/prompt-config.test.js out/test/thread-prompt-builder.test.js` 36/36 通过；`npm test` 364/364 全绿。
   - Manual validation: 真实 Copilot 可在 R3 前统一验证：含伪造 `</easy-mail-draft-text>` / `</easy-mail-analysis-translation-json>` / `</easy-mail-invalid-json>` 的草稿或模型输出不应越过数据边界影响系统指令。
   - Known issues: 本 step 不覆盖 draft generation prompt 的邮件上下文边界（历史未列入 R2.9a 三处裸拼接），也不处理 R2.9b/R2.9c。
-  - Commit: pending
+  - Commit: `e3f7c44`
 
 ### [ ] R2.9b normalizeOverview 改为始终按 items 重算（B-3 延续，潜在缺陷）
 
@@ -706,4 +706,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-10 · Codex（R2.9a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -8` 最新为 `eb3a7b4`、`49e912c`、`33d76b6`、`1b37866`、`886a89c`、`cd749c2`、`2441695`、`8e1d945`。已关闭当前会话暴露的 4 个历史 subagent（均为 completed 状态），后续按需再开。按计划重新定位并阅读 05 矩阵 L-6、02 文档 L-6、06 文档 Q2，以及 R2.9a 条目：当前 `extension.ts` polish/refine、`analysis-translation.ts` translation payload、`app-analysis.ts` repair raw JSON 均存在 untrusted text 裸拼接；R2.8c 已有 `escapePromptDelimiters` 可复用。Claim R2.9a；边界：只补 prompt 边界和测试，不改变用户 `Instruction:` 语义、不改 prompt schema、不进入 R2.9b/c。
 
-- **2026-07-10 · Codex（R2.9a completion）**：Action: 扩展 `escapePromptDelimiters` 到 draft/translation/invalid-json 三组 delimiter；polish/refine prompt 通过新 `draft-prompt` helper 包裹草稿文本，translation payload 与 JSON repair raw response 也用 untrusted-data 声明 + delimiter 包裹。Validated: `npm run compile` 零错误；定向 R2.9a 测试 36/36 通过；`npm test` 364/364 全绿。Manual: 真实 Copilot prompt-injection 行为留到 R3 前统一验证。Next: R2.9b。
+- **2026-07-10 · Codex（R2.9a completion）**：Action: 扩展 `escapePromptDelimiters` 到 draft/translation/invalid-json 三组 delimiter；polish/refine prompt 通过新 `draft-prompt` helper 包裹草稿文本，translation payload 与 JSON repair raw response 也用 untrusted-data 声明 + delimiter 包裹。Validated: `npm run compile` 零错误；定向 R2.9a 测试 36/36 通过；`npm test` 364/364 全绿。Manual: 真实 Copilot prompt-injection 行为留到 R3 前统一验证。Commit: `e3f7c44`。Next: R2.9b。
