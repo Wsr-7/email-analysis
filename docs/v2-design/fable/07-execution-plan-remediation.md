@@ -483,7 +483,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 无；本 step 不改模型 output schema，模型仍可输出 overview，但代码忽略它。
   - Commit: `e6f21a8`
 
-### [ ] R2.9c VBS folder.Items 与单封邮件字段读取的 COM 异常局部兜底（R2.8d 遗留，C-5b 延续）
+### [x] R2.9c VBS folder.Items 与单封邮件字段读取的 COM 异常局部兜底（R2.8d 遗留，C-5b 延续）
 
 - **缺陷（已核实）**：`scripts/collect-outlook-mails.vbs` 两处无守护：
   1. `Set items = folder.Items`（~L152）无 On Error 守护，COM 抛错 = 整脚本崩、无 digest（绕过了 R2.7b 的"单文件夹失败不中止全部"）；
@@ -493,6 +493,14 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   2. 主循环内守护 `BuildMailRecord` 调用：`On Error Resume Next` → 失败时 `Err.Clear` + 每封一行诊断（如 `FolderScan: folder=...; itemError=...`，经 `OneLine` 清洗）+ `itemErrors` 计数 + 跳过该封继续；**不要**在 `BuildMailRecord` 内部整体套 On Error（会静默掩盖逻辑错误），守护放调用点；
   3. 文件夹扫描正常走完但 `itemErrors > 0` → 状态降为 `"partial"`，随 R2.8d 的 `FolderScanSummary` 可见；`FolderScan:` 汇总行追加 `itemErrors=N`。
 - **验收**：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 语法检查；`--sample` 不回归；`npm test` 全绿（VBS 无单测）。Handover 标注 **needs user validation**（真机难以稳定构造毒邮件/Items 抛错，验收以代码审查 + 语法检查为主）。
+- Completion Notes:
+  - 改动文件：`scripts/collect-outlook-mails.vbs`。
+  - 实现：`folder.Items` 访问加 `On Error Resume Next` 守护，失败输出 `FolderScan: ...; error=Unable to access Outlook folder items...` 并返回 `"failed"`；主循环对 `BuildMailRecord` 调用点加局部守护，单封失败输出 `FolderScan: folder=...; itemError=...`、`itemErrors += 1` 并跳过该封；最终 `FolderScan` 汇总行追加 `itemErrors=N`，`itemErrors > 0` 时返回 `"partial"`，进入既有 `FolderScanSummary partial`。
+  - 边界：没有在 `BuildMailRecord` 内部整体 `On Error Resume Next`，避免静默吞掉字段/逻辑错误；未改 digest markdown 输出格式；未改 FolderScanSummary 语义，只复用 R2.8d 三态。
+  - 验收结果：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output F:/agent-workspace/codex/.tmp/easy-mail-r2-9c-sample.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 366/366 全绿；`git diff --check` 通过。
+  - Manual validation: **needs user validation on real Outlook**——真机难以稳定构造 `folder.Items` COM 异常或 IRM/权限保护毒邮件；后续真实采集时需留意 `FolderScan: ...; itemError=...` 与 `FolderScanSummary: ... partial=...`，partial folder 不应导致整次采集失败。
+  - Known issues: 无。
+  - Commit: pending
 
 ### 核实后接受不修的记录
 
@@ -718,3 +726,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-10 · Codex（R2.9b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；`git log --oneline -5` 最新为 `5b99ece`、`e3f7c44`、`eb3a7b4`、`49e912c`、`33d76b6`。按计划重新定位并阅读 05 矩阵 B-3、03 文档 B-3、R2.9b 条目：R2.7e 已做 category×priority/低 confidence 钳制，当前剩余缺口是 `analysis-schema.ts` 与 `thread-analysis-schema.ts` 的 `normalizeOverview` 仍优先信任模型自报 overview。Claim R2.9b；边界：只删模型 overview 优先分支并补单测，不改 output schema、不改 dashboard/merge 路径、不进入 R2.9c。
 
 - **2026-07-10 · Codex（R2.9b completion）**：Action: mail/thread 两个 schema 的 `normalizeOverview` 改为始终按 normalized items 重算，删除 mail schema 中不再使用的 `numberOr`；补模型 overview 与 items 不一致的回归测试。Validated: `npm run compile` 零错误；定向 schema 测试 9/9 通过；`npm test` 366/366 全绿。Manual: 不适用。Commit: `e6f21a8`。Next: R2.9c。
+
+- **2026-07-10 · Codex（R2.9c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `6e7a2b8`、`e6f21a8`、`5b99ece`、`e3f7c44`、`eb3a7b4`。按计划重新定位并阅读 05 矩阵 C-5b、01 文档 C-1/C-5、R2.9c 条目：`CollectFolderItems` 当前 `Set items = folder.Items` 无守护，主循环 `BuildMailRecord` 调用无守护；`BuildMailRecord` 内直读 `mail.EntryID`/`Subject`/`Body` 等属性，毒邮件可终止整次采集。Claim R2.9c；边界：只在 `folder.Items` 和 `BuildMailRecord` 调用点加局部兜底，不在 `BuildMailRecord` 内整体吞错、不改 digest 输出格式、不进入 R3/R4。
+
+- **2026-07-10 · Codex（R2.9c completion，Milestone R2.9 complete）**：Action: `CollectFolderItems` 对 `folder.Items` 访问失败降级为单文件夹 failed；对单封 `BuildMailRecord` COM 异常局部捕获并跳过该封，计入 `itemErrors`，扫描结束后以 partial 汇总可见。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 366/366 全绿；`git diff --check` 通过。Manual: **needs user validation on real Outlook**，真实采集时留意 `itemError` 与 partial summary。Next: R2.9a-c 已完成；进入 R3 前建议先统一执行真实 Outlook/VS Code/Copilot 验证清单，R3/R4 仍不得自行 claim。
