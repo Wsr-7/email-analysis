@@ -514,7 +514,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 **阶段归属决定**：放在 **R2.10**，不放 R3/R4。理由：它复用现有 `easyMail.folders` 设置与 Outlook collector，不改变 digest/store/schema/thread/UI 架构；目标是减少坏配置导致的采集失败，和 R2.7b/R2.9c 的"单坏文件夹不拖死整次采集"同属配置/collector 可靠性补强。R3/R4 仍保留给结构演进、增量渲染、DIAG 协议、键盘流和密度改造。
 
-### [ ] R2.10a 通过 Outlook 枚举文件夹并写回 `easyMail.folders`
+### [~] R2.10a 通过 Outlook 枚举文件夹并写回 `easyMail.folders`
 
 - **现状（已核实）**：
   1. `package.json` 只注册了静态 array 设置 `easyMail.folders`；VS Code Settings 无运行时动态 enum，无法直接在 Settings 页面里把 Outlook 文件夹列表变成真实 dropdown。
@@ -769,3 +769,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-10 · Codex（R2.10 planning checkpoint）**：用户追问此前"加载 Outlook folder 让用户选择而不是手写"是否已做；恢复核查确认：当前未实现，`easyMail.folders` 仍是静态 array 设置，VBS 仅支持 `--folders`，fable overview 仅把 `folder picker` 降级记录，未进入执行 step。Action: 新增 §3.9/R2.10a 方案与验收标准。Decision: 放 R2.10 而非 R3/R4，因为它复用现有 settings/collector，只是配置误填止血；VS Code Settings 本身不支持运行时动态 enum，最小方案是 command + QuickPick 多选后写回 `easyMail.folders`。No code changed. Next: 若用户确认继续，下一位 worker claim R2.10a；不得借机恢复 sidebar 手写输入框或引入新依赖。
 
 - **2026-07-10 · Claude Fable 5（规划者复审 R2.10a 方案）**：确认阶段归属（R2.10 而非 R3/R4）与总体路线（VBS list mode + QuickPick 写回既有设置）正确，但原方案有一处真机必坏的设计缺陷和数处与仓库现状不符的细节，已直接修订 §3.9：① **list 结果必须写 `--output` 文件（`WriteTextFile` UTF-8，vbs ~L963）而非 stdout**——`runProcess`（`process-runner.ts:9`）返回 `Promise<void>` 不回传 stdout，且 cscript stdout 为 OEM 代码页，中文文件夹名按 utf-8 读必乱码，原验收只测 ASCII 会绿灯放行坏实现（sample 与单测已补中文路径覆盖）；② 命令显示名 `Easy Mail:` → `EasyMail:`（`09645e7` 已统一单词化）；③ 新增硬验收：枚举输出必须是 `ResolveFolder`（vbs ~L445）可往返解析的 `/` 连接路径；④ Outlook 允许文件夹名含 `;` 而 `--folders`/`extension.ts:475` 以 `;` 分隔——此类路径无法往返，list 模式跳过 + 诊断行；同时删除原方案的 "escaped path" 转义设计（Outlook 禁 `/` 与 `\`，转义是多余复杂度）；⑤ 枚举按 R2.9c 惯例加 store/folder 级 COM 局部守护，只收 `DefaultItemType = 0`；⑥ pick 列表并入当前配置现值并预勾选，防旧值（如 well-known 简名 `Inbox`）被静默丢弃。文档-only，无代码改动。Next: worker claim R2.10a，按修订后方案执行。
+
+- **2026-07-10 · Codex（R2.10a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -5` 最新为 `cf435a1`、`2ce915f`、`343d401`、`c763c87`、`c0297c8`。R2.10a 不是 05 矩阵原始条目，已按 §3.9 与来源文档重新定位：`00-overview.md` 仅把 `folder picker` 降级记录，`05-post-c10-fix-optimization-plan.md` 记录过 collector-based folder listing；当前代码确认 `collect-outlook-mails.vbs` 仅支持 `--folders`、`runProcess` 不回传 stdout、`WriteTextFile` 是现有 UTF-8 文件输出路径、`extension.ts` 用 `easyMail.folders` 生效。Claim R2.10a；边界：不改 `easyMail.folders` 字段名/语义、不改 `runProcess` 签名、不做动态 Settings enum、不恢复 sidebar 手写输入、不引入新依赖、不做多账户 scope/anchor/增量拉取。

@@ -21,6 +21,23 @@ export function normalizeMailFolders(value: unknown, fallback: string[]): string
   return folders.length === 1 && folders[0]?.toLowerCase() === "inbox" ? fallback : folders;
 }
 
+export function parseOutlookFolderList(content: string): string[] {
+  const seen = new Set<string>();
+  const folders: string[] = [];
+  for (const rawLine of String(content || "").split(/\r?\n/)) {
+    const line = rawLine.replace(/^\uFEFF/, "").trim();
+    if (!line || line.startsWith("EasyMailFolderList:") || line.startsWith("FolderList:")) {
+      continue;
+    }
+    const key = line.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      folders.push(line);
+    }
+  }
+  return folders;
+}
+
 export function mergeStringLists(a: string[], b: string[]): string[] {
   return [...new Set([...(a || []), ...(b || [])].map(String).map((item) => item.trim()).filter(Boolean))];
 }

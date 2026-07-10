@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, parseOutlookFolderList, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
 import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
 
 describe("positiveNumber", () => {
@@ -44,6 +44,28 @@ describe("default folders", () => {
     assert.deepEqual(normalizeMailFolders("Inbox", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
     assert.deepEqual(normalizeMailFolders("Archive", ["Inbox", "Sent Items"]), ["Archive"]);
     assert.deepEqual(normalizeMailFolders("", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
+  });
+});
+
+describe("parseOutlookFolderList", () => {
+  it("parses folder list files and ignores diagnostics", () => {
+    const content = [
+      "\uFEFFEasyMailFolderList: version=1; mode=list-folders",
+      "",
+      "Inbox",
+      "FolderList: skipped=bad-store",
+      "Mailbox Name/Project Alpha",
+      "示例邮箱/收件箱",
+      "inbox",
+      "Sent Items"
+    ].join("\r\n");
+
+    assert.deepEqual(parseOutlookFolderList(content), [
+      "Inbox",
+      "Mailbox Name/Project Alpha",
+      "示例邮箱/收件箱",
+      "Sent Items"
+    ]);
   });
 });
 

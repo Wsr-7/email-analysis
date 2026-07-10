@@ -166,6 +166,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
         { id: "sampleDigest", label: "加载示例数据", description: "不用真实 Outlook 数据，快速验证界面和分析流程。" },
         { id: "loadModels", label: "加载 Copilot 模型", description: "手动读取当前 VS Code 可用的 Copilot Chat 模型。" },
         { id: "openSettings", label: "打开设置", description: "配置范围、文件夹、批大小、保留期和模型默认值。" },
+        { id: "selectFolders", label: "选择 Outlook 文件夹", description: "从 Outlook 加载可用邮件文件夹并写回设置。" },
         { id: "openPromptConfig", label: "Prompt 分类配置", description: "调整邮件分类、重点发件人和分类规则。" },
         { id: "openReplyTemplate", label: "打开回复模板", description: "Edit reply-template.md to control draft structure with fixed placeholders." }
       ],
@@ -183,7 +184,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
           id: "setup",
           title: "配置建议",
           items: [
-            "VS Code Settings 是唯一配置来源，Dashboard 内设置会自动同步到 Settings。",
+            "VS Code Settings 是唯一配置来源；文件夹建议通过选择 Outlook 文件夹命令加载，手写仍可用。",
             "模型列表不会自动刷新，点击加载模型后会缓存到本机，直到你再次手动加载。",
             "如果 Outlook COM 不可用，先用示例数据验证插件和 Copilot 路径。"
           ]
@@ -227,6 +228,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
       { id: "sampleDigest", label: "Load Sample Data", description: "Validate the UI and analysis path without real Outlook data." },
       { id: "loadModels", label: "Load Copilot Models", description: "Manually read Copilot Chat models exposed by this VS Code session." },
       { id: "openSettings", label: "Open Settings", description: "Configure range, folders, batch size, retention, and model defaults." },
+      { id: "selectFolders", label: "Select Outlook Folders", description: "Load available mail folders from Outlook and save them to Settings." },
       { id: "openPromptConfig", label: "Prompt Categories", description: "Adjust categories, important senders, and classification rules." },
       { id: "openReplyTemplate", label: "Open Reply Template", description: "Edit reply-template.md to control draft structure with fixed placeholders." }
     ],
@@ -244,7 +246,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
         id: "setup",
         title: "Setup",
         items: [
-          "VS Code Settings are the single source of truth. Dashboard controls auto-sync to Settings.",
+          "VS Code Settings are the single source of truth. Use Select Outlook Folders to load folder choices; manual entry remains available.",
           "Model discovery is manual and cached locally until you click Load Copilot Models again.",
           "If Outlook COM is unavailable, use sample data to validate the extension and Copilot path first."
         ]

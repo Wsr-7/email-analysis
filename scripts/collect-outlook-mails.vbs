@@ -18,6 +18,7 @@ config.Add "output", ""
 config.Add "older-than-map", ""
 config.Add "sample", False
 config.Add "help", False
+config.Add "list-folders", False
 
 Dim g_currentUserSmtp, g_currentUserName, g_recipientParseFailures
 g_currentUserSmtp = ""
@@ -32,19 +33,33 @@ If config("help") Then
 End If
 
 If config("output") = "" Then
-  config("output") = fso.BuildPath(GetScriptDirectory(), "..\data\mail-digest.md")
+  If CBool(config("list-folders")) Then
+    config("output") = fso.BuildPath(GetScriptDirectory(), "..\data\outlook-folders.txt")
+  Else
+    config("output") = fso.BuildPath(GetScriptDirectory(), "..\data\mail-digest.md")
+  End If
 End If
 
 EnsureParentFolder config("output")
 
 If CBool(config("sample")) Then
-  WriteSampleDigest config("output"), config
-  WScript.Echo "Generated sample digest at: " & config("output")
+  If CBool(config("list-folders")) Then
+    WriteSampleFolderList config("output")
+    WScript.Echo "Generated sample folder list at: " & config("output")
+  Else
+    WriteSampleDigest config("output"), config
+    WScript.Echo "Generated sample digest at: " & config("output")
+  End If
   WScript.Quit 0
 End If
 
-CollectFromOutlook config("output"), config
-WScript.Echo "Generated digest at: " & config("output")
+If CBool(config("list-folders")) Then
+  CollectFolderList config("output")
+  WScript.Echo "Generated folder list at: " & config("output")
+Else
+  CollectFromOutlook config("output"), config
+  WScript.Echo "Generated digest at: " & config("output")
+End If
 
 Sub ParseArgs(byVal cliArgs, byRef target)
   Dim i
@@ -61,6 +76,8 @@ Sub ParseArgs(byVal cliArgs, byRef target)
         i = i + 1
       Case "--sample"
         target("sample") = True
+      Case "--list-folders"
+        target("list-folders") = True
       Case "--help", "-h", "/?"
         target("help") = True
       Case Else
@@ -68,6 +85,114 @@ Sub ParseArgs(byVal cliArgs, byRef target)
     End Select
   Next
 End Sub
+
+Sub CollectFolderList(byVal outputPath)
+  On Error Resume Next
+  Dim outlook
+  Set outlook = CreateObject("Outlook.Application")
+  If Err.Number <> 0 Then
+    Fail "Unable to create Outlook.Application. " & Err.Description
+  End If
+  On Error GoTo 0
+
+  Dim ns
+  Set ns = outlook.GetNamespace("MAPI")
+
+  Dim content
+  content = "EasyMailFolderList: version=1; mode=list-folders" & vbCrLf
+
+  Dim storeCount
+  On Error Resume Next
+  storeCount = ns.Folders.Count
+  If Err.Number <> 0 Then
+    Fail "Unable to enumerate Outlook stores. " & Err.Description
+  End If
+  On Error GoTo 0
+
+  Dim idx
+  For idx = 1 To storeCount
+    Dim root
+    On Error Resume Next
+    Set root = ns.Folders.Item(idx)
+    If Err.Number <> 0 Then
+      content = content & "FolderList: storeIndex=" & CStr(idx) & "; error=" & OneLine(Err.Description) & vbCrLf
+      Err.Clear
+      On Error GoTo 0
+    Else
+      On Error GoTo 0
+      If Not root Is Nothing Then
+        EnumerateFolderForList root, SafeFolderName(root), content
+      End If
+    End If
+  Next
+
+  WriteTextFile outputPath, content
+End Sub
+
+Sub EnumerateFolderForList(byRef folder, byVal folderPath, byRef content)
+  If folderPath = "" Then
+    Exit Sub
+  End If
+
+  If InStr(folderPath, ";") > 0 Then
+    content = content & "FolderList: skipped=semicolon; path=" & OneLine(folderPath) & vbCrLf
+    Exit Sub
+  End If
+
+  If IsMailFolder(folder) Then
+    content = content & folderPath & vbCrLf
+  End If
+
+  Dim childCount
+  On Error Resume Next
+  childCount = folder.Folders.Count
+  If Err.Number <> 0 Then
+    content = content & "FolderList: path=" & OneLine(folderPath) & "; error=" & OneLine(Err.Description) & vbCrLf
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+  End If
+  On Error GoTo 0
+
+  Dim idx
+  For idx = 1 To childCount
+    Dim child
+    On Error Resume Next
+    Set child = folder.Folders.Item(idx)
+    If Err.Number <> 0 Then
+      content = content & "FolderList: path=" & OneLine(folderPath) & "; childIndex=" & CStr(idx) & "; error=" & OneLine(Err.Description) & vbCrLf
+      Err.Clear
+      On Error GoTo 0
+    Else
+      On Error GoTo 0
+      If Not child Is Nothing Then
+        EnumerateFolderForList child, folderPath & "/" & SafeFolderName(child), content
+      End If
+    End If
+  Next
+End Sub
+
+Function IsMailFolder(byRef folder)
+  IsMailFolder = False
+  On Error Resume Next
+  IsMailFolder = (CLng(folder.DefaultItemType) = 0)
+  If Err.Number <> 0 Then
+    Err.Clear
+    IsMailFolder = False
+  End If
+  On Error GoTo 0
+End Function
+
+Function SafeFolderName(byRef folder)
+  SafeFolderName = ""
+  On Error Resume Next
+  SafeFolderName = Trim(CStr(folder.Name))
+  If Err.Number <> 0 Then
+    Err.Clear
+    SafeFolderName = ""
+  End If
+  On Error GoTo 0
+End Function
 
 Sub CollectFromOutlook(byVal outputPath, byRef target)
   On Error Resume Next
@@ -932,6 +1057,17 @@ Sub WriteSampleDigest(byVal outputPath, byRef target)
   WriteDigest outputPath, target, records, recordCount
 End Sub
 
+Sub WriteSampleFolderList(byVal outputPath)
+  Dim content
+  content = "EasyMailFolderList: version=1; mode=list-folders; sample=true" & vbCrLf
+  content = content & "Inbox" & vbCrLf
+  content = content & "Sent Items" & vbCrLf
+  content = content & "Mailbox Name/Project Alpha" & vbCrLf
+  content = content & ChrW(&H793A) & ChrW(&H4F8B) & ChrW(&H90AE) & ChrW(&H7BB1) & "/" & ChrW(&H6536) & ChrW(&H4EF6) & ChrW(&H7BB1) & vbCrLf
+  content = content & "FolderList: skipped=semicolon; path=Mailbox Name/Bad;Folder" & vbCrLf
+  WriteTextFile outputPath, content
+End Sub
+
 Function BuildSampleRecord(byVal recordIndex, byVal subject, byVal senderName, byVal senderEmail, byVal folderPath, byVal importance, byVal unread, byVal ccMe, byVal bodyExcerpt)
   Dim record
   Set record = CreateObject("Scripting.Dictionary")
@@ -1041,10 +1177,11 @@ Sub PrintUsage()
   WScript.Echo "  --max-items <n>      Maximum mails to include."
   WScript.Echo "  --recent-hours <n>   Only include mails newer than n hours."
   WScript.Echo "  --folders <a;b;c>    Outlook folders to scan."
+  WScript.Echo "  --list-folders       Write available Outlook mail folders to --output."
   WScript.Echo "  --body-chars <n>     Body excerpt length."
   WScript.Echo "  --older-than-map <m> Per-folder older-than anchors: Inbox=2026-06-16 10:00:00;Inbox/Sub=..."
   WScript.Echo "  --output <path>      Output markdown path."
-  WScript.Echo "  --sample             Generate sample digest without Outlook."
+  WScript.Echo "  --sample             Generate sample digest or folder list without Outlook."
   WScript.Echo "  --help               Show this message."
 End Sub
 

@@ -29,6 +29,7 @@
     "onCommand:easyMail.openDailyBrief",
     "onCommand:easyMail.openThreadReport",
     "onCommand:easyMail.openSingleMailReport",
+    "onCommand:easyMail.selectFolders",
     "onCommand:easyMail.openGuide",
     "onCommand:easyMail.openReplyTemplate",
     "onCommand:easyMail.clearLocalCache",
@@ -91,7 +92,7 @@
             "Inbox",
             "Sent Items"
           ],
-          "description": "Outlook folders to scan. Use folder names or paths such as Inbox, Sent Items, Inbox/Project, or Mailbox Name/Inbox. Separate items in this array; Inbox-only legacy values are expanded to Inbox and Sent Items."
+          "description": "Outlook folders to scan. Prefer the EasyMail: Select Outlook Folders command to load available folders from Outlook, or enter names/paths such as Inbox, Sent Items, Inbox/Project, or Mailbox Name/Inbox. Inbox-only legacy values are expanded to Inbox and Sent Items."
         },
         "easyMail.bodyExcerptChars": {
           "type": "number",
@@ -241,7 +242,7 @@
           {
             "id": "easyMail.configure",
             "title": "Configure Mail Range",
-            "description": "Click Settings File to edit mail range, folders, retention, and security settings. Use Load Models and the Analysis Model dropdown in the dashboard for model selection.",
+            "description": "Click Settings File to edit mail range, folders, retention, and security settings. Use EasyMail: Select Outlook Folders to load folder choices from Outlook. Use Load Models and the Analysis Model dropdown in the dashboard for model selection.",
             "completionEvents": [
               "onCommand:easyMail.openSettings"
             ]
@@ -326,6 +327,10 @@
       {
         "command": "easyMail.openSettings",
         "title": "EasyMail: Open Settings"
+      },
+      {
+        "command": "easyMail.selectFolders",
+        "title": "EasyMail: Select Outlook Folders"
       },
       {
         "command": "easyMail.openGuide",
