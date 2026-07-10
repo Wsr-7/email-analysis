@@ -80,10 +80,10 @@ Dashboard 的模型下拉来自当前 VS Code session 实际暴露的 Copilot �
 
 ### 有 Copilot 的完整演示
 
-1. 执行 `Easy Mail: Pull Mail` 或 `Generate Sample Digest`。
-2. 执行 `Easy Mail: Analyze with Copilot`。
-3. 打开 sidebar 中的 `Dashboard`。
-4. 检查分类统计、卡片内容、`Copy Draft` 和 `Ignore`。
+1. 执行 `Easy Mail: Fetch New Mail` 或 `Generate Sample Digest`。
+2. 执行 `Easy Mail: Analyze Next Batch with Copilot`（或 `Analyze All Allowed with Copilot`）。
+3. 打开 sidebar 中的分诊队列，点开一封邮件进入 workbench。
+4. 检查分类统计、卡片内容、草稿生成和 `Ignore`。
 
 ## 配置
 
@@ -103,12 +103,13 @@ easy-mail.config.json
 - `sampleMode`
 - `modelFamily`
 - `outputLanguage`
-- `analysisBatchSize`
-- `autoAnalyzeEnabled`
+- `draftLanguage`
 - `autoAnalyzeMaxClassificationLevel`
 - `mailStoreRetentionDays`
 - `mailIndexRetentionDays`
 - `analysisRetentionDays`
+- `meetingDaysAhead`
+- `collectorTimeoutSeconds`
 - `importantSenders`
 
 `rangeMode` 可选值：
@@ -138,9 +139,11 @@ AI 分析默认优先请求 `gpt-5.4`。如果当前 VS Code / Copilot 运行时
 
 `bodyExcerptChars` 表示每封邮件最多截取多少个正文字符送给 Copilot，默认 `1500`。它不是摘要长度，而是输入裁剪上限；数值越大，模型看到的上下文越多，但分析可能更慢，也更容易超过上下文预算。这个配置只在 VS Code Settings 中调整，Dashboard 不再常驻展示。
 
-`analysisBatchSize` 表示 `Analyze Next Batch` 每次最多分析多少封邮件。
+`draftLanguage` 控制草稿回复语言，`auto` 跟随原邮件/会话语言，也可强制 `en` 或 `zh-CN`。
 
-`autoAnalyzeEnabled` 控制是否允许自动分析。关闭后，邮件会进入手动确认路径，需要用户勾选后点 `Analyze Selected`。
+`meetingDaysAhead` 表示从 Outlook 日历采集未来多少天内的会议，默认 `2` 天。
+
+`collectorTimeoutSeconds` 表示 Outlook 采集脚本（邮件/会议）的超时时间，默认 `120` 秒；邮箱较大或 Outlook 冷启动较慢时可以调大。
 
 `autoAnalyzeMaxClassificationLevel` 控制自动分析允许的最高密级。默认密级：
 
