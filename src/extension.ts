@@ -755,7 +755,7 @@ class EasyMailApp {
   }
 
   public async openSettings(): Promise<void> {
-    await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:Wsr-7.easy-mail");
+    await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:Wsr-7.easymail");
   }
 
   public async openPromptConfig(): Promise<void> {

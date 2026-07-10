@@ -48,7 +48,7 @@ Everything runs locally. No mail content leaves your machine except the excerpts
 Download the `.vsix` from [releases/](./releases) and install it:
 
 ```powershell
-code --install-extension releases/easy-mail-0.2.0.vsix
+code --install-extension releases/easymail-0.2.0.vsix
 ```
 
 Or build from source — see [Development](#development) below.
@@ -86,7 +86,7 @@ For the full module map and architecture diagram, see [AGENTS.md](./AGENTS.md).
 npm install
 npm run compile      # clean out/ then tsc
 npm test             # compile + run all tests (node --test)
-npm run package:vsix # build releases/easy-mail-0.2.0.vsix
+npm run package:vsix # build releases/easymail-0.2.0.vsix
 ```
 
 Run a single test file after compiling:
