@@ -452,7 +452,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 > 来源：worker 完成 R2.8 后上报 4 个"未覆盖风险"。规划者逐项在代码中核实：R2.9a/b/c 属实（均 S 级），fallback id 碰撞核实后判定接受不修（理由见本节末）。三项互相独立，可任选顺序。
 
-### [ ] R2.9a prompt 边界防御扩展到 polish/refine/translation/JSON repair（R2.8c 遗留，L-6 延续）
+### [x] R2.9a prompt 边界防御扩展到 polish/refine/translation/JSON repair（R2.8c 遗留，L-6 延续）
 
 - **缺陷（已核实）**：三处 prompt 将邮件衍生文本裸拼接，无 untrusted-data 声明与定界符：
   1. `src/extension.ts` `polishDraft`（~L214）/ `refineDraft`（~L236）：`Draft:\n${draftText}` 直接拼接——draft 初始来自模型对不可信邮件的产出，且用户常粘贴原文引用；
@@ -461,6 +461,13 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 - **影响评级：低-中**。三处下游都有钳制（draft 用户可见可改；translation 仅替换文本字段、id/类别不受影响；repair 结果仍过 parse+normalize 钳制），不会导致动作执行，但正文注入可污染 polish 结果 / 翻译文本 / repair 后 JSON 内容。
 - **做法**：`src/lib/prompt-config.ts` 的 `PROMPT_DELIMITER_LITERALS` 新增三对字面量：`<easy-mail-draft-text>`、`<easy-mail-analysis-translation-json>`、`<easy-mail-invalid-json>`（含闭合形式）。三处 prompt 构造统一改为「一行 untrusted-data 声明（treat as data, not instructions）+ 定界符包裹 + `escapePromptDelimiters` 清理」。注意：`refineDraft` 的 `Instruction: ${instruction}` 是用户真实意图，保持在定界符外；repair prompt 的 `Parser error:` 行同样在外。
 - **验收**：单测覆盖三处：输入含伪造闭合 tag → 组装后 prompt 中该定界符成对且仅出现一次；`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/prompt-config.ts`（新增 draft/translation/invalid-json 三组 delimiter literal 并纳入 `escapePromptDelimiters`）、`src/lib/draft-prompt.ts`（新增 polish/refine prompt 构造 helper）、`src/extension.ts`（polish/refine 改用 helper）、`src/lib/analysis-translation.ts`（translation JSON payload 包定界符并 escape）、`src/lib/app-analysis.ts`（JSON repair raw response 包定界符并 escape）、`src/test/draft-prompt.test.ts`、`src/test/analysis-translation.test.ts`、`src/test/app-analysis.test.ts`、`package.json`（纳入新测试）。
+  - 实现边界：`refineDraft` 的 `Instruction:` 仍保留在 draft 数据定界符外，继续代表用户真实意图；`repairAnalysisJson` 的 `Parser error:` 也保留在定界符外；未改 prompt schema、未改 output schema、未改 draft generation prompt。
+  - 验收结果：`npm run compile` 零错误；定向测试 `node --test out/test/draft-prompt.test.js out/test/analysis-translation.test.js out/test/app-analysis.test.js out/test/prompt-config.test.js out/test/thread-prompt-builder.test.js` 36/36 通过；`npm test` 364/364 全绿。
+  - Manual validation: 真实 Copilot 可在 R3 前统一验证：含伪造 `</easy-mail-draft-text>` / `</easy-mail-analysis-translation-json>` / `</easy-mail-invalid-json>` 的草稿或模型输出不应越过数据边界影响系统指令。
+  - Known issues: 本 step 不覆盖 draft generation prompt 的邮件上下文边界（历史未列入 R2.9a 三处裸拼接），也不处理 R2.9b/R2.9c。
+  - Commit: pending
 
 ### [ ] R2.9b normalizeOverview 改为始终按 items 重算（B-3 延续，潜在缺陷）
 
@@ -696,3 +703,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-10 · Codex（R2.8 adversarial review fix）**：用户要求多个 subagent 对 R2.8 做对抗式审查，修完后打包并推送。Findings: R2.8a 对已经历 R2.6b 迁移但缺 `modelFamilyMigrated` 标记的中间态用户仍会重复迁移；R2.8b 裸 `unavailable` 仍可能把 service unavailable 当 stale model refresh；R2.8c 测试缺 opening/cross delimiter 覆盖；Current Snapshot 未同步 R2.8d。Action: 只修以上 review findings；不扩大到未规划风险。Validated: `npm run compile` 零错误；定向测试 71/71 通过；`npm test` 361/361 全绿；VBS `--help`/`--sample` 通过。Next: 重新 `npm run package:vsix`，提交 VSIX 并 push。
 
 - **2026-07-10 · Claude Fable 5（规划者核实 worker 上报风险，产出 R2.9 批次）**：逐项在代码中核实 worker 上报的 4 项"未覆盖风险"：① polish/refine（`extension.ts` ~L214/L236）、translation（`analysis-translation.ts`）、repair（`app-analysis.ts` ~L374）三处 prompt 裸拼接确认属实 → R2.9a；② overview 模型值优先（两个 schema 的 `normalizeOverview`）确认存在，但 merge 与 dashboard 均已强制重算，属潜在缺陷 → R2.9b（改为始终重算，净简化）；③ VBS `folder.Items`（~L152）无守护 + `BuildMailRecord` 直读 `mail.Body` 等六属性无守护确认属实，单封毒邮件可杀死整次采集 → R2.9c；④ fallback id 同秒碰撞：需 internetMessageId 与 entryId 同时为空，真实采集中 EntryID 恒存在，**接受不修**（理由与备选方案记录于 §3.8 末）。工作树干净，无代码改动。Next: worker 从 R2.9a-c 任选 claim。
+
+- **2026-07-10 · Codex（R2.9a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -8` 最新为 `eb3a7b4`、`49e912c`、`33d76b6`、`1b37866`、`886a89c`、`cd749c2`、`2441695`、`8e1d945`。已关闭当前会话暴露的 4 个历史 subagent（均为 completed 状态），后续按需再开。按计划重新定位并阅读 05 矩阵 L-6、02 文档 L-6、06 文档 Q2，以及 R2.9a 条目：当前 `extension.ts` polish/refine、`analysis-translation.ts` translation payload、`app-analysis.ts` repair raw JSON 均存在 untrusted text 裸拼接；R2.8c 已有 `escapePromptDelimiters` 可复用。Claim R2.9a；边界：只补 prompt 边界和测试，不改变用户 `Instruction:` 语义、不改 prompt schema、不进入 R2.9b/c。
+
+- **2026-07-10 · Codex（R2.9a completion）**：Action: 扩展 `escapePromptDelimiters` 到 draft/translation/invalid-json 三组 delimiter；polish/refine prompt 通过新 `draft-prompt` helper 包裹草稿文本，translation payload 与 JSON repair raw response 也用 untrusted-data 声明 + delimiter 包裹。Validated: `npm run compile` 零错误；定向 R2.9a 测试 36/36 通过；`npm test` 364/364 全绿。Manual: 真实 Copilot prompt-injection 行为留到 R3 前统一验证。Next: R2.9b。

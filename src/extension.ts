@@ -23,6 +23,7 @@ import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
 import { handleWebviewMessage, type MessageHandlerContext } from "./lib/message-handler";
 import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
+import { buildPolishDraftPrompt, buildRefineDraftPrompt } from "./lib/draft-prompt";
 import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/process-runner";
 import { AppDataStore } from "./lib/app-data";
 import { DashboardProvider } from "./lib/dashboard-provider";
@@ -211,7 +212,7 @@ class EasyMailApp {
     await this.log("draft:polish", { itemId });
     const config = await this.readConfig();
     const language = resolveDraftLanguage(config.draftLanguage, draftText);
-    const prompt = `You are an email writing assistant. Polish the following draft reply: improve grammar, clarity, and tone while preserving the original intent and meaning. Keep the style concise, professional, and appropriate for internal workplace communication. Output only the improved reply text, nothing else. ${draftOutputInstruction(language)}\n\nDraft:\n${draftText}`;
+    const prompt = buildPolishDraftPrompt(draftText, language);
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Polish draft", cancellable: true },
@@ -233,7 +234,7 @@ class EasyMailApp {
     await this.log("draft:refine", { itemId });
     const config = await this.readConfig();
     const language = resolveDraftLanguage(config.draftLanguage, draftText);
-    const prompt = `You are an email writing assistant. Rewrite the following draft reply according to the user's instruction. Keep the style concise, professional, and appropriate for internal workplace communication unless the instruction says otherwise. Output only the rewritten reply text, nothing else. ${draftOutputInstruction(language)}\n\nInstruction: ${instruction}\n\nDraft:\n${draftText}`;
+    const prompt = buildRefineDraftPrompt(draftText, instruction, language);
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Refine draft", cancellable: true },

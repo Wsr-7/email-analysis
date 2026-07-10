@@ -17,11 +17,23 @@ export interface PromptConfig {
 
 const DIGEST_DELIMITER_START = "<easy-mail-digest-data>";
 const DIGEST_DELIMITER_END = "</easy-mail-digest-data>";
+export const DRAFT_TEXT_DELIMITER_START = "<easy-mail-draft-text>";
+export const DRAFT_TEXT_DELIMITER_END = "</easy-mail-draft-text>";
+export const ANALYSIS_TRANSLATION_DELIMITER_START = "<easy-mail-analysis-translation-json>";
+export const ANALYSIS_TRANSLATION_DELIMITER_END = "</easy-mail-analysis-translation-json>";
+export const INVALID_JSON_DELIMITER_START = "<easy-mail-invalid-json>";
+export const INVALID_JSON_DELIMITER_END = "</easy-mail-invalid-json>";
 const PROMPT_DELIMITER_LITERALS = [
   DIGEST_DELIMITER_START,
   DIGEST_DELIMITER_END,
   "<easy-mail-thread-timeline-json>",
-  "</easy-mail-thread-timeline-json>"
+  "</easy-mail-thread-timeline-json>",
+  DRAFT_TEXT_DELIMITER_START,
+  DRAFT_TEXT_DELIMITER_END,
+  ANALYSIS_TRANSLATION_DELIMITER_START,
+  ANALYSIS_TRANSLATION_DELIMITER_END,
+  INVALID_JSON_DELIMITER_START,
+  INVALID_JSON_DELIMITER_END
 ];
 
 export const DEFAULT_PROMPT_CONFIG: PromptConfig = {
