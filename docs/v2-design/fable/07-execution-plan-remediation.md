@@ -481,7 +481,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`npm run compile` 零错误；定向测试 `node --test out/test/analysis-schema.test.js out/test/thread-analysis-schema.test.js` 9/9 通过；`npm test` 366/366 全绿。
   - Manual validation: 不适用（纯 normalize 逻辑）。
   - Known issues: 无；本 step 不改模型 output schema，模型仍可输出 overview，但代码忽略它。
-  - Commit: pending
+  - Commit: `e6f21a8`
 
 ### [ ] R2.9c VBS folder.Items 与单封邮件字段读取的 COM 异常局部兜底（R2.8d 遗留，C-5b 延续）
 
@@ -717,4 +717,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-10 · Codex（R2.9b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；`git log --oneline -5` 最新为 `5b99ece`、`e3f7c44`、`eb3a7b4`、`49e912c`、`33d76b6`。按计划重新定位并阅读 05 矩阵 B-3、03 文档 B-3、R2.9b 条目：R2.7e 已做 category×priority/低 confidence 钳制，当前剩余缺口是 `analysis-schema.ts` 与 `thread-analysis-schema.ts` 的 `normalizeOverview` 仍优先信任模型自报 overview。Claim R2.9b；边界：只删模型 overview 优先分支并补单测，不改 output schema、不改 dashboard/merge 路径、不进入 R2.9c。
 
-- **2026-07-10 · Codex（R2.9b completion）**：Action: mail/thread 两个 schema 的 `normalizeOverview` 改为始终按 normalized items 重算，删除 mail schema 中不再使用的 `numberOr`；补模型 overview 与 items 不一致的回归测试。Validated: `npm run compile` 零错误；定向 schema 测试 9/9 通过；`npm test` 366/366 全绿。Manual: 不适用。Next: R2.9c。
+- **2026-07-10 · Codex（R2.9b completion）**：Action: mail/thread 两个 schema 的 `normalizeOverview` 改为始终按 normalized items 重算，删除 mail schema 中不再使用的 `numberOr`；补模型 overview 与 items 不一致的回归测试。Validated: `npm run compile` 零错误；定向 schema 测试 9/9 通过；`npm test` 366/366 全绿。Manual: 不适用。Commit: `e6f21a8`。Next: R2.9c。
