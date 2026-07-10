@@ -14,7 +14,7 @@ test("renderEasyMailGuideHtml renders guide content and command buttons", () => 
     }
   });
 
-  assert.match(html, /Easy Mail 使用指南/);
+  assert.match(html, /EasyMail 使用指南/);
   assert.match(html, /data-action="openDashboard"/);
   assert.match(html, /data-action="loadModels"/);
   assert.match(html, /guideAction/);

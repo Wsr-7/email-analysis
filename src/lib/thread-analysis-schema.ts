@@ -78,14 +78,13 @@ export function normalizeThreadAnalysis(input: unknown, allowedCategories?: stri
 }
 
 function normalizeOverview(overview: unknown, items: ThreadAnalysisItem[]): ThreadAnalysisOverview {
-  const base = isObject(overview) ? overview : {};
   const grouped = groupCounts(items);
   return {
-    totalThreads: numberOr(base.totalThreads, items.length),
-    mustHandleToday: numberOr(base.mustHandleToday, grouped.mustHandleToday),
-    risks: numberOr(base.risks, grouped.risk),
-    waitingForMe: numberOr(base.waitingForMe, grouped.waitingForMe),
-    notices: numberOr(base.notices, grouped.notice)
+    totalThreads: items.length,
+    mustHandleToday: grouped.mustHandleToday,
+    risks: grouped.risk,
+    waitingForMe: grouped.waitingForMe,
+    notices: grouped.notice
   };
 }
 

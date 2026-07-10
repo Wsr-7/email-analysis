@@ -392,35 +392,119 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 > 来源：规划者对 `76bbfc7..6e9aef8` 全量 diff 的复审（独立复核 `npm run compile` 零错误、`npm test` 357/357 全绿）。R2.6a/c/e、R2.7a-e 主体实现全部确认正确；以下 4 项（R2.8a-c 规划者复审产出，R2.8d 由 worker 复核发现、规划者采纳）是本轮引入或未闭合的缺陷，修完即达到"仅剩人工验证"状态。
 
-### [ ] R2.8a modelFamily 迁移非一次性 → 用户选中默认同名模型会被 legacy 值反复覆盖（R2.6b 缺陷，优先）
+### [x] R2.8a modelFamily 迁移非一次性 → 用户选中默认同名模型会被 legacy 值反复覆盖（R2.6b 缺陷，优先）
 
 - **缺陷**：`shouldMigrateLegacyModelFamily` 的第三条件 `storedValue === defaultModel && legacyValue !== defaultModel` 会**反复**触发：legacy settings 键从不清除、也无迁移完成标记。复现链：老用户 settings.json 有 `easyMail.modelFamily: "X"`（X ≠ "gpt-5.4"）→ 首次迁移正常 → 用户之后在 dashboard 选中 id/family 恰为 `gpt-5.4` 的模型（`renderModelOptions` 的 option value = `model.id || model.family`，与默认串同名完全可能）→ 下一次 `readConfig()` 判定 stored===default 再次"迁移"→ 用户选择被 X 覆盖，且每次 readConfig 都重写私有 config 文件。用户永远无法保持选中该模型。
 - **做法**：迁移改一次性——私有 config 增加 `modelFamilyMigrated: true` 标记，`shouldMigrateLegacyModelFamily` 增加 `migrated` 参数，已标记则永不再迁移；首次迁移时把标记与 modelFamily 一起 `writeConfig`。可选加分项：迁移成功后 try/catch 尝试 `settings.update("modelFamily", undefined, Global)` 清除孤儿键（unregistered 键 update 可能抛错，必须 catch 吞掉）。
 - **验收**：纯函数单测：已标记时 stored===default 且 legacy≠default → 不迁移；未标记时现有用例全部保持。`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/config-utils.ts`（`shouldMigrateLegacyModelFamily` 增加 `migrated` 参数，已迁移则直接 false）、`src/extension.ts`（迁移时写入 `modelFamilyMigrated: true`，后续 readConfig 传入标记）、`src/test/config-utils.test.ts`（补已标记不再迁移用例）。
+  - 验收结果：`npm run compile` 零错误；`node --test out/test/config-utils.test.js` 32/32 通过；`npm test` 358/358 全绿。
+  - Manual validation: 真实 VS Code 扩展宿主仍需验证旧 `easyMail.modelFamily` settings 值只迁移一次；用户随后在 dashboard 选择默认同名模型时不会再被 legacy settings 覆盖。
+  - Known issues: 未清除旧 VS Code settings 孤儿键，依赖 `modelFamilyMigrated` 标记阻断重复迁移；这是本 step 的最小安全修复。
+  - Commit: `fd724e6`
 
-### [ ] R2.8b isModelRefreshableErrorMessage 正则过宽 → 429 类错误被无退避地立即重发（R2.6d 缺陷）
+### [x] R2.8b isModelRefreshableErrorMessage 正则过宽 → 429 类错误被无退避地立即重发（R2.6d 缺陷）
 
 - **缺陷**：`llm-provider.ts` 的 `/model|language model|unavailable|not available|not found|no longer|invalid|auth|sign.?in|permission|access/` 会命中大量非"模型过期"错误——如 `"Rate limit exceeded for model gpt-x"`、`"Model is overloaded"` 都含 "model"。命中后 `copilot-provider.sendPrompt` **立即无退避**重发一次，再与外层 `sendPromptWithRetry` 的退避重试叠加：429 场景最坏请求数放大近一倍，且内层重试恰恰发生在最不该立即重发的时刻（消耗 premium requests 配额）。
 - **做法**：① `isRefreshableModelError` 先排除外层 retryable 模式（复用/对齐 `isRetryableLlmError` 的 `/429|too many requests|rate.?limit|quota|temporar|timeout/i`，命中即 return false，交给外层退避处理）；② 正则收窄为确属"所选模型已不存在/不可用"的语义：`/not found|no longer (available|supported)|unavailable|unknown model|model_not_supported|does not exist/i`；`auth`/`permission`/`invalid` 类刷新模型列表也无济于事，移出。
 - **验收**：单测：rate-limit 消息 → false；"model not found" → true；`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/llm-provider.ts`（rate-limit/quota/timeout/temporary 先排除，刷新模型列表只匹配 stale/missing model 语义）、`src/test/llm-provider.test.ts`（rate-limit/auth 负向与 model-not-found 正向断言）。
+  - 验收结果：`npm run compile` 零错误；`node --test out/test/llm-provider.test.js` 7/7 通过；`npm test` 358/358 全绿。
+  - Manual validation: 真实 VS Code + Copilot 仍需验证 429/quota 错误只走外层退避，不再先立即 refresh+resend。
+  - Known issues: 无。
+  - Commit: `7e34367`
 
-### [ ] R2.8c 定界符可被邮件正文闭合逃逸（R2.7a 缺陷）
+### [x] R2.8c 定界符可被邮件正文闭合逃逸（R2.7a 缺陷）
 
 - **缺陷**：邮件正文只要包含字面量 `</easy-mail-digest-data>`（或线程路径的 `</easy-mail-thread-timeline-json>`）即可提前闭合数据段，其后内容脱离"untrusted data"声明的保护——注入防御被一行正文绕过。
 - **做法**：`composeAnalysisPrompt` / `buildThreadAnalysisPrompt` 在包裹前对 digestText / `JSON.stringify(payload)` 做一次替换，把出现的两个定界符字面量改写为无害形式（如 `[easy-mail-delimiter-removed]`）；导出小工具函数便于两处复用与单测。
 - **验收**：单测：digest 正文含闭合定界符 → 组装后 prompt 中定界符仅出现成对的一次；`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/prompt-config.ts`（新增导出 `escapePromptDelimiters` 并用于 digest payload）、`src/lib/thread-prompt-builder.ts`（timeline JSON 入 prompt 前复用 delimiter 清理）、`src/test/prompt-config.test.ts`、`src/test/thread-prompt-builder.test.ts`。
+  - 验收结果：`npm run compile` 零错误；`node --test out/test/prompt-config.test.js out/test/thread-prompt-builder.test.js` 11/11 通过；`npm test` 360/360 全绿。
+  - Manual validation: 真实 Copilot 仍需观察包含伪造 `</easy-mail-...>` 的邮件不会逃出数据段改变输出规则。
+  - Known issues: 只覆盖 R2.7a 已包定界符的 batch/thread payload；draft/translation/JSON repair prompt boundary 是本轮 review 新发现但未列入 R2.8c 的后续规划项。
+  - Commit: `2441695`
 
-### [ ] R2.8d GetNext 中途失败的"部分采集"不进失败汇总（R2.7b 缺陷，worker 与规划者交叉确认）
+### [x] R2.8d GetNext 中途失败的"部分采集"不进失败汇总（R2.7b 缺陷，worker 与规划者交叉确认）
 
 - **缺陷**：`collect-outlook-mails.vbs` `CollectFolderItems` 在 `GetNext` 中途失败时返回 `addedInFolder > 0`——已采到邮件即计为成功。后果：该文件夹"扫到一半断了"与"扫完了"对采集结果和 `FolderScanSummary` 完全不可区分，中断点之后未扫到的邮件成为无感知数据缺口（recentHours 降序模式下断得早会漏较旧的近期邮件）。现有 `FolderScan: error=` 诊断行只是日志，不构成失败信号。
 - **做法**：把"部分采集"作为独立状态计数：`CollectFromOutlook` 新增 `folderPartialCount`/`folderPartials` 列表；`CollectFolderItems` 返回值区分三态（如 "ok"/"partial"/"failed" 字符串，或保持 Boolean 成功 + byRef partial 标志，取实现最小者），`GetNext` 中途失败且 `addedInFolder > 0` 时计入 partial（不触发 all-fail）；`FolderScanSummary` 扩展为 `failed=N; partial=M; total=K; folders=...; partialFolders=...`，只要 failed+partial > 0 就输出。不改 digest 格式、不改整体成败语义。
 - **验收**：`cscript //nologo --help` 语法检查；`--sample` 不回归；Handover 标注 needs user validation（真机难以稳定构造 GetNext 中途失败，验收以代码审查 + 语法检查为主，真机留意 partial 行）。
+- Completion Notes:
+  - 改动文件：`scripts/collect-outlook-mails.vbs`（`CollectFolderItems` 返回 `"ok"`/`"failed"`/`"partial"`；`GetNext` 中途失败且已有新增记录时返回 partial；外层新增 `folderPartialCount`/`folderPartials` 并扩展 `FolderScanSummary`）。
+  - 验收结果：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output F:/agent-workspace/codex/.tmp/easy-mail-r2-8d-sample.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 360/360 全绿。
+  - Manual validation: **needs user validation on real Outlook**——真机难以稳定构造 GetNext 中途失败；后续真实大邮箱采集时需留意 stdout 是否出现 `FolderScanSummary: failed=...; partial=...`，partial folder 不应触发 all-fail，但应可见。
+  - Known issues: 本 step 未处理 reviewer 额外指出的 `folder.Items` 和单封 `BuildMailRecord` COM 异常；已在 handover 风险中保留，需后续规划。
+  - Commit: `886a89c`
 
 ### 复审确认无需行动的记录
 
 - R2.7e 的 `confidence` 缺失不降级是 worker 的自觉保守选择，Completion Notes 已写明兼容性理由，接受。
 - ~~R2.7b 的 `GetNext` 中途失败按"已有产出即成功"处理，配套 `FolderScan: error=` 诊断行，接受。~~ **2026-07-09 修订**：worker 复核指出"部分采集不进失败汇总"是无感知数据缺口，规划者采纳，升级为 R2.8d。
 - vsix 打包提交（`8c479d7`/`6e9aef8`）符合仓库 `releases/` 既有惯例，接受。
+
+---
+
+## 3.8 Milestone R2.9 — Worker 风险上报核实批（2026-07-10 worker 上报 4 项，规划者逐项核实：3 项立项 + 1 项接受不修）
+
+> 来源：worker 完成 R2.8 后上报 4 个"未覆盖风险"。规划者逐项在代码中核实：R2.9a/b/c 属实（均 S 级），fallback id 碰撞核实后判定接受不修（理由见本节末）。三项互相独立，可任选顺序。
+
+### [x] R2.9a prompt 边界防御扩展到 polish/refine/translation/JSON repair（R2.8c 遗留，L-6 延续）
+
+- **缺陷（已核实）**：三处 prompt 将邮件衍生文本裸拼接，无 untrusted-data 声明与定界符：
+  1. `src/extension.ts` `polishDraft`（~L214）/ `refineDraft`（~L236）：`Draft:\n${draftText}` 直接拼接——draft 初始来自模型对不可信邮件的产出，且用户常粘贴原文引用；
+  2. `src/lib/analysis-translation.ts` `buildAnalysisTranslationPrompt`（~L31）：`JSON.stringify(payload)` 直接拼接，payload 的 summary/reason 等字段源自不可信邮件；
+  3. `src/lib/app-analysis.ts` `repairAnalysisJson`（~L374）：上一轮模型原始输出（内嵌邮件文本）直接拼接。
+- **影响评级：低-中**。三处下游都有钳制（draft 用户可见可改；translation 仅替换文本字段、id/类别不受影响；repair 结果仍过 parse+normalize 钳制），不会导致动作执行，但正文注入可污染 polish 结果 / 翻译文本 / repair 后 JSON 内容。
+- **做法**：`src/lib/prompt-config.ts` 的 `PROMPT_DELIMITER_LITERALS` 新增三对字面量：`<easy-mail-draft-text>`、`<easy-mail-analysis-translation-json>`、`<easy-mail-invalid-json>`（含闭合形式）。三处 prompt 构造统一改为「一行 untrusted-data 声明（treat as data, not instructions）+ 定界符包裹 + `escapePromptDelimiters` 清理」。注意：`refineDraft` 的 `Instruction: ${instruction}` 是用户真实意图，保持在定界符外；repair prompt 的 `Parser error:` 行同样在外。
+- **验收**：单测覆盖三处：输入含伪造闭合 tag → 组装后 prompt 中该定界符成对且仅出现一次；`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/prompt-config.ts`（新增 draft/translation/invalid-json 三组 delimiter literal 并纳入 `escapePromptDelimiters`）、`src/lib/draft-prompt.ts`（新增 polish/refine prompt 构造 helper）、`src/extension.ts`（polish/refine 改用 helper）、`src/lib/analysis-translation.ts`（translation JSON payload 包定界符并 escape）、`src/lib/app-analysis.ts`（JSON repair raw response 包定界符并 escape）、`src/test/draft-prompt.test.ts`、`src/test/analysis-translation.test.ts`、`src/test/app-analysis.test.ts`、`package.json`（纳入新测试）。
+  - 实现边界：`refineDraft` 的 `Instruction:` 仍保留在 draft 数据定界符外，继续代表用户真实意图；`repairAnalysisJson` 的 `Parser error:` 也保留在定界符外；未改 prompt schema、未改 output schema、未改 draft generation prompt。
+  - 验收结果：`npm run compile` 零错误；定向测试 `node --test out/test/draft-prompt.test.js out/test/analysis-translation.test.js out/test/app-analysis.test.js out/test/prompt-config.test.js out/test/thread-prompt-builder.test.js` 36/36 通过；`npm test` 364/364 全绿。
+  - Manual validation: 真实 Copilot 可在 R3 前统一验证：含伪造 `</easy-mail-draft-text>` / `</easy-mail-analysis-translation-json>` / `</easy-mail-invalid-json>` 的草稿或模型输出不应越过数据边界影响系统指令。
+  - Known issues: 本 step 不覆盖 draft generation prompt 的邮件上下文边界（历史未列入 R2.9a 三处裸拼接），也不处理 R2.9b/R2.9c。
+  - Commit: `e3f7c44`
+
+### [x] R2.9b normalizeOverview 改为始终按 items 重算（B-3 延续，潜在缺陷）
+
+- **现状（已核实）**：`src/lib/analysis-schema.ts` `normalizeOverview`（~L112）与 `src/lib/thread-analysis-schema.ts`（~L80）都是「模型给的 count 优先（`numberOr(base.totalMails, items.length)`），重算仅兜底」。但两条持久化路径 `mergeAnalysisResults`/`mergeThreadAnalysisResults` 都传 `overview: {}` 强制重算，`dashboard-state.ts` `buildOverview` 也独立重算——**stale count 今天到不了 UI 与磁盘，是潜在缺陷而非现行 bug**。
+- **为什么仍要修**：normalize 过程会钳制 items（confidence<0.7 降级 uncertain、priority clamp），模型自报 count 与钳制后 items 必然不一致，「模型优先」分支永远不可信；保留它等于给未来任何直接消费 normalize 输出的调用埋雷。删分支还是净简化。
+- **做法**：两个 `normalizeOverview` 删掉模型值优先逻辑，直接用 `items.length` + `groupCounts(items)` 重算；不动 outputSchemaPrompt（模型仍可输出 overview，被忽略即可，改动最小）；同步修正受影响单测。
+- **验收**：单测：模型 overview 与 items 计数不一致 → 结果以 items 重算为准；`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/analysis-schema.ts`、`src/lib/thread-analysis-schema.ts`、`src/test/analysis-schema.test.ts`、`src/test/thread-analysis-schema.test.ts`。
+  - 实现：两个 `normalizeOverview` 均忽略模型自报 overview，直接从 normalized items 的长度与 `groupCounts(items)` 生成计数；`analysis-schema.ts` 中不再需要的 `numberOr` 删除，`thread-analysis-schema.ts` 中 `numberOr` 仍保留给 confidence fallback 使用。
+  - 验收结果：`npm run compile` 零错误；定向测试 `node --test out/test/analysis-schema.test.js out/test/thread-analysis-schema.test.js` 9/9 通过；`npm test` 366/366 全绿。
+  - Manual validation: 不适用（纯 normalize 逻辑）。
+  - Known issues: 无；本 step 不改模型 output schema，模型仍可输出 overview，但代码忽略它。
+  - Commit: `e6f21a8`
+
+### [x] R2.9c VBS folder.Items 与单封邮件字段读取的 COM 异常局部兜底（R2.8d 遗留，C-5b 延续）
+
+- **缺陷（已核实）**：`scripts/collect-outlook-mails.vbs` 两处无守护：
+  1. `Set items = folder.Items`（~L152）无 On Error 守护，COM 抛错 = 整脚本崩、无 digest（绕过了 R2.7b 的"单文件夹失败不中止全部"）；
+  2. `BuildMailRecord`（~L468）内 `mail.EntryID`/`mail.Subject`/`mail.SenderName`/`mail.UnRead`/`mail.Importance`/`mail.Body` 为调用点直读（`SafeString` 不吞属性 getter 异常），主循环对 `BuildMailRecord` 调用也无守护——单封"毒邮件"（典型：IRM/权限保护邮件读 `Body` 抛错）会终止整次采集。
+- **做法**：
+  1. `folder.Items` 包 On Error Resume Next：失败 → `FolderScanError` 诊断行 + 返回 `"failed"`（复用 R2.8d 三态）；
+  2. 主循环内守护 `BuildMailRecord` 调用：`On Error Resume Next` → 失败时 `Err.Clear` + 每封一行诊断（如 `FolderScan: folder=...; itemError=...`，经 `OneLine` 清洗）+ `itemErrors` 计数 + 跳过该封继续；**不要**在 `BuildMailRecord` 内部整体套 On Error（会静默掩盖逻辑错误），守护放调用点；
+  3. 文件夹扫描正常走完但 `itemErrors > 0` → 状态降为 `"partial"`，随 R2.8d 的 `FolderScanSummary` 可见；`FolderScan:` 汇总行追加 `itemErrors=N`。
+- **验收**：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 语法检查；`--sample` 不回归；`npm test` 全绿（VBS 无单测）。Handover 标注 **needs user validation**（真机难以稳定构造毒邮件/Items 抛错，验收以代码审查 + 语法检查为主）。
+- Completion Notes:
+  - 改动文件：`scripts/collect-outlook-mails.vbs`。
+  - 实现：`folder.Items` 访问加 `On Error Resume Next` 守护，失败输出 `FolderScan: ...; error=Unable to access Outlook folder items...` 并返回 `"failed"`；主循环对 `BuildMailRecord` 调用点加局部守护，单封失败输出 `FolderScan: folder=...; itemError=...`、`itemErrors += 1` 并跳过该封；最终 `FolderScan` 汇总行追加 `itemErrors=N`，`itemErrors > 0` 时返回 `"partial"`，进入既有 `FolderScanSummary partial`。
+  - 边界：没有在 `BuildMailRecord` 内部整体 `On Error Resume Next`，避免静默吞掉字段/逻辑错误；未改 digest markdown 输出格式；未改 FolderScanSummary 语义，只复用 R2.8d 三态。
+  - 验收结果：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output F:/agent-workspace/codex/.tmp/easy-mail-r2-9c-sample.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 366/366 全绿；`git diff --check` 通过。
+  - Manual validation: **needs user validation on real Outlook**——真机难以稳定构造 `folder.Items` COM 异常或 IRM/权限保护毒邮件；后续真实采集时需留意 `FolderScan: ...; itemError=...` 与 `FolderScanSummary: ... partial=...`，partial folder 不应导致整次采集失败。
+  - Known issues: 无。
+  - Commit: `e0b091a`
+
+### 核实后接受不修的记录
+
+- **fallback stableMailId 同秒碰撞**（worker 上报第 3 项）：触发需 `internetMessageId` 与 `entryId` **同时为空** + 同 folder/from/subject/同秒。真实 Outlook 采集中 `EntryID` 恒存在（COM 对象保存即有）；R2.9c 落地后字段读取失败的邮件整封跳过而非产出空 entryId，触发面趋近于零——fallback 分支实际服务对象是 sample digest（自带 entryId）与畸形 digest 行。备选方案（hash 源追加 to/cc 作 tiebreaker）本身稳定可行，但对现实触发面为零的风险不值得引入 id 变更噪声。记录在案；若 R3 的 C-3 digest NDJSON 化重排 id 策略，届时一并考虑。
 
 ---
 
@@ -449,7 +533,8 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
 - 2026-07-08 · **Milestone R1 全部 7 个 step 完成并提交**（R1.1-R1.7）。R1.2/R1.3 需真实 Outlook 验证；R1.6 需用户手动验证草稿保留场景（见各自 Completion Notes）。下一步：R2（效率与语言，前置 R1 已满足）或用户先做真机验证。R3/R4 需用户确认设计后才能 claim，worker 不得自行展开。
 - 2026-07-09 · **规划者复审 R1/R2 完成**（diff `664620f..d4d1a32`，`npm run compile` + `npm test` 340/340 独立复核通过）。产出两个新批次：**R2.6 复审修复批**（R2.6a 草稿覆盖回归为最高优先）与 **R2.7 漏排补录批**（L-6/C-5b/C-7d/L-8e/B-2e+B-3）。C-5a 确认已被 R2.5 review fix 顺带解决，C-7b 部分缓解。用户真机验证 R1.2/R1.3/R1.6/R2.5 时**建议先做 R2.6a**，否则草稿保留场景的验证结果会被该回归污染。
-- 2026-07-09 · **规划者二次复审 R2.6/R2.7 完成**（diff `76bbfc7..6e9aef8`，独立复核 357/357 全绿）。R2.6a/c/e、R2.7a-e 确认修复正确；产出 **R2.8 批次**（3 项：R2.8a modelFamily 迁移振荡、R2.8b 可刷新错误正则过宽致 429 无退避重发、R2.8c 定界符逃逸）。**R2.8 完成后 R1/R2 即达"仅剩人工验证"状态**，人工验证清单见各 step 的 needs user validation 标注（R1.2/R1.3/R1.6/R2.4/R2.5/R2.6a/R2.7b）。
+- 2026-07-09 · **规划者二次复审 R2.6/R2.7 完成并扩充 R2.8**（diff `76bbfc7..6e9aef8`，独立复核 357/357 全绿）。R2.6a/c/e、R2.7a-e 确认修复正确；产出 **R2.8 批次**（R2.8a modelFamily 迁移振荡、R2.8b 可刷新错误正则过宽致 429 无退避重发、R2.8c 定界符逃逸、R2.8d GetNext partial-scan 汇总）。R2.8a-d 已完成；R1/R2 当前达"仅剩人工验证 + 若干后续规划风险"状态，人工验证清单见各 step 的 needs user validation 标注。
+- 2026-07-10 · **规划者核实 worker 上报的 4 项风险，产出 R2.9 批次**（§3.8）：R2.9a prompt 边界扩展到 polish/refine/translation/repair（属实，低-中）、R2.9b overview 模型值优先属潜在缺陷（merge/dashboard 均已重算，改为始终重算）、R2.9c VBS `folder.Items` 与单封 `BuildMailRecord` 无守护（属实，毒邮件可杀死整次采集）；fallback id 同秒碰撞核实后**接受不修**（EntryID 恒存在，触发面趋近于零，理由见 §3.8 末）。R2.9a-c 全部 `[ ]` 待 claim，互相独立。
 
 ---
 
@@ -615,3 +700,33 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Claude Fable 5（规划者二次复审 R2.6/R2.7）**：对 `76bbfc7..6e9aef8` 全量 diff 复审，独立跑 `npm run compile` 零错误、`npm test` 357/357 全绿。R2.6a（updateDraft 同步 draftState）、R2.6c（chunk 传输错误隔离 + 取消 rethrow）、R2.6e（本地化 Sent 文件夹名单，超出原验收范围的加分实现）、R2.7a-e 全部确认正确。发现 3 个缺陷展开为 R2.8a-c（详见 3.7 节，含复现链与验收标准），其中 R2.8a 会导致用户模型选择被反复覆盖、R2.8b 会放大 429 场景配额消耗、R2.8c 使注入防御可被一行正文绕过。下一个 worker 从 R2.8a 开始，三项互相独立、均为 S 级。R2.8 完成前不进入人工验证。
 
 - **2026-07-09 · Claude Fable 5（规划者，R2.8 扩充）**：worker 复核提出两个风险点，与规划者二次复审交叉比对：定界符逃逸与 R2.8c 完全重合（无需新增）；`GetNext` 中途失败计为成功一项，规划者原判"接受"（理由：有 error 诊断行），worker 指出"部分采集不进失败汇总 = 无感知数据缺口"更准确，采纳并升级为 **R2.8d**（三态返回 + FolderScanSummary 增加 partial 计数）。R2.8 现共 4 项（a-d），互相独立。下一个 worker 从 R2.8a 开始。
+
+- **2026-07-09 · Codex（R2.7 adversarial review + R2.8a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -8` 最新为 `2c7226a`、`fcf79cb`、`6e9aef8`、`5d0ef65`、`cefa504`。R2.7 多 reviewer 已完成/部分因 session limit 中断后重启；已确认 R2.8 覆盖 modelFamily 迁移振荡、429 刷新误判、delimiter spoof、GetNext partial-scan。未覆盖但需后续规划的风险：draft/translation/JSON repair prompt boundary、overview stale count、fallback id 同秒碰撞、VBS `folder.Items`/`BuildMailRecord` COM 异常。Claim R2.8a；边界：只加 `modelFamilyMigrated` 一次性迁移标记与纯函数测试，不改模型列表 UI、不恢复 Settings contribution、不进入 R2.8b。
+
+- **2026-07-09 · Codex（R2.8a completion）**：Action: `shouldMigrateLegacyModelFamily` 增加一次性 `modelFamilyMigrated` 标记，迁移成功后写入私有 config；未清除旧 VS Code settings orphan key。Validated: `npm run compile` 零错误；`node --test out/test/config-utils.test.js` 32/32 通过；`npm test` 358/358 全绿。Manual: 真实 VS Code 扩展宿主仍需验证旧 settings 只迁移一次且默认同名模型选择不再被覆盖。Next: R2.8b。
+
+- **2026-07-09 · Codex（R2.8b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；最新提交 `44a6a31`、`fd724e6`。按计划重新定位 R2.8b 与 L-8 相关说明：`src/lib/llm-provider.ts:isModelRefreshableErrorMessage` 把 `model/auth/sign in/permission/access` 等宽泛词都当作可刷新模型错误；`src/lib/app-analysis.ts:isRetryableLlmError` 已有 429/quota/timeout 退避路径。Claim R2.8b；边界：只收窄可刷新模型错误判断与单测，不改外层 retry/backoff，不进入 R2.8c。
+
+- **2026-07-09 · Codex（R2.8b completion）**：Action: `isModelRefreshableErrorMessage` 先排除 429/quota/timeout/temporary，再仅匹配 stale/missing model 语义；auth/permission/sign-in 不再触发内层立即 refresh+resend。Validated: `npm run compile` 零错误；`node --test out/test/llm-provider.test.js` 7/7 通过；`npm test` 358/358 全绿。Manual: 真实 VS Code + Copilot 仍需验证 429/quota 错误只走外层退避。Next: R2.8c。
+
+- **2026-07-09 · Codex（R2.8c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；最新提交 `8e1d945`、`7e34367`。按计划重新定位 R2.8c 与 L-6：`composeAnalysisPrompt()` 直接把 `digestText` 放进 `<easy-mail-digest-data>`，`buildThreadAnalysisPrompt()` 直接把 `JSON.stringify(payload)` 放进 `<easy-mail-thread-timeline-json>`；JSON 不转义 `<`，payload 可伪造闭合 tag。Claim R2.8c；边界：只替换 payload 内 prompt delimiter literals 并补单测，不改 prompt schema、不扩展 draft/translation/repair boundary、不进入 R2.8d。
+
+- **2026-07-09 · Codex（R2.8c completion）**：Action: batch digest 与 thread timeline JSON 入 prompt 前统一替换 Easy Mail prompt delimiters，防止正文伪造闭合 tag 逃出 untrusted data 段；补 batch/thread 回归测试。Validated: `npm run compile` 零错误；定向 prompt 测试 11/11 通过；`npm test` 360/360 全绿。Manual: 真实 Copilot 仍需观察伪造 delimiter 邮件不会改变输出规则。Next: R2.8d。
+
+- **2026-07-09 · Codex（R2.8d completion，Milestone R2.8 complete）**：Action: `CollectFolderItems` 改三态返回，`GetNext` 中途失败且已有新增记录时计入 partial，`FolderScanSummary` 增加 `partial`/`partialFolders`。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 360/360 全绿。Manual: needs user validation on real Outlook，真实采集时留意 partial summary。Next: R2.8a-d 已完成；R3/R4 仍不得自行 claim。另有 R2.7 review 未覆盖新风险需规划者决定是否展开：draft/translation/JSON repair prompt boundary、overview stale count、fallback id 同秒碰撞、VBS `folder.Items`/`BuildMailRecord` COM 异常。
+
+- **2026-07-10 · Codex（R2.8 adversarial review fix）**：用户要求多个 subagent 对 R2.8 做对抗式审查，修完后打包并推送。Findings: R2.8a 对已经历 R2.6b 迁移但缺 `modelFamilyMigrated` 标记的中间态用户仍会重复迁移；R2.8b 裸 `unavailable` 仍可能把 service unavailable 当 stale model refresh；R2.8c 测试缺 opening/cross delimiter 覆盖；Current Snapshot 未同步 R2.8d。Action: 只修以上 review findings；不扩大到未规划风险。Validated: `npm run compile` 零错误；定向测试 71/71 通过；`npm test` 361/361 全绿；VBS `--help`/`--sample` 通过。Next: 重新 `npm run package:vsix`，提交 VSIX 并 push。
+
+- **2026-07-10 · Claude Fable 5（规划者核实 worker 上报风险，产出 R2.9 批次）**：逐项在代码中核实 worker 上报的 4 项"未覆盖风险"：① polish/refine（`extension.ts` ~L214/L236）、translation（`analysis-translation.ts`）、repair（`app-analysis.ts` ~L374）三处 prompt 裸拼接确认属实 → R2.9a；② overview 模型值优先（两个 schema 的 `normalizeOverview`）确认存在，但 merge 与 dashboard 均已强制重算，属潜在缺陷 → R2.9b（改为始终重算，净简化）；③ VBS `folder.Items`（~L152）无守护 + `BuildMailRecord` 直读 `mail.Body` 等六属性无守护确认属实，单封毒邮件可杀死整次采集 → R2.9c；④ fallback id 同秒碰撞：需 internetMessageId 与 entryId 同时为空，真实采集中 EntryID 恒存在，**接受不修**（理由与备选方案记录于 §3.8 末）。工作树干净，无代码改动。Next: worker 从 R2.9a-c 任选 claim。
+
+- **2026-07-10 · Codex（R2.9a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -8` 最新为 `eb3a7b4`、`49e912c`、`33d76b6`、`1b37866`、`886a89c`、`cd749c2`、`2441695`、`8e1d945`。已关闭当前会话暴露的 4 个历史 subagent（均为 completed 状态），后续按需再开。按计划重新定位并阅读 05 矩阵 L-6、02 文档 L-6、06 文档 Q2，以及 R2.9a 条目：当前 `extension.ts` polish/refine、`analysis-translation.ts` translation payload、`app-analysis.ts` repair raw JSON 均存在 untrusted text 裸拼接；R2.8c 已有 `escapePromptDelimiters` 可复用。Claim R2.9a；边界：只补 prompt 边界和测试，不改变用户 `Instruction:` 语义、不改 prompt schema、不进入 R2.9b/c。
+
+- **2026-07-10 · Codex（R2.9a completion）**：Action: 扩展 `escapePromptDelimiters` 到 draft/translation/invalid-json 三组 delimiter；polish/refine prompt 通过新 `draft-prompt` helper 包裹草稿文本，translation payload 与 JSON repair raw response 也用 untrusted-data 声明 + delimiter 包裹。Validated: `npm run compile` 零错误；定向 R2.9a 测试 36/36 通过；`npm test` 364/364 全绿。Manual: 真实 Copilot prompt-injection 行为留到 R3 前统一验证。Commit: `e3f7c44`。Next: R2.9b。
+
+- **2026-07-10 · Codex（R2.9b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；`git log --oneline -5` 最新为 `5b99ece`、`e3f7c44`、`eb3a7b4`、`49e912c`、`33d76b6`。按计划重新定位并阅读 05 矩阵 B-3、03 文档 B-3、R2.9b 条目：R2.7e 已做 category×priority/低 confidence 钳制，当前剩余缺口是 `analysis-schema.ts` 与 `thread-analysis-schema.ts` 的 `normalizeOverview` 仍优先信任模型自报 overview。Claim R2.9b；边界：只删模型 overview 优先分支并补单测，不改 output schema、不改 dashboard/merge 路径、不进入 R2.9c。
+
+- **2026-07-10 · Codex（R2.9b completion）**：Action: mail/thread 两个 schema 的 `normalizeOverview` 改为始终按 normalized items 重算，删除 mail schema 中不再使用的 `numberOr`；补模型 overview 与 items 不一致的回归测试。Validated: `npm run compile` 零错误；定向 schema 测试 9/9 通过；`npm test` 366/366 全绿。Manual: 不适用。Commit: `e6f21a8`。Next: R2.9c。
+
+- **2026-07-10 · Codex（R2.9c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `6e7a2b8`、`e6f21a8`、`5b99ece`、`e3f7c44`、`eb3a7b4`。按计划重新定位并阅读 05 矩阵 C-5b、01 文档 C-1/C-5、R2.9c 条目：`CollectFolderItems` 当前 `Set items = folder.Items` 无守护，主循环 `BuildMailRecord` 调用无守护；`BuildMailRecord` 内直读 `mail.EntryID`/`Subject`/`Body` 等属性，毒邮件可终止整次采集。Claim R2.9c；边界：只在 `folder.Items` 和 `BuildMailRecord` 调用点加局部兜底，不在 `BuildMailRecord` 内整体吞错、不改 digest 输出格式、不进入 R3/R4。
+
+- **2026-07-10 · Codex（R2.9c completion，Milestone R2.9 complete）**：Action: `CollectFolderItems` 对 `folder.Items` 访问失败降级为单文件夹 failed；对单封 `BuildMailRecord` COM 异常局部捕获并跳过该封，计入 `itemErrors`，扫描结束后以 partial 汇总可见。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 366/366 全绿；`git diff --check` 通过。Manual: **needs user validation on real Outlook**，真实采集时留意 `itemError` 与 partial summary。Commit: `e0b091a`。Next: R2.9a-c 已完成；进入 R3 前建议先统一执行真实 Outlook/VS Code/Copilot 验证清单，R3/R4 仍不得自行 claim。

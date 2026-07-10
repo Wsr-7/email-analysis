@@ -105,5 +105,8 @@ export function modelKey(model: AvailableModel): string {
 
 export function isModelRefreshableErrorMessage(message: unknown): boolean {
   const text = String(message || "").toLowerCase();
-  return /model|language model|unavailable|not available|not found|no longer|invalid|auth|sign.?in|permission|access/.test(text);
+  if (/429|too many requests|rate.?limit|quota|temporar|timeout/.test(text)) {
+    return false;
+  }
+  return /unknown model|model_not_supported|language model is no longer (available|supported)|selected model (not found|does not exist|unavailable)|model (not found|does not exist|unavailable)/.test(text);
 }

@@ -1,53 +1,102 @@
-# Easy Mail
+# EasyMail
 
-`Easy Mail` 是一个面向 `classic Outlook + VS Code + GitHub Copilot` 的本地邮件分析插件原型。
+**EasyMail** is a VS Code extension that turns classic desktop Outlook into a locally-analyzed, AI-triaged inbox. It collects mail and calendar data via VBScript COM automation, analyzes it with GitHub Copilot through the VS Code Language Model API, and presents a triage dashboard — all without sending data to any service other than Copilot itself.
 
-它完成这条本地链路：
+[简体中文](./README_zh.md)
 
-```text
-classic Outlook
-  -> VBScript 采集邮件
-  -> mail-digest.md
-  -> VS Code 插件调用 Copilot
-  -> analysis-result.json
-  -> Dashboard + mail-summary.md
-```
-
-## 根目录结构
+## How it works
 
 ```text
-prompts/     Copilot 分析提示词
-scripts/     VBScript 与构建/验证脚本
-src/         TypeScript 插件源码
-releases/    打包生成的带版本号 VSIX
+classic Outlook (Windows)
+  │  VBScript COM automation (cscript.exe)
+  ▼
+mail-digest.md / meeting-digest.md
+  │  parsed by the extension
+  ▼
+mail-store.json / meeting-store.json / thread-store.json
+  │  analyzed by GitHub Copilot (vscode.lm API)
+  ▼
+analysis-result.json / thread-analysis-result.json
+  │
+  ▼
+Sidebar (triage queue) + Workbench (reading pane) + Markdown reports
 ```
 
-## 关键能力
+Everything runs locally. No mail content leaves your machine except the excerpts sent to the Copilot model you select.
 
-- 支持 `最近 N 封` 与 `最近 N 小时`
-- 支持 `指定一个或多个 Outlook 文件夹`
-- 支持 `sample mode`，无 Outlook 也能演示
-- 支持 `GitHub Copilot` 模型分析，默认优先请求 `gpt-5.4`，不可用时使用 VS Code 当前可用的 Copilot 模型
-- 支持在看板中配置拉取参数、界面/分析语言和模型 family
-- 支持 Pull / Analyze 任务进度提示，避免长任务无反馈
-- 支持渐进式分析：拉取后进入本地 JSON mail store，按批次或选中邮件分析
-- 支持优先用 `InternetMessageId` / `EntryId` 去重，缺失时才使用 hash 兜底
-- 支持未分析、已分析、需手动确认统计和面板
-- 支持短期原文缓存、7 天去重索引、7 天分析摘要和手动清理本地缓存
-- 支持 classification gating：超过配置密级的邮件不会自动送 Copilot，密级为 `PUBLIC` / `INTERNAL` / `REGISTERED` / `HIGH REGISTERED`
-- 支持自定义分类 prompt，程序会组合 prompt 后分析邮件
-- 支持重点发件人/邮件组分类 `importantSender`
-- 支持可折叠分类面板
-- 生成：
-  - `mail-digest.md`
-  - `mail-store.json`
-  - `mail-index.json`
-  - `classification-cache.json`
-  - `analysis-result.json`
-  - `mail-summary.md`
+## Features
 
-更多说明见：
+- **Local collection** — pulls mail and meetings from classic Outlook via COM, no server or mailbox export required
+- **Flexible range** — collect by recent hours or a max item count, across one or more folders
+- **Progressive analysis** — mail lands in a local queue first; analyze it next-batch, selected, or all-allowed
+- **Thread awareness** — groups mail into conversations, trims quoted history, and dedupes repeated bodies before sending to the model
+- **Security classification gate** — mail above a configured classification level (`PUBLIC` → `HIGH REGISTERED`) requires manual confirmation instead of auto-analysis
+- **Draft replies** — Copilot drafts a reply per mail/thread, with polish/refine actions and one-click hand-off to an Outlook compose window (never auto-sends)
+- **Two-panel UI** — a sidebar triage queue (category counts, Next Actions) and a full-width workbench reading pane
+- **Bilingual** — UI and analysis output support English and Simplified Chinese, switchable at runtime
+- **Sample mode** — generates fake mail data so you can try the extension without Outlook or Copilot
+- **No cloud storage** — all data is written to VS Code's `globalStorageUri`, with configurable retention and a one-click local cache clear
 
-- [user guide.md](./user%20guide.md)
-- [setup.md](./setup.md)
-- [docs/acceptance-criteria.md](./docs/acceptance-criteria.md)
+## Requirements
+
+- Windows, with classic (desktop) Outlook installed and configured
+- VS Code `^1.90.0`
+- A signed-in GitHub Copilot subscription with Language Model API access
+
+## Installation
+
+Download the `.vsix` from [releases/](./releases) and install it:
+
+```powershell
+code --install-extension releases/easymail-0.3.0.vsix
+```
+
+Or build from source — see [Development](#development) below.
+
+## Quick start
+
+1. Open the EasyMail view from the Activity Bar.
+2. No Outlook yet? Run **EasyMail: Generate Sample Digest** to try the flow with fake data.
+3. Run **EasyMail: Fetch New Mail** to pull recent mail from Outlook.
+4. Pick an **Analysis Model** in the sidebar, then run **Analyze Next Batch** (or **Analyze All Allowed**).
+5. Review triaged mail in the sidebar queue; open an item to read, draft a reply, or take action in the workbench.
+
+See [user guide.md](./user%20guide.md) for the full command list, configuration reference, and custom classification prompts.
+
+## Configuration
+
+All settings live under the `easyMail.*` namespace in VS Code Settings (`easyMail.rangeMode`, `easyMail.folders`, `easyMail.outputLanguage`, `easyMail.autoAnalyzeMaxClassificationLevel`, retention windows, `easyMail.importantSenders`, etc.). The dashboard's Settings panel is a shortcut editor for common fields — VS Code Settings is always the source of truth.
+
+## Project layout
+
+```text
+src/         TypeScript extension source (src/lib holds the business logic modules)
+scripts/     VBScript COM automation for Outlook, plus build/validation scripts
+prompts/     Copilot analysis prompt templates
+media/       Extension icon assets
+releases/    Versioned .vsix packages
+docs/        Design and remediation-plan documents
+```
+
+For the full module map and architecture diagram, see [AGENTS.md](./AGENTS.md).
+
+## Development
+
+```powershell
+npm install
+npm run compile      # clean out/ then tsc
+npm test             # compile + run all tests (node --test)
+npm run package:vsix # build releases/easymail-0.3.0.vsix
+```
+
+Run a single test file after compiling:
+
+```powershell
+node --test out/test/digest.test.js
+```
+
+See [setup.md](./setup.md) for a step-by-step first-time setup, and [AGENTS.md](./AGENTS.md) for architecture and contribution conventions.
+
+## License
+
+[MIT](./LICENSE)

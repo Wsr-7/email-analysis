@@ -110,7 +110,7 @@ export function renderEasyMailGuideHtml(options: EasyMailGuideOptions): string {
 <body>
   <div class="layout">
     <nav>
-      <h2>Easy Mail</h2>
+      <h2>EasyMail</h2>
       <h3>${escapeHtml(labels.statsTitle)}</h3>
       <a href="#impact">${escapeHtml(labels.statsTitle)}</a>
       <h3>${escapeHtml(labels.sections[0].title)}</h3>
@@ -151,7 +151,7 @@ export function renderEasyMailGuideHtml(options: EasyMailGuideOptions): string {
 function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
   if (options.locale === "zh-CN") {
     return {
-      title: "Easy Mail 使用指南",
+      title: "EasyMail 使用指南",
       subtitle: `本地读取 classic Outlook 邮件，用 Copilot 做分类、摘要、回复草稿和线程分析。当前版本 ${options.version}，插件保持只读：不会自动发送、删除、移动、归档或标记邮件。`,
       statsTitle: "当前状态",
       cards: [
@@ -207,13 +207,13 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
           ]
         }
       ],
-      footer: "Easy Mail Guide 使用插件内置 webview 渲染，因此不依赖 VS Code 原生 walkthrough 是否自动弹出。"
+      footer: "EasyMail Guide 使用插件内置 webview 渲染，因此不依赖 VS Code 原生 walkthrough 是否自动弹出。"
     };
   }
 
   return {
-    title: "Easy Mail User Guide",
-    subtitle: `Collect classic Outlook mail locally, then use Copilot for triage, summaries, draft replies, and thread analysis. Version ${options.version}. Easy Mail is read-only: it does not send, delete, move, archive, or mark Outlook messages.`,
+    title: "EasyMail User Guide",
+    subtitle: `Collect classic Outlook mail locally, then use Copilot for triage, summaries, draft replies, and thread analysis. Version ${options.version}. EasyMail is read-only: it does not send, delete, move, archive, or mark Outlook messages.`,
     statsTitle: "Current Status",
     cards: [
       { value: String(options.stats.pulled), label: "Pulled", hint: "From the local index" },
@@ -253,7 +253,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
         id: "privacy",
         title: "Privacy and Read-only Boundaries",
         items: [
-          "Easy Mail does not parse PST/OST files and does not write back to Outlook.",
+          "EasyMail does not parse PST/OST files and does not write back to Outlook.",
           "Original mail body content stays in the short-lived local queue; analysis and index data are controlled by retention settings.",
           "Blocked or high-sensitivity items do not enter the model automatically."
         ]
@@ -268,7 +268,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
         ]
       }
     ],
-    footer: "The Easy Mail Guide is rendered by the extension webview, so it does not depend on VS Code's native walkthrough auto-open behavior."
+    footer: "The EasyMail Guide is rendered by the extension webview, so it does not depend on VS Code's native walkthrough auto-open behavior."
   };
 }
 

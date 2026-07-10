@@ -23,6 +23,7 @@ import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
 import { handleWebviewMessage, type MessageHandlerContext } from "./lib/message-handler";
 import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
+import { buildPolishDraftPrompt, buildRefineDraftPrompt } from "./lib/draft-prompt";
 import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/process-runner";
 import { AppDataStore } from "./lib/app-data";
 import { DashboardProvider } from "./lib/dashboard-provider";
@@ -132,7 +133,7 @@ class EasyMailApp {
   }
 
   private async maybeOpenGuide(): Promise<void> {
-    const key = "easyMail.guideShown.0.2.0";
+    const key = `easyMail.guideShown.${this.context.extension.packageJSON?.version || "0.0.0"}`;
     if (this.context.globalState.get<boolean>(key)) {
       return;
     }
@@ -159,7 +160,7 @@ class EasyMailApp {
 
     const panel = vscode.window.createWebviewPanel(
       "easyMail.guide",
-      "Easy Mail - User Guide",
+      "EasyMail - User Guide",
       vscode.ViewColumn.One,
       { enableScripts: true, retainContextWhenHidden: true }
     );
@@ -211,7 +212,7 @@ class EasyMailApp {
     await this.log("draft:polish", { itemId });
     const config = await this.readConfig();
     const language = resolveDraftLanguage(config.draftLanguage, draftText);
-    const prompt = `You are an email writing assistant. Polish the following draft reply: improve grammar, clarity, and tone while preserving the original intent and meaning. Keep the style concise, professional, and appropriate for internal workplace communication. Output only the improved reply text, nothing else. ${draftOutputInstruction(language)}\n\nDraft:\n${draftText}`;
+    const prompt = buildPolishDraftPrompt(draftText, language);
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Polish draft", cancellable: true },
@@ -233,7 +234,7 @@ class EasyMailApp {
     await this.log("draft:refine", { itemId });
     const config = await this.readConfig();
     const language = resolveDraftLanguage(config.draftLanguage, draftText);
-    const prompt = `You are an email writing assistant. Rewrite the following draft reply according to the user's instruction. Keep the style concise, professional, and appropriate for internal workplace communication unless the instruction says otherwise. Output only the rewritten reply text, nothing else. ${draftOutputInstruction(language)}\n\nInstruction: ${instruction}\n\nDraft:\n${draftText}`;
+    const prompt = buildRefineDraftPrompt(draftText, instruction, language);
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Refine draft", cancellable: true },
@@ -375,7 +376,7 @@ class EasyMailApp {
     const visibleThreadStore = filterVisibleThreadsForDashboard(threadStore);
     return renderEasyMailGuideHtml({
       locale,
-      version: String(this.context.extension.packageJSON?.version || "0.2.0"),
+      version: String(this.context.extension.packageJSON?.version || "0.3.0"),
       stats: {
         pulled: store.items.length,
         pending: queue.pending.length,
@@ -536,7 +537,7 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeNext",
       async (token) => await this.analyzeBatchCore(batchSize, token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
       true
     );
   }
@@ -549,7 +550,7 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeAll",
       async (token) => await this.analyzeBatchCore("allAllowed", token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
       true
     );
   }
@@ -562,7 +563,7 @@ class EasyMailApp {
       labels.progress.detail,
       "analyzeSelected",
       async (token) => await this.analyzeBatchCore(mailIds, token),
-      (result) => `Easy Mail analysis completed for ${result.batchSize} mail(s).`,
+      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
       true
     );
   }
@@ -619,7 +620,7 @@ class EasyMailApp {
     cancellable = false
   ): Promise<T> {
     if (this.busy) {
-      throw new Error(`Another Easy Mail task is already running: ${this.busy.label}`);
+      throw new Error(`Another EasyMail task is already running: ${this.busy.label}`);
     }
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
@@ -673,7 +674,7 @@ class EasyMailApp {
       labels.progress.detail,
       "reports",
       async () => await this.generateReportsCore(),
-      () => "Easy Mail reports generated."
+      () => "EasyMail reports generated."
     );
     await openTextDocument(this.data.getDailyBriefPath());
   }
@@ -686,7 +687,7 @@ class EasyMailApp {
       labels.progress.detail,
       "loadModels",
       async () => await this.loadAvailableModels(),
-      () => "Easy Mail Copilot models loaded."
+      () => "EasyMail Copilot models loaded."
     );
   }
 
@@ -730,7 +731,7 @@ class EasyMailApp {
         labels.progress.detail,
         "translate",
         async (token) => await this.translateExistingAnalysis(nextLocale, token),
-        (result) => `Easy Mail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
+        (result) => `EasyMail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
         true
       );
     } else {
@@ -754,7 +755,7 @@ class EasyMailApp {
   }
 
   public async openSettings(): Promise<void> {
-    await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:Wsr-7.easy-mail");
+    await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:Wsr-7.easymail");
   }
 
   public async openPromptConfig(): Promise<void> {
@@ -769,7 +770,7 @@ class EasyMailApp {
   public async openMailInOutlook(mailId: string): Promise<void> {
     const target = await this.findOutlookOpenTarget(mailId);
     if (!target?.entryId) {
-      await vscode.window.showWarningMessage("Easy Mail cannot open this mail in Outlook because its EntryID is no longer available in the local index.");
+      await vscode.window.showWarningMessage("EasyMail cannot open this mail in Outlook because its EntryID is no longer available in the local index.");
       return;
     }
 
@@ -787,7 +788,7 @@ class EasyMailApp {
   public async composeOutlookMail(mode: string, draftText: string, itemId: string): Promise<void> {
     const target = await this.findOutlookOpenTarget(itemId);
     if (!target?.entryId) {
-      await vscode.window.showWarningMessage("Easy Mail cannot open Outlook compose because the mail EntryID is no longer available.");
+      await vscode.window.showWarningMessage("EasyMail cannot open Outlook compose because the mail EntryID is no longer available.");
       return;
     }
     const scriptPath = await this.findScript("compose-outlook-mail.vbs");
@@ -919,12 +920,18 @@ class EasyMailApp {
     const defaultFolders = Array.isArray(defaults.folders) ? defaults.folders.map(String) : ["Inbox", "Sent Items"];
     const storedModelFamily = typeof storedConfig.modelFamily === "string" ? storedConfig.modelFamily.trim() : "";
     const legacySettingsModelFamily = settings.get("modelFamily", "");
-    const shouldMigrateModelFamily = shouldMigrateLegacyModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily, configExisted);
+    const shouldMigrateModelFamily = shouldMigrateLegacyModelFamily(
+      storedModelFamily,
+      legacySettingsModelFamily,
+      defaults.modelFamily,
+      configExisted,
+      storedConfig.modelFamilyMigrated === true
+    );
     const modelFamily = shouldMigrateModelFamily
       ? String(legacySettingsModelFamily || "").trim()
       : resolveModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily);
     if (shouldMigrateModelFamily) {
-      await this.data.writeConfig({ ...storedConfig, modelFamily });
+      await this.data.writeConfig({ ...storedConfig, modelFamily, modelFamilyMigrated: true });
     }
     return {
       ...defaults,

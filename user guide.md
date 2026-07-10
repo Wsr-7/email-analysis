@@ -9,16 +9,16 @@
 
 ## 主要命令
 
-- `Easy Mail: Fetch New Mail`
-- `Easy Mail: More History`
-- `Easy Mail: Generate Sample Digest`
-- `Easy Mail: Analyze Next Batch with Copilot`
-- `Easy Mail: Analyze All Allowed with Copilot`
-- `Easy Mail: Refresh Dashboard`
-- `Easy Mail: Open Digest`
-- `Easy Mail: Open Summary`
-- `Easy Mail: Open Settings`
-- `Easy Mail: Open Prompt Config`
+- `EasyMail: Fetch New Mail`
+- `EasyMail: More History`
+- `EasyMail: Generate Sample Digest`
+- `EasyMail: Analyze Next Batch with Copilot`
+- `EasyMail: Analyze All Allowed with Copilot`
+- `EasyMail: Refresh Dashboard`
+- `EasyMail: Open Digest`
+- `EasyMail: Open Summary`
+- `EasyMail: Open Settings`
+- `EasyMail: Open Prompt Config`
 
 看板顶部也提供同等按钮：
 
@@ -58,7 +58,7 @@ Outlook COM 的 `MailItem.ReceivedTime` 在 VBS 中按 Outlook/Windows 本地时
 
 VS Code Settings 是唯一生效源。Dashboard 顶部的 Settings panel 只是常用设置的快捷编辑器，保存后会写回 VS Code Settings。
 
-如果你直接在 VS Code Settings 页面修改 `Easy Mail` 配置，Dashboard 会监听配置变化并自动刷新。模型选择也是同一套规则：Dashboard 中的 `Analysis Model` 会保存到 VS Code Settings，VS Code Settings 中修改后也会反映回 Dashboard。
+如果你直接在 VS Code Settings 页面修改 `EasyMail` 配置，Dashboard 会监听配置变化并自动刷新。模型选择也是同一套规则：Dashboard 中的 `Analysis Model` 会保存到 VS Code Settings，VS Code Settings 中修改后也会反映回 Dashboard。
 
 Dashboard 的模型下拉来自当前 VS Code session 实际暴露的 Copilot 模型列表，显示格式为 `vendor / family / id / name`。VS Code Settings 里的模型选项是静态枚举，用于常见模型；如果当前 VS Code runtime 暴露了更多模型，以 Dashboard 列表为准。
 
@@ -74,16 +74,16 @@ Dashboard 的模型下拉来自当前 VS Code session 实际暴露的 Copilot �
 ### 无 Outlook / 无 Copilot 的本地演示
 
 1. 安装扩展。
-2. 执行 `Easy Mail: Generate Sample Digest`。
-3. 执行 `Easy Mail: Open Digest`。
+2. 执行 `EasyMail: Generate Sample Digest`。
+3. 执行 `EasyMail: Open Digest`。
 4. 检查 `mail-digest.md` 是否生成。
 
 ### 有 Copilot 的完整演示
 
-1. 执行 `Easy Mail: Pull Mail` 或 `Generate Sample Digest`。
-2. 执行 `Easy Mail: Analyze with Copilot`。
-3. 打开 sidebar 中的 `Dashboard`。
-4. 检查分类统计、卡片内容、`Copy Draft` 和 `Ignore`。
+1. 执行 `EasyMail: Fetch New Mail` 或 `Generate Sample Digest`。
+2. 执行 `EasyMail: Analyze Next Batch with Copilot`（或 `Analyze All Allowed with Copilot`）。
+3. 打开 sidebar 中的分诊队列，点开一封邮件进入 workbench。
+4. 检查分类统计、卡片内容、草稿生成和 `Ignore`。
 
 ## 配置
 
@@ -103,12 +103,13 @@ easy-mail.config.json
 - `sampleMode`
 - `modelFamily`
 - `outputLanguage`
-- `analysisBatchSize`
-- `autoAnalyzeEnabled`
+- `draftLanguage`
 - `autoAnalyzeMaxClassificationLevel`
 - `mailStoreRetentionDays`
 - `mailIndexRetentionDays`
 - `analysisRetentionDays`
+- `meetingDaysAhead`
+- `collectorTimeoutSeconds`
 - `importantSenders`
 
 `rangeMode` 可选值：
@@ -138,9 +139,11 @@ AI 分析默认优先请求 `gpt-5.4`。如果当前 VS Code / Copilot 运行时
 
 `bodyExcerptChars` 表示每封邮件最多截取多少个正文字符送给 Copilot，默认 `1500`。它不是摘要长度，而是输入裁剪上限；数值越大，模型看到的上下文越多，但分析可能更慢，也更容易超过上下文预算。这个配置只在 VS Code Settings 中调整，Dashboard 不再常驻展示。
 
-`analysisBatchSize` 表示 `Analyze Next Batch` 每次最多分析多少封邮件。
+`draftLanguage` 控制草稿回复语言，`auto` 跟随原邮件/会话语言，也可强制 `en` 或 `zh-CN`。
 
-`autoAnalyzeEnabled` 控制是否允许自动分析。关闭后，邮件会进入手动确认路径，需要用户勾选后点 `Analyze Selected`。
+`meetingDaysAhead` 表示从 Outlook 日历采集未来多少天内的会议，默认 `2` 天。
+
+`collectorTimeoutSeconds` 表示 Outlook 采集脚本（邮件/会议）的超时时间，默认 `120` 秒；邮箱较大或 Outlook 冷启动较慢时可以调大。
 
 `autoAnalyzeMaxClassificationLevel` 控制自动分析允许的最高密级。默认密级：
 

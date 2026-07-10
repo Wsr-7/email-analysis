@@ -1,8 +1,8 @@
 {
-  "name": "easy-mail",
-  "displayName": "Easy Mail",
+  "name": "easymail",
+  "displayName": "EasyMail",
   "description": "Local Outlook digest collection, Copilot analysis, and dashboard for classic Outlook.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "Wsr-7",
   "private": true,
   "icon": "media/icon.png",
@@ -43,6 +43,7 @@
     "media/**",
     "LICENSE",
     "README.md",
+    "README_zh.md",
     "user guide.md",
     "setup.md",
     "AGENTS.md",
@@ -50,7 +51,7 @@
   ],
   "contributes": {
     "configuration": {
-      "title": "Easy Mail",
+      "title": "EasyMail",
       "properties": {
         "easyMail.rangeMode": {
           "type": "string",
@@ -223,13 +224,13 @@
     "walkthroughs": [
       {
         "id": "easyMail.gettingStarted",
-        "title": "Get Started with Easy Mail",
+        "title": "Get Started with EasyMail",
         "description": "Collect local Outlook mail, review pending items, and analyze with GitHub Copilot.",
         "steps": [
           {
             "id": "easyMail.openDashboard",
             "title": "Open the Dashboard",
-            "description": "Open the Easy Mail view from the Activity Bar. Use the language button in the top-right corner to switch between English and Simplified Chinese.",
+            "description": "Open the EasyMail view from the Activity Bar. Use the language button in the top-right corner to switch between English and Simplified Chinese.",
             "media": {
               "markdown": "readme.md"
             },
@@ -268,90 +269,90 @@
     "commands": [
       {
         "command": "easyMail.pullMail",
-        "title": "Easy Mail: Fetch New Mail"
+        "title": "EasyMail: Fetch New Mail"
       },
       {
         "command": "easyMail.loadMore",
-        "title": "Easy Mail: More History"
+        "title": "EasyMail: More History"
       },
       {
         "command": "easyMail.generateSampleDigest",
-        "title": "Easy Mail: Generate Sample Digest"
+        "title": "EasyMail: Generate Sample Digest"
       },
       {
         "command": "easyMail.analyze",
-        "title": "Easy Mail: Analyze Next Batch with Copilot"
+        "title": "EasyMail: Analyze Next Batch with Copilot"
       },
       {
         "command": "easyMail.analyzeThread",
-        "title": "Easy Mail: Analyze Thread with Copilot"
+        "title": "EasyMail: Analyze Thread with Copilot"
       },
       {
         "command": "easyMail.analyzeAllAllowed",
-        "title": "Easy Mail: Analyze All Allowed with Copilot"
+        "title": "EasyMail: Analyze All Allowed with Copilot"
       },
       {
         "command": "easyMail.loadModels",
-        "title": "Easy Mail: Load Copilot Models"
+        "title": "EasyMail: Load Copilot Models"
       },
       {
         "command": "easyMail.refreshDashboard",
-        "title": "Easy Mail: Refresh Dashboard"
+        "title": "EasyMail: Refresh Dashboard"
       },
       {
         "command": "easyMail.openDigest",
-        "title": "Easy Mail: Open Digest"
+        "title": "EasyMail: Open Digest"
       },
       {
         "command": "easyMail.openSummary",
-        "title": "Easy Mail: Open Summary"
+        "title": "EasyMail: Open Summary"
       },
       {
         "command": "easyMail.generateReports",
-        "title": "Easy Mail: Generate Reports"
+        "title": "EasyMail: Generate Reports"
       },
       {
         "command": "easyMail.openDailyBrief",
-        "title": "Easy Mail: Open Daily Brief"
+        "title": "EasyMail: Open Daily Brief"
       },
       {
         "command": "easyMail.openThreadReport",
-        "title": "Easy Mail: Open Thread Report"
+        "title": "EasyMail: Open Thread Report"
       },
       {
         "command": "easyMail.openSingleMailReport",
-        "title": "Easy Mail: Open Single Mail Report"
+        "title": "EasyMail: Open Single Mail Report"
       },
       {
         "command": "easyMail.openSettings",
-        "title": "Easy Mail: Open Settings"
+        "title": "EasyMail: Open Settings"
       },
       {
         "command": "easyMail.openGuide",
-        "title": "Easy Mail: Open User Guide"
+        "title": "EasyMail: Open User Guide"
       },
       {
         "command": "easyMail.openReplyTemplate",
-        "title": "Easy Mail: Open Reply Template"
+        "title": "EasyMail: Open Reply Template"
       },
       {
         "command": "easyMail.openPromptConfig",
-        "title": "Easy Mail: Open Prompt Config"
+        "title": "EasyMail: Open Prompt Config"
       },
       {
         "command": "easyMail.clearLocalCache",
-        "title": "Easy Mail: Clear Local Cache"
+        "title": "EasyMail: Clear Local Cache"
       },
       {
         "command": "easyMail.openWorkbench",
-        "title": "Easy Mail: Open Workbench"
+        "title": "EasyMail: Open Workbench"
       }
     ]
   },
   "scripts": {
     "compile": "node scripts/clean-out.js && tsc -p .",
-    "test": "npm run compile && node --test out/test/digest.test.js out/test/analysis-schema.test.js out/test/summary.test.js out/test/dashboard-state.test.js out/test/mail-store.test.js out/test/classification.test.js out/test/prompt-config.test.js out/test/thread-engine.test.js out/test/thread-timeline.test.js out/test/redaction.test.js out/test/security-gate.test.js out/test/thread-analysis-schema.test.js out/test/thread-prompt-builder.test.js out/test/app-analysis.test.js out/test/report-single-mail.test.js out/test/report-thread.test.js out/test/report-daily.test.js out/test/llm-provider.test.js out/test/guide-webview.test.js out/test/reply-template.test.js out/test/analysis-translation.test.js out/test/html-utils.test.js out/test/config-utils.test.js out/test/dashboard-labels.test.js out/test/process-runner.test.js out/test/app-data.test.js out/test/dashboard-render.test.js out/test/message-handler.test.js out/test/sidebar-render.test.js out/test/workbench-render.test.js out/test/meeting-digest.test.js out/test/meeting-store.test.js out/test/next-actions.test.js",
-    "package:vsix": "npm run compile && vsce package --out releases/easy-mail-0.2.0.vsix",
+    "test": "npm run compile && node --test out/test/digest.test.js out/test/analysis-schema.test.js out/test/summary.test.js out/test/dashboard-state.test.js out/test/mail-store.test.js out/test/classification.test.js out/test/prompt-config.test.js out/test/thread-engine.test.js out/test/thread-timeline.test.js out/test/redaction.test.js out/test/security-gate.test.js out/test/thread-analysis-schema.test.js out/test/thread-prompt-builder.test.js out/test/app-analysis.test.js out/test/report-single-mail.test.js out/test/report-thread.test.js out/test/report-daily.test.js out/test/llm-provider.test.js out/test/guide-webview.test.js out/test/reply-template.test.js out/test/draft-prompt.test.js out/test/analysis-translation.test.js out/test/html-utils.test.js out/test/config-utils.test.js out/test/dashboard-labels.test.js out/test/process-runner.test.js out/test/app-data.test.js out/test/dashboard-render.test.js out/test/message-handler.test.js out/test/sidebar-render.test.js out/test/workbench-render.test.js out/test/meeting-digest.test.js out/test/meeting-store.test.js out/test/next-actions.test.js",
+    "package:vsix": "npm run compile && vsce package --out releases/easymail-0.3.0.vsix",
     "validate:sample": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-sample-validation.ps1"
   },
   "devDependencies": {

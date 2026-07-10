@@ -482,7 +482,7 @@ export function renderDashboardHtml(input: DashboardRenderInput): string {
   </style>
 </head>
 <body>
-  <button class="help-toggle" type="button" title="Open Easy Mail guide" aria-label="Open Easy Mail guide" onclick="post('openGuide')">?</button>
+  <button class="help-toggle" type="button" title="Open EasyMail guide" aria-label="Open EasyMail guide" onclick="post('openGuide')">?</button>
   <button class="language-toggle" id="outputLanguage" type="button" value="${escapeAttr(locale)}" onclick="toggleLanguage()"><span class="globe-icon" aria-hidden="true"></span><span class="language-label">${escapeHtml(locale === "en-US" ? labels.settings.enOption : labels.settings.zhOption)}</span><span class="chevron" aria-hidden="true"></span></button>
   <div class="toolbar">
     <div class="toolbar-group">
