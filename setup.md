@@ -35,7 +35,7 @@
 输出位置：
 
 ```text
-releases/easymail-0.2.0.vsix
+releases/easymail-0.3.0.vsix
 ```
 
 ## 5. 本地 sample 验证

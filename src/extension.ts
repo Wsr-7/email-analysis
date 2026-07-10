@@ -133,7 +133,7 @@ class EasyMailApp {
   }
 
   private async maybeOpenGuide(): Promise<void> {
-    const key = "easyMail.guideShown.0.2.0";
+    const key = `easyMail.guideShown.${this.context.extension.packageJSON?.version || "0.0.0"}`;
     if (this.context.globalState.get<boolean>(key)) {
       return;
     }
@@ -376,7 +376,7 @@ class EasyMailApp {
     const visibleThreadStore = filterVisibleThreadsForDashboard(threadStore);
     return renderEasyMailGuideHtml({
       locale,
-      version: String(this.context.extension.packageJSON?.version || "0.2.0"),
+      version: String(this.context.extension.packageJSON?.version || "0.3.0"),
       stats: {
         pulled: store.items.length,
         pending: queue.pending.length,

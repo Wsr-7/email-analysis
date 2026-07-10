@@ -48,7 +48,7 @@ Sidebar（分诊队列）+ Workbench（阅读面板）+ Markdown 报告
 从 [releases/](./releases) 下载 `.vsix` 后安装：
 
 ```powershell
-code --install-extension releases/easymail-0.2.0.vsix
+code --install-extension releases/easymail-0.3.0.vsix
 ```
 
 也可以从源码构建，见下方[开发](#开发)部分。
@@ -86,7 +86,7 @@ docs/        设计文档与修复计划
 npm install
 npm run compile      # 清空 out/ 后执行 tsc
 npm test             # 编译 + 运行全部测试（node --test）
-npm run package:vsix # 打包 releases/easymail-0.2.0.vsix
+npm run package:vsix # 打包 releases/easymail-0.3.0.vsix
 ```
 
 编译后运行单个测试文件：
