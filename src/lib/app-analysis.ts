@@ -91,7 +91,7 @@ async function sendPromptWithRetry(
 
 function isRetryableLlmError(error: unknown): boolean {
   const text = error instanceof Error ? `${error.name} ${error.message}` : String(error || "");
-  return /429|too many requests|rate.?limit|quota|temporar|timeout/i.test(text);
+  return /429|too many requests|rate.?limit|quota|temporar|timeout|overload/i.test(text);
 }
 
 function delay(ms: number, token?: CancellationTokenLike): Promise<void> {

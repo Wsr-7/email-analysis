@@ -58,7 +58,7 @@ export function shouldMigrateLegacyModelFamily(stored: unknown, settingsValue: u
   if (!storedValue) {
     return true;
   }
-  return !configExisted || (storedValue === defaultModel && legacyValue !== defaultModel);
+  return !configExisted && storedValue === defaultModel && legacyValue !== defaultModel;
 }
 
 export function parseClassificationLevel(value: unknown, fallback: number): number {

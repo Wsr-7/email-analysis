@@ -117,6 +117,25 @@ describe("analyzeBatchCore", () => {
     assert.ok(logs.includes("test:retry"));
   });
 
+  it("retries overloaded model errors before succeeding", async () => {
+    const provider = new MockProvider({ responses: [new Error("Model is overloaded"), "{}"] });
+
+    await sendPromptToModel({
+      data: {
+        readCachedAvailableModels: async () => [{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }],
+        writeModelInfo: async () => {}
+      } as unknown as AppDataStore,
+      llmProvider: provider,
+      extensionPath: process.cwd(),
+      readConfig: async () => ({}),
+      log: async () => {},
+      availableModelsCache: null,
+      retryDelaysMs: [0, 0]
+    }, "prompt", "mock-model", "test");
+
+    assert.equal(provider.prompts.length, 2);
+  });
+
   it("stops retrying after configured retry delays are exhausted", async () => {
     const provider = new MockProvider({
       responses: [

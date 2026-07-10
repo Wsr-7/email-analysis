@@ -36,6 +36,8 @@ test("resolveModelSelection prefers the requested model and marks fallback when 
 test("isModelRefreshableErrorMessage only matches stale model selection errors", () => {
   assert.equal(isModelRefreshableErrorMessage("Language model is no longer available"), true);
   assert.equal(isModelRefreshableErrorMessage("selected model not found"), true);
+  assert.equal(isModelRefreshableErrorMessage("selected model unavailable"), true);
+  assert.equal(isModelRefreshableErrorMessage("Copilot service unavailable"), false);
   assert.equal(isModelRefreshableErrorMessage("Rate limit exceeded for model gpt-x"), false);
   assert.equal(isModelRefreshableErrorMessage("Authentication required: sign in to GitHub Copilot"), false);
   assert.equal(isModelRefreshableErrorMessage("JSON parse failed"), false);

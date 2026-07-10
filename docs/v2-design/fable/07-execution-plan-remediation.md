@@ -473,7 +473,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - 2026-07-08 · branch `v3` · 计划创建，R1 全部 step 未开始。工作树干净（fable 审查文档与 UI 截图已随本计划提交）。
 - 2026-07-08 · **Milestone R1 全部 7 个 step 完成并提交**（R1.1-R1.7）。R1.2/R1.3 需真实 Outlook 验证；R1.6 需用户手动验证草稿保留场景（见各自 Completion Notes）。下一步：R2（效率与语言，前置 R1 已满足）或用户先做真机验证。R3/R4 需用户确认设计后才能 claim，worker 不得自行展开。
 - 2026-07-09 · **规划者复审 R1/R2 完成**（diff `664620f..d4d1a32`，`npm run compile` + `npm test` 340/340 独立复核通过）。产出两个新批次：**R2.6 复审修复批**（R2.6a 草稿覆盖回归为最高优先）与 **R2.7 漏排补录批**（L-6/C-5b/C-7d/L-8e/B-2e+B-3）。C-5a 确认已被 R2.5 review fix 顺带解决，C-7b 部分缓解。用户真机验证 R1.2/R1.3/R1.6/R2.5 时**建议先做 R2.6a**，否则草稿保留场景的验证结果会被该回归污染。
-- 2026-07-09 · **规划者二次复审 R2.6/R2.7 完成**（diff `76bbfc7..6e9aef8`，独立复核 357/357 全绿）。R2.6a/c/e、R2.7a-e 确认修复正确；产出 **R2.8 批次**（3 项：R2.8a modelFamily 迁移振荡、R2.8b 可刷新错误正则过宽致 429 无退避重发、R2.8c 定界符逃逸）。**R2.8 完成后 R1/R2 即达"仅剩人工验证"状态**，人工验证清单见各 step 的 needs user validation 标注（R1.2/R1.3/R1.6/R2.4/R2.5/R2.6a/R2.7b）。
+- 2026-07-09 · **规划者二次复审 R2.6/R2.7 完成并扩充 R2.8**（diff `76bbfc7..6e9aef8`，独立复核 357/357 全绿）。R2.6a/c/e、R2.7a-e 确认修复正确；产出 **R2.8 批次**（R2.8a modelFamily 迁移振荡、R2.8b 可刷新错误正则过宽致 429 无退避重发、R2.8c 定界符逃逸、R2.8d GetNext partial-scan 汇总）。R2.8a-d 已完成；R1/R2 当前达"仅剩人工验证 + 若干后续规划风险"状态，人工验证清单见各 step 的 needs user validation 标注。
 
 ---
 
@@ -653,3 +653,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-09 · Codex（R2.8c completion）**：Action: batch digest 与 thread timeline JSON 入 prompt 前统一替换 Easy Mail prompt delimiters，防止正文伪造闭合 tag 逃出 untrusted data 段；补 batch/thread 回归测试。Validated: `npm run compile` 零错误；定向 prompt 测试 11/11 通过；`npm test` 360/360 全绿。Manual: 真实 Copilot 仍需观察伪造 delimiter 邮件不会改变输出规则。Next: R2.8d。
 
 - **2026-07-09 · Codex（R2.8d completion，Milestone R2.8 complete）**：Action: `CollectFolderItems` 改三态返回，`GetNext` 中途失败且已有新增记录时计入 partial，`FolderScanSummary` 增加 `partial`/`partialFolders`。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 360/360 全绿。Manual: needs user validation on real Outlook，真实采集时留意 partial summary。Next: R2.8a-d 已完成；R3/R4 仍不得自行 claim。另有 R2.7 review 未覆盖新风险需规划者决定是否展开：draft/translation/JSON repair prompt boundary、overview stale count、fallback id 同秒碰撞、VBS `folder.Items`/`BuildMailRecord` COM 异常。
+
+- **2026-07-10 · Codex（R2.8 adversarial review fix）**：用户要求多个 subagent 对 R2.8 做对抗式审查，修完后打包并推送。Findings: R2.8a 对已经历 R2.6b 迁移但缺 `modelFamilyMigrated` 标记的中间态用户仍会重复迁移；R2.8b 裸 `unavailable` 仍可能把 service unavailable 当 stale model refresh；R2.8c 测试缺 opening/cross delimiter 覆盖；Current Snapshot 未同步 R2.8d。Action: 只修以上 review findings；不扩大到未规划风险。Validated: `npm run compile` 零错误；定向测试 71/71 通过；`npm test` 361/361 全绿；VBS `--help`/`--sample` 通过。Next: 重新 `npm run package:vsix`，提交 VSIX 并 push。

@@ -108,5 +108,5 @@ export function isModelRefreshableErrorMessage(message: unknown): boolean {
   if (/429|too many requests|rate.?limit|quota|temporar|timeout/.test(text)) {
     return false;
   }
-  return /not found|no longer (available|supported)|unavailable|unknown model|model_not_supported|does not exist/.test(text);
+  return /unknown model|model_not_supported|language model is no longer (available|supported)|selected model (not found|does not exist|unavailable)|model (not found|does not exist|unavailable)/.test(text);
 }
