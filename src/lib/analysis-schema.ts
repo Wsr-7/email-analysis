@@ -110,14 +110,13 @@ export function normalizeAnalysis(input: unknown, allowedCategories?: string[]):
 }
 
 function normalizeOverview(overview: unknown, items: AnalysisItem[]): AnalysisOverview {
-  const base = isObject(overview) ? overview : {};
   const grouped = groupCounts(items);
   return {
-    totalMails: numberOr((base as Record<string, unknown>).totalMails, items.length),
-    mustHandleToday: numberOr((base as Record<string, unknown>).mustHandleToday, grouped.mustHandleToday),
-    risks: numberOr((base as Record<string, unknown>).risks, grouped.risk),
-    waitingForMe: numberOr((base as Record<string, unknown>).waitingForMe, grouped.waitingForMe),
-    notices: numberOr((base as Record<string, unknown>).notices, grouped.notice)
+    totalMails: items.length,
+    mustHandleToday: grouped.mustHandleToday,
+    risks: grouped.risk,
+    waitingForMe: grouped.waitingForMe,
+    notices: grouped.notice
   };
 }
 
@@ -250,10 +249,6 @@ function groupCounts(items: AnalysisItem[]): Record<Category, number> {
     counts[item.category] = (counts[item.category] || 0) + 1;
   }
   return counts;
-}
-
-function numberOr(value: unknown, fallback: number): number {
-  return Number.isFinite(Number(value)) ? Number(value) : fallback;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

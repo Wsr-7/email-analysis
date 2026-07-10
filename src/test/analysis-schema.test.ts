@@ -158,3 +158,29 @@ test("parseAnalysisJson clamps category priority mismatches and lowers confidenc
   assert.equal(analysis.items[0].priority, "P2");
   assert.equal(analysis.items[0].confidence, 0.7);
 });
+
+test("parseAnalysisJson recomputes overview from normalized items", () => {
+  const analysis = parseAnalysisJson(JSON.stringify({
+    overview: { totalMails: 99, mustHandleToday: 99, risks: 99, waitingForMe: 99, notices: 99 },
+    items: [
+      {
+        mailId: "mail-001",
+        category: "notice",
+        priority: "P0",
+        subject: "Routine notice",
+        sender: "System",
+        receivedTime: "2026-06-16 09:12:00",
+        summary: "Routine notice.",
+        reason: "Informational only.",
+        suggestedAction: "No action.",
+        draftReply: "",
+        confidence: 0.95,
+        needsOriginalMailCheck: false
+      }
+    ]
+  }));
+
+  assert.equal(analysis.overview.totalMails, 1);
+  assert.equal(analysis.overview.mustHandleToday, 0);
+  assert.equal(analysis.overview.notices, 1);
+});

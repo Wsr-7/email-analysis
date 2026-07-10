@@ -469,12 +469,19 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - Known issues: 本 step 不覆盖 draft generation prompt 的邮件上下文边界（历史未列入 R2.9a 三处裸拼接），也不处理 R2.9b/R2.9c。
   - Commit: `e3f7c44`
 
-### [ ] R2.9b normalizeOverview 改为始终按 items 重算（B-3 延续，潜在缺陷）
+### [x] R2.9b normalizeOverview 改为始终按 items 重算（B-3 延续，潜在缺陷）
 
 - **现状（已核实）**：`src/lib/analysis-schema.ts` `normalizeOverview`（~L112）与 `src/lib/thread-analysis-schema.ts`（~L80）都是「模型给的 count 优先（`numberOr(base.totalMails, items.length)`），重算仅兜底」。但两条持久化路径 `mergeAnalysisResults`/`mergeThreadAnalysisResults` 都传 `overview: {}` 强制重算，`dashboard-state.ts` `buildOverview` 也独立重算——**stale count 今天到不了 UI 与磁盘，是潜在缺陷而非现行 bug**。
 - **为什么仍要修**：normalize 过程会钳制 items（confidence<0.7 降级 uncertain、priority clamp），模型自报 count 与钳制后 items 必然不一致，「模型优先」分支永远不可信；保留它等于给未来任何直接消费 normalize 输出的调用埋雷。删分支还是净简化。
 - **做法**：两个 `normalizeOverview` 删掉模型值优先逻辑，直接用 `items.length` + `groupCounts(items)` 重算；不动 outputSchemaPrompt（模型仍可输出 overview，被忽略即可，改动最小）；同步修正受影响单测。
 - **验收**：单测：模型 overview 与 items 计数不一致 → 结果以 items 重算为准；`npm test` 全绿。
+- Completion Notes:
+  - 改动文件：`src/lib/analysis-schema.ts`、`src/lib/thread-analysis-schema.ts`、`src/test/analysis-schema.test.ts`、`src/test/thread-analysis-schema.test.ts`。
+  - 实现：两个 `normalizeOverview` 均忽略模型自报 overview，直接从 normalized items 的长度与 `groupCounts(items)` 生成计数；`analysis-schema.ts` 中不再需要的 `numberOr` 删除，`thread-analysis-schema.ts` 中 `numberOr` 仍保留给 confidence fallback 使用。
+  - 验收结果：`npm run compile` 零错误；定向测试 `node --test out/test/analysis-schema.test.js out/test/thread-analysis-schema.test.js` 9/9 通过；`npm test` 366/366 全绿。
+  - Manual validation: 不适用（纯 normalize 逻辑）。
+  - Known issues: 无；本 step 不改模型 output schema，模型仍可输出 overview，但代码忽略它。
+  - Commit: pending
 
 ### [ ] R2.9c VBS folder.Items 与单封邮件字段读取的 COM 异常局部兜底（R2.8d 遗留，C-5b 延续）
 
@@ -707,3 +714,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-10 · Codex（R2.9a pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；`git log --oneline -8` 最新为 `eb3a7b4`、`49e912c`、`33d76b6`、`1b37866`、`886a89c`、`cd749c2`、`2441695`、`8e1d945`。已关闭当前会话暴露的 4 个历史 subagent（均为 completed 状态），后续按需再开。按计划重新定位并阅读 05 矩阵 L-6、02 文档 L-6、06 文档 Q2，以及 R2.9a 条目：当前 `extension.ts` polish/refine、`analysis-translation.ts` translation payload、`app-analysis.ts` repair raw JSON 均存在 untrusted text 裸拼接；R2.8c 已有 `escapePromptDelimiters` 可复用。Claim R2.9a；边界：只补 prompt 边界和测试，不改变用户 `Instruction:` 语义、不改 prompt schema、不进入 R2.9b/c。
 
 - **2026-07-10 · Codex（R2.9a completion）**：Action: 扩展 `escapePromptDelimiters` 到 draft/translation/invalid-json 三组 delimiter；polish/refine prompt 通过新 `draft-prompt` helper 包裹草稿文本，translation payload 与 JSON repair raw response 也用 untrusted-data 声明 + delimiter 包裹。Validated: `npm run compile` 零错误；定向 R2.9a 测试 36/36 通过；`npm test` 364/364 全绿。Manual: 真实 Copilot prompt-injection 行为留到 R3 前统一验证。Commit: `e3f7c44`。Next: R2.9b。
+
+- **2026-07-10 · Codex（R2.9b pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 2]`；`git log --oneline -5` 最新为 `5b99ece`、`e3f7c44`、`eb3a7b4`、`49e912c`、`33d76b6`。按计划重新定位并阅读 05 矩阵 B-3、03 文档 B-3、R2.9b 条目：R2.7e 已做 category×priority/低 confidence 钳制，当前剩余缺口是 `analysis-schema.ts` 与 `thread-analysis-schema.ts` 的 `normalizeOverview` 仍优先信任模型自报 overview。Claim R2.9b；边界：只删模型 overview 优先分支并补单测，不改 output schema、不改 dashboard/merge 路径、不进入 R2.9c。
+
+- **2026-07-10 · Codex（R2.9b completion）**：Action: mail/thread 两个 schema 的 `normalizeOverview` 改为始终按 normalized items 重算，删除 mail schema 中不再使用的 `numberOr`；补模型 overview 与 items 不一致的回归测试。Validated: `npm run compile` 零错误；定向 schema 测试 9/9 通过；`npm test` 366/366 全绿。Manual: 不适用。Next: R2.9c。

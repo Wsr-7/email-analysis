@@ -61,3 +61,21 @@ test("normalizeThreadAnalysis keeps old or partial JSON compatible", () => {
   assert.equal(result.items[0].risks[0].level, "medium");
   assert.equal(result.overview.totalThreads, 1);
 });
+
+test("normalizeThreadAnalysis recomputes overview from items", () => {
+  const result = normalizeThreadAnalysis({
+    overview: { totalThreads: 99, mustHandleToday: 99, risks: 99, waitingForMe: 99, notices: 99 },
+    items: [
+      {
+        threadId: "thread-1",
+        category: "risk",
+        priority: "P1",
+        participants: []
+      }
+    ]
+  });
+
+  assert.equal(result.overview.totalThreads, 1);
+  assert.equal(result.overview.risks, 1);
+  assert.equal(result.overview.notices, 0);
+});
