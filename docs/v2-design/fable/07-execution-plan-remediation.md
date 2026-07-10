@@ -500,7 +500,7 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
   - 验收结果：`cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；`--sample --output F:/agent-workspace/codex/.tmp/easy-mail-r2-9c-sample.md` 通过且临时文件已删除；`npm run compile` 零错误；`npm test` 366/366 全绿；`git diff --check` 通过。
   - Manual validation: **needs user validation on real Outlook**——真机难以稳定构造 `folder.Items` COM 异常或 IRM/权限保护毒邮件；后续真实采集时需留意 `FolderScan: ...; itemError=...` 与 `FolderScanSummary: ... partial=...`，partial folder 不应导致整次采集失败。
   - Known issues: 无。
-  - Commit: pending
+  - Commit: `e0b091a`
 
 ### 核实后接受不修的记录
 
@@ -729,4 +729,4 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 
 - **2026-07-10 · Codex（R2.9c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `6e7a2b8`、`e6f21a8`、`5b99ece`、`e3f7c44`、`eb3a7b4`。按计划重新定位并阅读 05 矩阵 C-5b、01 文档 C-1/C-5、R2.9c 条目：`CollectFolderItems` 当前 `Set items = folder.Items` 无守护，主循环 `BuildMailRecord` 调用无守护；`BuildMailRecord` 内直读 `mail.EntryID`/`Subject`/`Body` 等属性，毒邮件可终止整次采集。Claim R2.9c；边界：只在 `folder.Items` 和 `BuildMailRecord` 调用点加局部兜底，不在 `BuildMailRecord` 内整体吞错、不改 digest 输出格式、不进入 R3/R4。
 
-- **2026-07-10 · Codex（R2.9c completion，Milestone R2.9 complete）**：Action: `CollectFolderItems` 对 `folder.Items` 访问失败降级为单文件夹 failed；对单封 `BuildMailRecord` COM 异常局部捕获并跳过该封，计入 `itemErrors`，扫描结束后以 partial 汇总可见。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 366/366 全绿；`git diff --check` 通过。Manual: **needs user validation on real Outlook**，真实采集时留意 `itemError` 与 partial summary。Next: R2.9a-c 已完成；进入 R3 前建议先统一执行真实 Outlook/VS Code/Copilot 验证清单，R3/R4 仍不得自行 claim。
+- **2026-07-10 · Codex（R2.9c completion，Milestone R2.9 complete）**：Action: `CollectFolderItems` 对 `folder.Items` 访问失败降级为单文件夹 failed；对单封 `BuildMailRecord` COM 异常局部捕获并跳过该封，计入 `itemErrors`，扫描结束后以 partial 汇总可见。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 366/366 全绿；`git diff --check` 通过。Manual: **needs user validation on real Outlook**，真实采集时留意 `itemError` 与 partial summary。Commit: `e0b091a`。Next: R2.9a-c 已完成；进入 R3 前建议先统一执行真实 Outlook/VS Code/Copilot 验证清单，R3/R4 仍不得自行 claim。
