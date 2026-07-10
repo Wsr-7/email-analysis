@@ -29,7 +29,7 @@ Source of truth: 本文件。发现依据与修复理由见 [05-remediation-matr
 | Milestone | 内容 | 前置 |
 | --- | --- | --- |
 | R1 正确性止血 | 7 个 S 级修复，互相独立，可任意顺序 claim | 无 |
-| R2 效率与语言 | chunk 化、语言契约、取消/退避、Restrict、微效率 | R1 完成（尤其 R1.1/R1.5） |
+| R2 效率与语言 | chunk 化、语言契约、取消/退避、Restrict、微效率、配置误填止血 | R1 完成（尤其 R1.1/R1.5） |
 | R3 结构演进 | tags 化、线程一等公民、增量渲染+CSP、MIP 标签、NDJSON | **需用户确认设计后才可 claim** |
 | R4 体验差异化 | 键盘流、密度改造、诊断协议、增量拉取 | R3 之后 |
 
@@ -508,6 +508,37 @@ R3/R4 在本文件中只有条目占位（见 `## 4`），worker 不得自行展
 
 ---
 
+## 3.9 Milestone R2.10 — Outlook 文件夹加载与选择（用户确认的配置 UX 止血）
+
+> 来源：用户指出当前 `easyMail.folders` 仍需在 VS Code Settings 里 `Add Item` 后手写 folder 名/路径，写错后体验差。Fable `00-overview.md` 早已把 `folder picker` 记录为"有价值但可降级"；`05-post-c10-fix-optimization-plan.md` 也记录过"collector-based Outlook folder listing for a dropdown instead of manual folder strings"。现在 R2.9 已完成，该项可作为进入 R3 前的最后一个小型 UX/配置可靠性 step。
+
+**阶段归属决定**：放在 **R2.10**，不放 R3/R4。理由：它复用现有 `easyMail.folders` 设置与 Outlook collector，不改变 digest/store/schema/thread/UI 架构；目标是减少坏配置导致的采集失败，和 R2.7b/R2.9c 的"单坏文件夹不拖死整次采集"同属配置/collector 可靠性补强。R3/R4 仍保留给结构演进、增量渲染、DIAG 协议、键盘流和密度改造。
+
+### [ ] R2.10a 通过 Outlook 枚举文件夹并写回 `easyMail.folders`
+
+- **现状（已核实）**：
+  1. `package.json` 只注册了静态 array 设置 `easyMail.folders`；VS Code Settings 无运行时动态 enum，无法直接在 Settings 页面里把 Outlook 文件夹列表变成真实 dropdown。
+  2. `extension.ts` 拉取时仍读取 `config.folders` 并传给 VBS `--folders`；这是正确的生效路径，不能改成另一套配置。
+  3. `collect-outlook-mails.vbs` 只支持 `--folders <a;b;c>`，没有 list mode；legacy dashboard 仍有手写 input，但当前 sidebar 已移除 folder 编辑。
+- **做法（最小可用方案）**：
+  1. 在 `scripts/collect-outlook-mails.vbs` 增加 `--list-folders` 模式：启动 Outlook/MAPI 后递归枚举可访问的 mail folders，输出稳定的机器可解析文本（如 header + 每行一个 escaped folder path），不写 digest，不改变现有 `--folders`/`--sample` 输出格式。
+  2. 为 `--list-folders --sample` 提供确定性样例输出，便于无 Outlook 环境做语法和解析验收。
+  3. 在 TS 侧新增一个小 parser（纯函数、可单测），只解析 list mode 的 folder path 行，忽略 `FolderScan`/诊断行；不要把解析写成 ad hoc split 到命令处理里。
+  4. 新增 VS Code command（建议 `easyMail.selectFolders` / 显示名 `Easy Mail: Select Outlook Folders`）：运行 `cscript //nologo scripts/collect-outlook-mails.vbs --list-folders`，用 `vscode.window.showQuickPick(..., { canPickMany: true })` 展示多选，默认勾选当前 `easyMail.folders`，用户确认后写回已注册设置 `easyMail.folders`。取消选择不改配置。
+  5. 在 Settings description、walkthrough/guide 的 `openSettings` 附近补一句：手写仍可用，但推荐用 `Select Outlook Folders` 命令从 Outlook 加载；不要恢复旧 sidebar 手写输入框，不新增 npm 依赖。
+- **验收**：
+  - `cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过，help 文案列出 `--list-folders`。
+  - `cscript //nologo scripts/collect-outlook-mails.vbs --list-folders --sample` 通过，输出可被 TS parser 解析为至少 `Inbox` 与 `Sent Items`。
+  - 新增 parser 单测：含空行/诊断行/含空格 folder path/重复 path 时结果稳定；`npm run compile` 零错误；`npm test` 全绿。
+  - 手动验证标注 **needs user validation on real Outlook**：真实 VS Code 中运行 `Easy Mail: Select Outlook Folders` 能看到 Outlook 文件夹列表，多选后 `easyMail.folders` 被写回；随后 Fetch New 使用所选文件夹；Outlook 不可用或枚举失败时显示错误且不覆盖原配置。
+- **边界**：
+  - 不改 `easyMail.folders` 的存储字段名和生效语义。
+  - 不做动态 Settings enum（VS Code contribution 不支持运行时枚举）。
+  - 不恢复 sidebar folder 手写编辑；如要在 sidebar 加按钮，只能作为同一命令的入口，不能再引入第二套状态。
+  - 不做多账户 folder scope 设计、不做 per-store anchor 改造、不做增量拉取逻辑。
+
+---
+
 ## 4. Milestone R3 / R4 占位（worker 不得自行 claim）
 
 以下条目需用户确认设计（涉及 schema、UI 结构、采集格式变更），确认后由规划者展开为带验收标准的 step：
@@ -535,6 +566,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - 2026-07-09 · **规划者复审 R1/R2 完成**（diff `664620f..d4d1a32`，`npm run compile` + `npm test` 340/340 独立复核通过）。产出两个新批次：**R2.6 复审修复批**（R2.6a 草稿覆盖回归为最高优先）与 **R2.7 漏排补录批**（L-6/C-5b/C-7d/L-8e/B-2e+B-3）。C-5a 确认已被 R2.5 review fix 顺带解决，C-7b 部分缓解。用户真机验证 R1.2/R1.3/R1.6/R2.5 时**建议先做 R2.6a**，否则草稿保留场景的验证结果会被该回归污染。
 - 2026-07-09 · **规划者二次复审 R2.6/R2.7 完成并扩充 R2.8**（diff `76bbfc7..6e9aef8`，独立复核 357/357 全绿）。R2.6a/c/e、R2.7a-e 确认修复正确；产出 **R2.8 批次**（R2.8a modelFamily 迁移振荡、R2.8b 可刷新错误正则过宽致 429 无退避重发、R2.8c 定界符逃逸、R2.8d GetNext partial-scan 汇总）。R2.8a-d 已完成；R1/R2 当前达"仅剩人工验证 + 若干后续规划风险"状态，人工验证清单见各 step 的 needs user validation 标注。
 - 2026-07-10 · **规划者核实 worker 上报的 4 项风险，产出 R2.9 批次**（§3.8）：R2.9a prompt 边界扩展到 polish/refine/translation/repair（属实，低-中）、R2.9b overview 模型值优先属潜在缺陷（merge/dashboard 均已重算，改为始终重算）、R2.9c VBS `folder.Items` 与单封 `BuildMailRecord` 无守护（属实，毒邮件可杀死整次采集）；fallback id 同秒碰撞核实后**接受不修**（EntryID 恒存在，触发面趋近于零，理由见 §3.8 末）。R2.9a-c 全部 `[ ]` 待 claim，互相独立。
+- 2026-07-10 · **用户确认新增 folder loading/selection 需求，规划为 R2.10**（§3.9）：目标是避免 `easyMail.folders` 手写误填；不改变配置字段、不做动态 Settings enum、不进入 R3/R4 架构批次。下一位 worker 可从 R2.10a 开始，开工前仍需按规则恢复现场并 claim。
 
 ---
 
@@ -730,3 +762,5 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - **2026-07-10 · Codex（R2.9c pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3 [ahead 4]`；`git log --oneline -5` 最新为 `6e7a2b8`、`e6f21a8`、`5b99ece`、`e3f7c44`、`eb3a7b4`。按计划重新定位并阅读 05 矩阵 C-5b、01 文档 C-1/C-5、R2.9c 条目：`CollectFolderItems` 当前 `Set items = folder.Items` 无守护，主循环 `BuildMailRecord` 调用无守护；`BuildMailRecord` 内直读 `mail.EntryID`/`Subject`/`Body` 等属性，毒邮件可终止整次采集。Claim R2.9c；边界：只在 `folder.Items` 和 `BuildMailRecord` 调用点加局部兜底，不在 `BuildMailRecord` 内整体吞错、不改 digest 输出格式、不进入 R3/R4。
 
 - **2026-07-10 · Codex（R2.9c completion，Milestone R2.9 complete）**：Action: `CollectFolderItems` 对 `folder.Items` 访问失败降级为单文件夹 failed；对单封 `BuildMailRecord` COM 异常局部捕获并跳过该封，计入 `itemErrors`，扫描结束后以 partial 汇总可见。Validated: VBS `--help` 通过；`--sample` 通过且临时文件删除；`npm run compile` 零错误；`npm test` 366/366 全绿；`git diff --check` 通过。Manual: **needs user validation on real Outlook**，真实采集时留意 `itemError` 与 partial summary。Commit: `e0b091a`。Next: R2.9a-c 已完成；进入 R3 前建议先统一执行真实 Outlook/VS Code/Copilot 验证清单，R3/R4 仍不得自行 claim。
+
+- **2026-07-10 · Codex（R2.10 planning checkpoint）**：用户追问此前"加载 Outlook folder 让用户选择而不是手写"是否已做；恢复核查确认：当前未实现，`easyMail.folders` 仍是静态 array 设置，VBS 仅支持 `--folders`，fable overview 仅把 `folder picker` 降级记录，未进入执行 step。Action: 新增 §3.9/R2.10a 方案与验收标准。Decision: 放 R2.10 而非 R3/R4，因为它复用现有 settings/collector，只是配置误填止血；VS Code Settings 本身不支持运行时动态 enum，最小方案是 command + QuickPick 多选后写回 `easyMail.folders`。No code changed. Next: 若用户确认继续，下一位 worker claim R2.10a；不得借机恢复 sidebar 手写输入框或引入新依赖。
