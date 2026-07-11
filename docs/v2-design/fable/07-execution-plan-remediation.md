@@ -578,6 +578,7 @@ cscript //nologo scripts/collect-outlook-mails.vbs --help   # VBS 语法检查
 - 2026-07-10 · **规划者复审 R2.10a 方案并修订**（阶段归属与总体方向确认无误）：① list 输出改走 `--output` 文件 + `WriteTextFile` UTF-8（stdout 是 OEM 代码页且 `runProcess` 不回传 stdout，中文文件夹名必乱码）；② 命令显示名修正为 `EasyMail:` 单词形式（`09645e7` 惯例）；③ 枚举输出必须是 `ResolveFolder` 可往返解析的 `/` 连接路径，作为硬验收；④ 含 `;` 的路径无法通过 `--folders`/settings 往返，跳过 + 诊断行；取消"escaped path"转义设计（Outlook 禁 `/`、`\`，无需转义）；⑤ 枚举加 R2.9c 式 COM 局部守护 + 只收 `DefaultItemType = 0` 的 mail folders；⑥ QuickPick pick 列表并入当前配置现值，保证直接确认为无操作。R2.10a 保持 `[ ]` 待 claim。
 - 2026-07-10 · **R2.10a 完成**：实现 Outlook folder list mode + VS Code QuickPick 写回 `easyMail.folders`；无 schema/digest/store 变更，无新依赖。自动验收全绿；真实 Outlook folder 枚举与往返解析仍需用户手动验证。下一步：进入 R3 前建议统一执行真实 Outlook/VS Code/Copilot 验证清单，R3/R4 仍不得自行 claim。
 - 2026-07-11 · **规划者三次复审通过，进入人工验证阶段**：R2.9a-c、R2.10a、改名批次（easymail 0.3.0）全部独立复核确认正确（`npm test` 367/367、VBS list mode 端到端含中文路径）；发现 vsix 打包早于 R2.10a 代码，已重新打包提交（`b4b0c07`）。R1/R2 全部 24 个 step `[x]`，代码层面无遗留问题。人工验证清单见 **§8**（12 项，用户填写）；R3/R4 待用户确认设计后由规划者展开。
+- 2026-07-11 · **用户完成人工验证并提交详细反馈**（`easymail-verification-notes.md`），多项真机失败（recentHours 拉不到邮件、Meetings 队列空、草稿丢失、注入邮件消失、坏文件夹无提示等）。规划者逐条代码级核实后产出 **`08-execution-plan-validation-feedback.md`（F 批次：F1.1-F1.7 + F2.1-F2.7）**，后续 worker 以 08 计划为唯一执行依据；本文件（07）就此封版，仅作历史记录。**R3/R4 在 F 批次完成并通过用户复验前保持锁定。**
 
 ---
 
