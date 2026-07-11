@@ -299,6 +299,7 @@ Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal m
 
   Dim restricted
   If Trim(CStr(olderThan)) <> "" Then
+    WScript.Echo "RestrictFilter: folder=" & OneLine(folderPath) & "; filter=[" & timeProperty & "] < '" & FormatRestrictDate(ParseAnchorDate(olderThan)) & "'"
     On Error Resume Next
     Set restricted = items.Restrict("[" & timeProperty & "] < '" & FormatRestrictDate(ParseAnchorDate(olderThan)) & "'")
     If Err.Number <> 0 Then
@@ -311,6 +312,7 @@ Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal m
     Set items = restricted
   End If
   If cutoffEnabled Then
+    WScript.Echo "RestrictFilter: folder=" & OneLine(folderPath) & "; filter=[" & timeProperty & "] >= '" & FormatRestrictDate(cutoff) & "'"
     On Error Resume Next
     Set restricted = items.Restrict("[" & timeProperty & "] >= '" & FormatRestrictDate(cutoff) & "'")
     If Err.Number <> 0 Then
@@ -397,7 +399,13 @@ Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal m
     End If
     On Error GoTo 0
   Loop
-  WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; scanned=" & scanned & "; added=" & addedInFolder & "; itemErrors=" & itemErrors & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
+  Dim modeParameter
+  If cutoffEnabled Then
+    modeParameter = "; recentHours=" & recentHours
+  Else
+    modeParameter = "; maxItems=" & maxItems
+  End If
+  WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; scanned=" & scanned & "; added=" & addedInFolder & "; itemErrors=" & itemErrors & modeParameter & "; olderThan=" & ValueOrDash(olderThan)
   If itemErrors > 0 Then
     CollectFolderItems = "partial"
   Else
@@ -454,6 +462,10 @@ Function IsSentFolder(byRef ns, byRef folder)
 
   Dim sentEntryId
   sentEntryId = SafeString(sentFolder.EntryID)
+  If sentEntryId = "" Then
+    On Error GoTo 0
+    Exit Function
+  End If
   Dim current
   Set current = folder
   Dim depth
@@ -539,7 +551,7 @@ Function FormatRestrictDate(byVal dateValue)
   ElseIf hourPart > 12 Then
     hourPart = hourPart - 12
   End If
-  FormatRestrictDate = Month(dateValue) & "/" & Day(dateValue) & "/" & Year(dateValue) & " " & hourPart & ":" & Right("0" & Minute(dateValue), 2) & ":" & Right("0" & Second(dateValue), 2) & " " & suffix
+  FormatRestrictDate = Month(dateValue) & "/" & Day(dateValue) & "/" & Year(dateValue) & " " & hourPart & ":" & Right("0" & Minute(dateValue), 2) & " " & suffix
 End Function
 
 Function ParseAnchorDate(byVal value)
@@ -986,8 +998,11 @@ Sub WriteDigest(byVal outputPath, byRef target, byRef records, byVal recordCount
   content = "# Outlook Mail Digest" & vbCrLf & vbCrLf
   content = content & "GeneratedAt: " & FormatDateValue(Now) & vbCrLf
   content = content & "RangeMode: " & target("range-mode") & vbCrLf
-  content = content & "RecentHours: " & target("recent-hours") & vbCrLf
-  content = content & "MaxItems: " & target("max-items") & vbCrLf
+  If IsRecentHoursMode(target("range-mode")) Then
+    content = content & "RecentHours: " & target("recent-hours") & vbCrLf
+  Else
+    content = content & "MaxItems: " & target("max-items") & vbCrLf
+  End If
   content = content & "Folders:" & vbCrLf
 
   Dim folderNames

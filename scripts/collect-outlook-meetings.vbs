@@ -127,6 +127,7 @@ Sub CollectCalendarItems(byRef ns, byVal rangeStart, byVal rangeEnd, byVal bodyC
   Dim endFilter
   endFilter = FormatRestrictDate(rangeEnd)
 
+  WScript.Echo "RestrictFilter: folder=Calendar; filter=[Start] >= '" & startFilter & "' AND [Start] < '" & endFilter & "'"
   On Error Resume Next
   Dim restricted
   Set restricted = items.Restrict("[Start] >= '" & startFilter & "' AND [Start] < '" & endFilter & "'")
@@ -169,7 +170,7 @@ Sub CollectCalendarItems(byRef ns, byVal rangeStart, byVal rangeEnd, byVal bodyC
       If itemStart >= rangeEnd Then Exit Do
     End If
 
-    If TypeName(item) = "AppointmentItem" Then
+    If (Not gotStart Or itemStart >= rangeStart) And TypeName(item) = "AppointmentItem" Then
       Dim respStatus
       respStatus = SafeResponseStatus(item)
       If respStatus <> 4 Then
@@ -215,6 +216,7 @@ Sub CollectUnrespondedInvites(byRef ns, byVal todayStart, byVal bodyChars, byRef
   Dim cutoff
   cutoff = DateAdd("d", -7, Now)
 
+  WScript.Echo "RestrictFilter: folder=Inbox; filter=[MessageClass] = 'IPM.Schedule.Meeting.Request' AND [ReceivedTime] >= '" & FormatRestrictDate(cutoff) & "'"
   On Error Resume Next
   Dim restricted
   Set restricted = items.Restrict("[MessageClass] = 'IPM.Schedule.Meeting.Request' AND [ReceivedTime] >= '" & FormatRestrictDate(cutoff) & "'")
