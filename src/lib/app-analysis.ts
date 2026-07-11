@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { normalizeAnalysis, parseAnalysisJson, stripCodeFence, mergeAnalysisResults, pruneAnalysisResult } from "./analysis-schema";
+import { normalizeAnalysis, parseAnalysisJson, stripCodeFence, mergeAnalysisResults, pruneAnalysisResult, type AnalysisItem } from "./analysis-schema";
 import { applyAnalysisTranslation, buildAnalysisTranslationPrompt } from "./analysis-translation";
 import { buildQueueState, ensureClassifications } from "./classification";
 import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "./config-utils";
@@ -30,6 +30,12 @@ export interface AnalysisContext {
   availableModelsCache: AvailableModel[] | null;
   cancellationToken?: CancellationTokenLike;
   retryDelaysMs?: number[];
+}
+
+export interface AnalysisBatchResult {
+  batchSize: number;
+  skippedChunks: number;
+  omittedMails: number;
 }
 
 export async function sendPromptToModel(
@@ -171,6 +177,23 @@ function estimateMailTokens(mail: StoredMail): number {
   return estimateTextTokens(chars);
 }
 
+function omittedAnalysisItems(mails: StoredMail[]): AnalysisItem[] {
+  return mails.map((mail) => ({
+    mailId: mail.mailId,
+    category: "uncertain",
+    priority: "P2",
+    subject: mail.subject,
+    sender: mail.from,
+    receivedTime: mail.receivedTime,
+    summary: "analysis incomplete: model omitted this mail",
+    reason: "",
+    suggestedAction: "",
+    draftReply: "",
+    confidence: 0,
+    needsOriginalMailCheck: false
+  }));
+}
+
 function estimateTextTokens(textOrLength: string | number): number {
   const chars = typeof textOrLength === "number" ? textOrLength : textOrLength.length;
   return Math.ceil(chars / 4);
@@ -188,7 +211,7 @@ async function analysisTokenBudget(ctx: AnalysisContext, configuredModel: string
 export async function analyzeBatchCore(
   ctx: AnalysisContext,
   selection?: "allAllowed" | string[] | number
-): Promise<{ batchSize: number }> {
+): Promise<AnalysisBatchResult> {
   const config = await ctx.readConfig();
   await ctx.data.importDigestIfStoreMissing();
   const store = await ctx.data.readMailStore();
@@ -263,9 +286,26 @@ export async function analyzeBatchCore(
   let merged = currentAnalysis;
   let analyzedCount = 0;
   let skippedChunks = 0;
+  let omittedMails = 0;
   let totalReplacements = 0;
   let cancelled = false;
   const summaryLabels = buildCategoryLabels(getLabels(getLocaleFromConfig(config)), promptConfig, getLocaleFromConfig(config));
+  const mergeAndPersist = async (incoming: ReturnType<typeof normalizeAnalysis>): Promise<void> => {
+    merged = pruneAnalysisResult(
+      mergeAnalysisResults(merged, incoming, allowedCategoryIds(promptConfig)),
+      Number(config.analysisRetentionDays || 7),
+      allowedCategoryIds(promptConfig)
+    );
+    await fs.promises.writeFile(ctx.data.getAnalysisPath(), `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+    await fs.promises.writeFile(ctx.data.getSummaryPath(), buildSummaryMarkdown(merged, summaryLabels), "utf8");
+  };
+  const persistSkippedChunk = async (chunk: StoredMail[], chunkIndex: number): Promise<void> => {
+    omittedMails += chunk.length;
+    await ctx.log("analyze:omittedItems", { chunk: chunkIndex, chunks: chunks.length, mailIds: chunk.map((mail) => mail.mailId), reason: "chunkSkipped" });
+    const fallback = normalizeAnalysis({ generatedAt: "", overview: {}, items: omittedAnalysisItems(chunk) }, allowedCategoryIds(promptConfig));
+    fallback.language = getLocaleFromConfig(config);
+    await mergeAndPersist(fallback);
+  };
 
   for (let index = 0; index < chunks.length; index += 1) {
     if (ctx.cancellationToken?.isCancellationRequested) {
@@ -301,6 +341,7 @@ export async function analyzeBatchCore(
         chunks: chunks.length,
         error: error instanceof Error ? error.message : String(error)
       });
+      await persistSkippedChunk(chunk, index + 1);
       continue;
     }
     await ctx.log("analyze:response", { chunk: index + 1, chunks: chunks.length, rawLength: raw.length });
@@ -321,6 +362,7 @@ export async function analyzeBatchCore(
           chunks: chunks.length,
           error: repairError instanceof Error ? repairError.message : String(repairError)
         });
+        await persistSkippedChunk(chunk, index + 1);
         continue;
       }
     }
@@ -330,14 +372,24 @@ export async function analyzeBatchCore(
       replyTemplate
     );
     normalized.language = getLocaleFromConfig(config);
-    merged = pruneAnalysisResult(
-      mergeAnalysisResults(merged, normalized, allowedCategoryIds(promptConfig)),
-      Number(config.analysisRetentionDays || 7),
-      allowedCategoryIds(promptConfig)
-    );
+    const batchMailIds = new Set(chunk.map((mail) => mail.mailId));
+    const returnedItems = normalized.items.filter((item) => batchMailIds.has(item.mailId));
+    const orphanMailIds = normalized.items.filter((item) => !batchMailIds.has(item.mailId)).map((item) => item.mailId);
+    if (orphanMailIds.length) {
+      await ctx.log("analyze:orphanItems", { chunk: index + 1, chunks: chunks.length, mailIds: orphanMailIds });
+    }
+    const returnedMailIds = new Set(returnedItems.map((item) => item.mailId));
+    const omitted = chunk.filter((mail) => !returnedMailIds.has(mail.mailId));
+    if (omitted.length) {
+      omittedMails += omitted.length;
+      await ctx.log("analyze:omittedItems", { chunk: index + 1, chunks: chunks.length, mailIds: omitted.map((mail) => mail.mailId) });
+    }
+    normalized.items = [
+      ...returnedItems,
+      ...omittedAnalysisItems(omitted)
+    ];
+    await mergeAndPersist(normalized);
     analyzedCount += chunk.length;
-    await fs.promises.writeFile(ctx.data.getAnalysisPath(), `${JSON.stringify(merged, null, 2)}\n`, "utf8");
-    await fs.promises.writeFile(ctx.data.getSummaryPath(), buildSummaryMarkdown(merged, summaryLabels), "utf8");
     await ctx.log("analyze:chunkDone", { chunk: index + 1, chunks: chunks.length, mergedItems: merged.items.length });
   }
 
@@ -352,17 +404,19 @@ export async function analyzeBatchCore(
   if (!analyzedCount) {
     throwIfCancelled(ctx.cancellationToken);
     await ctx.log("analyze:failed", { batchSize: batch.length, skippedChunks });
-    throw new Error("All analysis chunks failed. Check model output or try a different model.");
+    const error = Object.assign(new Error("All analysis chunks failed. Check model output or try a different model."), { skippedChunks, omittedMails });
+    throw error;
   }
 
   await ctx.log("analyze:done", {
     batchSize: batch.length,
     analyzedCount,
     skippedChunks,
+    omittedMails,
     redactionReplacements: totalReplacements,
     mergedItems: merged.items.length
   });
-  return { batchSize: analyzedCount };
+  return { batchSize: analyzedCount, skippedChunks, omittedMails };
 }
 
 async function repairAnalysisJson(

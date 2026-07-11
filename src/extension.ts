@@ -20,7 +20,7 @@ import { renderEasyMailGuideHtml } from "./lib/guide-webview";
 import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, parseOutlookFolderList, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
-import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
+import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisBatchResult, type AnalysisContext } from "./lib/app-analysis";
 import { handleWebviewMessage, type MessageHandlerContext } from "./lib/message-handler";
 import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
 import { buildPolishDraftPrompt, buildRefineDraftPrompt } from "./lib/draft-prompt";
@@ -551,42 +551,44 @@ class EasyMailApp {
   }
 
   public async analyze(batchSize?: number): Promise<void> {
-    const locale = await this.readLocale();
-    const labels = getLabels(locale);
-    await this.runWithBusy(
-      labels.progress.analyze,
-      labels.progress.detail,
-      "analyzeNext",
-      async (token) => await this.analyzeBatchCore(batchSize, token),
-      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
-      true
-    );
+    await this.runAnalysisWithBusy("analyzeNext", batchSize);
   }
 
   public async analyzeAllAllowed(): Promise<void> {
-    const locale = await this.readLocale();
-    const labels = getLabels(locale);
-    await this.runWithBusy(
-      labels.progress.analyze,
-      labels.progress.detail,
-      "analyzeAll",
-      async (token) => await this.analyzeBatchCore("allAllowed", token),
-      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
-      true
-    );
+    await this.runAnalysisWithBusy("analyzeAll", "allAllowed");
   }
 
   private async analyzeSelected(mailIds: string[]): Promise<void> {
+    await this.runAnalysisWithBusy("analyzeSelected", mailIds);
+  }
+
+  private async runAnalysisWithBusy(kind: string, selection?: "allAllowed" | string[] | number): Promise<void> {
     const locale = await this.readLocale();
     const labels = getLabels(locale);
-    await this.runWithBusy(
-      labels.progress.analyze,
-      labels.progress.detail,
-      "analyzeSelected",
-      async (token) => await this.analyzeBatchCore(mailIds, token),
-      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
-      true
-    );
+    try {
+      const result = await this.runWithBusy(
+        labels.progress.analyze,
+        labels.progress.detail,
+        kind,
+        async (token) => await this.analyzeBatchCore(selection, token),
+        (analysis) => `EasyMail analysis completed for ${analysis.batchSize} mail(s).`,
+        true
+      );
+      this.showAnalysisWarning(result);
+    } catch (error) {
+      if (error && typeof error === "object") {
+        this.showAnalysisWarning(error as Partial<AnalysisBatchResult>);
+      }
+      throw error;
+    }
+  }
+
+  private showAnalysisWarning(result: Partial<AnalysisBatchResult>): void {
+    const skippedChunks = Number(result.skippedChunks || 0);
+    const omittedMails = Number(result.omittedMails || 0);
+    if (skippedChunks || omittedMails) {
+      void vscode.window.showWarningMessage(`EasyMail analysis incomplete: ${skippedChunks} chunk(s) skipped; ${omittedMails} mail(s) marked Uncertain.`);
+    }
   }
 
   private analysisContext(cancellationToken?: CancellationTokenLike): AnalysisContext {
@@ -601,7 +603,7 @@ class EasyMailApp {
     };
   }
 
-  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike): Promise<{ batchSize: number }> {
+  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike): Promise<AnalysisBatchResult> {
     return analyzeBatchCoreImpl(this.analysisContext(cancellationToken), selection);
   }
 

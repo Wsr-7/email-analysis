@@ -67,6 +67,78 @@ describe("analyzeBatchCore", () => {
     assert.equal(hugeChunks[1][0].mailId, "mail-100");
   });
 
+  it("marks a mail uncertain when the model omits it from a batch response", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({ generatedAt: "", lastPullAt: "", items: [mail(1), mail(2)] });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+
+      await analyzeBatchCore({
+        data,
+        llmProvider: new MockProvider({ responses: [analysisResponse("mail-001")] }),
+        extensionPath: process.cwd(),
+        readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+        log: async () => {},
+        availableModelsCache: null
+      });
+
+      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
+      assert.deepEqual(result.items.map((item) => item.mailId).sort(), ["mail-001", "mail-002"]);
+      assert.deepEqual(result.items.find((item) => item.mailId === "mail-002"), {
+        mailId: "mail-002",
+        category: "uncertain",
+        priority: "P2",
+        subject: "Subject 2",
+        sender: "sender2@example.com",
+        receivedTime: "2026-07-02 09:02:00",
+        summary: "analysis incomplete: model omitted this mail",
+        reason: "",
+        suggestedAction: "",
+        draftReply: "",
+        confidence: 0,
+        needsOriginalMailCheck: false
+      });
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("drops a model item whose mail id was changed", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({ generatedAt: "", lastPullAt: "", items: [mail(1)] });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+      const events: string[] = [];
+
+      await analyzeBatchCore({
+        data,
+        llmProvider: new MockProvider({ responses: [analysisResponse("tampered-mail-id")] }),
+        extensionPath: process.cwd(),
+        readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+        log: async (event) => { events.push(event); },
+        availableModelsCache: null
+      });
+
+      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
+      assert.deepEqual(result.items.map((item) => item.mailId), ["mail-001"]);
+      assert.equal(result.items[0].category, "uncertain");
+      assert.equal(result.items[0].summary, "analysis incomplete: model omitted this mail");
+      assert.ok(events.includes("analyze:orphanItems"));
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
   it("passes the selected model to the provider", async () => {
     const selectedModel = { vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" };
     let capturedOptions: LlmRequestOptions | undefined;
@@ -225,7 +297,7 @@ describe("analyzeBatchCore", () => {
     assert.ok(Date.now() - startedAt < 1000);
   });
 
-  it("keeps successful chunks when one chunk fails JSON parsing and repair", async () => {
+  it("keeps a JSON-repair-skipped chunk visible as uncertain", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
       const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
@@ -264,7 +336,8 @@ describe("analyzeBatchCore", () => {
       }, "allAllowed");
 
       const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
-      assert.deepEqual(result.items.map((item) => item.mailId).sort(), ["mail-001", "mail-003"]);
+      assert.deepEqual(result.items.map((item) => item.mailId).sort(), ["mail-001", "mail-002", "mail-003"]);
+      assert.equal(result.items.find((item) => item.mailId === "mail-002")?.summary, "analysis incomplete: model omitted this mail");
       assert.equal(provider.prompts.length, 4);
       assert.match(provider.prompts[2], /Fix this invalid JSON response/);
       assert.equal(count(provider.prompts[2], "<easy-mail-invalid-json>"), 1);
@@ -275,7 +348,7 @@ describe("analyzeBatchCore", () => {
     }
   });
 
-  it("keeps successful chunks when one chunk fails during model transport", async () => {
+  it("keeps a transport-skipped chunk visible as uncertain", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
       const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
@@ -316,7 +389,10 @@ describe("analyzeBatchCore", () => {
 
       const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
       assert.equal(result.batchSize, 2);
-      assert.deepEqual(analysis.items.map((item) => item.mailId).sort(), ["mail-001", "mail-003"]);
+      assert.equal(result.skippedChunks, 1);
+      assert.equal(result.omittedMails, 1);
+      assert.deepEqual(analysis.items.map((item) => item.mailId).sort(), ["mail-001", "mail-002", "mail-003"]);
+      assert.equal(analysis.items.find((item) => item.mailId === "mail-002")?.summary, "analysis incomplete: model omitted this mail");
       assert.equal(provider.prompts.length, 3);
       assert.ok(events.includes("analyze:chunkSkipped"));
     } finally {
@@ -513,6 +589,44 @@ describe("analyzeBatchCore", () => {
         }, "allAllowed"),
         /All analysis chunks failed/
       );
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("persists uncertain fallback mail when every chunk fails", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({ generatedAt: "", lastPullAt: "", items: [mail(1)] });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+
+      await assert.rejects(
+        () => analyzeBatchCore({
+          data,
+          llmProvider: new MockProvider({ responses: [new Error("model unavailable")] }),
+          extensionPath: process.cwd(),
+          readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+          log: async () => {},
+          availableModelsCache: null,
+          retryDelaysMs: []
+        }),
+        (error: Error & { skippedChunks?: number; omittedMails?: number }) => {
+          assert.match(error.message, /All analysis chunks failed/);
+          assert.equal(error.skippedChunks, 1);
+          assert.equal(error.omittedMails, 1);
+          return true;
+        }
+      );
+
+      const result = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
+      assert.deepEqual(result.items.map((item) => item.mailId), ["mail-001"]);
+      assert.equal(result.items[0].category, "uncertain");
+      assert.equal(result.items[0].summary, "analysis incomplete: model omitted this mail");
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }
