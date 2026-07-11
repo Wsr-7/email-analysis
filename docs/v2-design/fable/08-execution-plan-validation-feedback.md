@@ -60,7 +60,7 @@
   - Known issues：无真实 Outlook/Exchange 邮箱，无法在本机确认 Outlook COM 对 RestrictFilter 与 Sent folder EntryID 的实际行为。
   - Commit：`040713d`。
 
-### [ ] F1.2 分析结果 id 对账：送析邮件不得凭空消失（清单#8）
+### [x] F1.2 分析结果 id 对账：送析邮件不得凭空消失（清单#8，commit `bd56b6e`）
 
 - **现状（已核实）**：`src/lib/classification.ts:84-96`——`pending` = 不在 analysis items 里的邮件，模型漏返理论上应留在 Pending。但用户实测注入邮件"不存在于任何分类"且日志无踪。可能路径：(a) 所在 chunk 解析失败被 R2.6c 静默跳过（`analyze:chunkSkipped` 只进日志文件不提示用户）；(b) 模型被注入改写了返回的 mailId → 产生孤儿分析项；(c) UI 某处过滤。需真机复现定位。
 - **做法**：
@@ -69,6 +69,14 @@
   3. 用注入邮件真机复现，Completion Notes 写明实际根因路径。
   4. 单测：模型漏返一封 / 返回篡改 id → 缺失邮件落 uncertain、孤儿被丢弃。
 - **验收**：单测 + `npm test` 全绿。**needs user validation**：重发注入测试邮件，分析后该邮件出现在 Uncertain（或正常分类），绝不消失；若 chunk 失败有 toast。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/app-analysis.ts`、`src/extension.ts`、`src/test/app-analysis.test.ts`。
+  - 实现边界：成功与 skipped chunk 均按送析 id 对账；漏返/篡改 id 生成 `uncertain` 兜底，孤儿丢弃并记日志；全部失败亦先持久化兜底，扩展侧三类入口统一显示数量 warning。
+  - 验收结果：定向对账、transport skip、repair skip、全失败持久化测试通过；`npm run compile` 零错误；`npm test` 370/370 通过；task review 的 P0 已修复并复审通过。
+  - Manual validation：**needs user validation on real Outlook**。重发注入邮件并分析，确认正常分类或 Uncertain；人为触发 chunk 失败时确认出现含数量 warning。
+  - Known issues：未在真实 Copilot/Outlook 环境复现原始注入路径。
+  - Commit：`bd56b6e`。
 
 ### [ ] F1.3 草稿改为扩展侧持久化（清单#3，手写与生成草稿刷新即丢）
 
@@ -177,6 +185,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-11 · 计划创建。规划者已完成全部反馈的代码级核实：F1.1（Restrict `\` 日期格式，双脚本同病）与 Meetings 队列空为同源根因；F1.2-F1.7、F2.1-F2.7 已列明现状锚点与做法。全部 `[ ]` 待 claim。R3/R4 锁定不变。
 - 2026-07-12 · F1.1 已完成，代码提交 `040713d`：统一无秒 Restrict 日期格式、补齐 RestrictFilter 诊断与 Calendar 下界防线、修正空 Sent EntryID 误判及 range mode 显示互串。自动验收通过；真实 Outlook 验证仍待用户完成。下一步按用户指定顺序 claim F1.2。
+- 2026-07-12 · F1.2 已完成，代码提交 `bd56b6e`：批分析对账兜底覆盖漏返、篡改 id 与 skipped chunk，并向 UI 报告不完整结果。下一步 claim F1.3。
 
 ---
 
@@ -187,3 +196,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F1.1 pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；HEAD `4ba7b90`。已通读 08 与 07 协作协议，并重新定位 F1.1 调用链：mail 的 `FormatRestrictDate` 仍含秒（`collect-outlook-mails.vbs:529-543`），recentHours Restrict 在 `315`，且 `FolderScan`/digest 同时展示 inactive 参数（`400`、`988-990`）；`IsSentFolder` 的空 `sentEntryId` 比较在 `444-475`。meetings 的 formatter 现已是目标 `M/D/YYYY H:MM AM|PM`（`444-458`），但 Restrict 前无诊断且 `CollectCalendarItems` 只有上界守卫（`132`、`169`）；将保持两个 formatter 完全一致，不重复改动已满足目标的一侧。边界：仅 F1.1 两个 VBS 与本计划记录；不改 digest/store/schema，不进入 F1.2。开始按 RED/GREEN 最小验证实现。
 
 - **2026-07-12 · Codex（F1.1 completion）**：完成 `040713d`。mail formatter 去秒，与 meetings 的既有目标格式保持字面一致；四个 Restrict 调用均在实际调用前输出 `RestrictFilter`；Calendar 对早于 `rangeStart` 的可读取实例不收；空 `sentEntryId` 直接返回 False；mail digest 头与 `FolderScan` 不再展示 inactive range 参数。验收：双 VBS `--help`/`--sample` 通过，range mode sample 头部断言通过，`npm run compile` 零错误，`npm test` 367/367 通过，`git diff --check` 通过；实现后经 task reviewer 复审，发现的两处遗漏诊断已补齐并复审通过。Manual：**needs user validation on real Outlook**，按 Completion Notes 的三项操作确认 Restrict、Meetings 与 Inbox timeProperty。Known：无本机真实 Outlook/Exchange 可验证 COM 行为。Next：按用户指定顺序 claim F1.2；不进入 F1.3/F1.4 或 R3/R4。
+
+- **2026-07-12 · Codex（F1.2 pre-work checkpoint）**：恢复现场：F1.1 的代码与记录已提交（`040713d`、`89129b0`），工作树干净，branch `v3...origin/v3 [ahead 2]`。重新定位根因链：`app-analysis.ts:188-355` 的每个成功 chunk 直接把模型 `normalized.items` 传给 `mergeAnalysisResults`（`334`），模型漏返或篡改 id 不会被对账；传输/修复失败仅累加 `skippedChunks`、记 `analyze:chunkSkipped` 后继续（`291-325`），返回值只含 `batchSize`（`371`）；`extension.ts:553-605` 的三个邮件分析入口均走该函数，现有 `runWithBusy` 只显示成功 toast。边界：仅在现有批分析结果合并点做送析 id 与返回 id 对账，扩展侧经既有 VS Code warning API 报告缺失/skip 数量，并补 app-analysis 单测；不改 digest/store/schema，不进入 F1.3。
+
+- **2026-07-12 · Codex（F1.2 completion）**：完成 `bd56b6e`。review 首轮发现 skipped chunk 绕过对账的 P0；已在所有非取消 skipped 路径先持久化 exact uncertain fallback，再继续或抛原错误，复审通过。自动验收：`npm run compile` 零错误、`npm test` 370/370 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**，重发注入邮件，确认该邮件不会消失且 chunk 失败有 warning。Next：claim F1.3；不进入 F1.4/R3/R4。
