@@ -78,7 +78,7 @@
   - Known issues：未在真实 Copilot/Outlook 环境复现原始注入路径。
   - Commit：`bd56b6e`。
 
-### [ ] F1.3 草稿改为扩展侧持久化（清单#3，手写与生成草稿刷新即丢）
+### [x] F1.3 草稿改为扩展侧持久化（清单#3，手写与生成草稿刷新即丢，commit `2ab0299`）
 
 - **现状（已核实）**：草稿保留完全依赖 webview 客户端 `vscode.setState/getState` 回填（`src/lib/workbench-render.ts:404-487`）。真机实测 Fetch New 重设 `webview.html` 后草稿丢失（手写与 Generate Draft 的都丢），R1.6+R2.6a 的客户端方案在真实环境不成立。用户另指出："不提交"表述无意义——草稿框本就没有提交动作。
 - **做法（根治，不再修补客户端回填）**：
@@ -87,6 +87,14 @@
   3. `getWorkbenchHtml` 渲染时把 Map 中的草稿直接注入对应 textarea 初值（escape 后），刷新天然带回；客户端 getState 回填逻辑降级为兜底或删除。
   4. 单测：render 注入草稿初值；message-handler 处理草稿上报。
 - **验收**：`npm test` 全绿。**needs user validation**：手写草稿 → Fetch New → 草稿仍在；Generate Draft → 刷新 → 仍在；切换邮件互不串。
+
+- **Completion Notes**：
+  - 改动文件：`src/extension.ts`、`src/lib/message-handler.ts`、`src/lib/workbench-render.ts` 及对应测试。
+  - 实现边界：复用内存 `workingDrafts`；手写草稿以 500ms debounce 上报，重建前先 flush 当前 textarea，扩展写入 Map 后才重设 HTML；生成/润色/改写同步 Map。客户端 getState 不再作为草稿恢复路径。
+  - 验收结果：renderer/message-handler 回归测试覆盖初值、上报、flush；`npm run compile` 零错误；`npm test` 373/373 通过；task review 修复 debounce 丢失窗口后复审通过。
+  - Manual validation：**needs user validation on real Outlook**。手写草稿后立即 Fetch New、Generate Draft 后 Fetch New、切换不同邮件，分别确认草稿保留且不串。
+  - Known issues：跨扩展进程重启不保留（本 step 按计划只要求进程存活期）。
+  - Commit：`2ab0299`。
 
 ### [ ] F1.4 采集诊断接通 UI：坏文件夹/partial 必须让用户看见（清单#5）
 
@@ -186,6 +194,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-11 · 计划创建。规划者已完成全部反馈的代码级核实：F1.1（Restrict `\` 日期格式，双脚本同病）与 Meetings 队列空为同源根因；F1.2-F1.7、F2.1-F2.7 已列明现状锚点与做法。全部 `[ ]` 待 claim。R3/R4 锁定不变。
 - 2026-07-12 · F1.1 已完成，代码提交 `040713d`：统一无秒 Restrict 日期格式、补齐 RestrictFilter 诊断与 Calendar 下界防线、修正空 Sent EntryID 误判及 range mode 显示互串。自动验收通过；真实 Outlook 验证仍待用户完成。下一步按用户指定顺序 claim F1.2。
 - 2026-07-12 · F1.2 已完成，代码提交 `bd56b6e`：批分析对账兜底覆盖漏返、篡改 id 与 skipped chunk，并向 UI 报告不完整结果。下一步 claim F1.3。
+- 2026-07-12 · F1.3 已完成，代码提交 `2ab0299`：草稿恢复改为扩展侧内存 Map，含刷新前 flush，真实 VS Code 验证待用户执行。按用户指示暂停，F1.4 未 claim。
 
 ---
 
@@ -200,3 +209,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F1.2 pre-work checkpoint）**：恢复现场：F1.1 的代码与记录已提交（`040713d`、`89129b0`），工作树干净，branch `v3...origin/v3 [ahead 2]`。重新定位根因链：`app-analysis.ts:188-355` 的每个成功 chunk 直接把模型 `normalized.items` 传给 `mergeAnalysisResults`（`334`），模型漏返或篡改 id 不会被对账；传输/修复失败仅累加 `skippedChunks`、记 `analyze:chunkSkipped` 后继续（`291-325`），返回值只含 `batchSize`（`371`）；`extension.ts:553-605` 的三个邮件分析入口均走该函数，现有 `runWithBusy` 只显示成功 toast。边界：仅在现有批分析结果合并点做送析 id 与返回 id 对账，扩展侧经既有 VS Code warning API 报告缺失/skip 数量，并补 app-analysis 单测；不改 digest/store/schema，不进入 F1.3。
 
 - **2026-07-12 · Codex（F1.2 completion）**：完成 `bd56b6e`。review 首轮发现 skipped chunk 绕过对账的 P0；已在所有非取消 skipped 路径先持久化 exact uncertain fallback，再继续或抛原错误，复审通过。自动验收：`npm run compile` 零错误、`npm test` 370/370 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**，重发注入邮件，确认该邮件不会消失且 chunk 失败有 warning。Next：claim F1.3；不进入 F1.4/R3/R4。
+
+- **2026-07-12 · Codex（F1.3 pre-work checkpoint）**：恢复现场：F1.1/F1.2 已提交，工作树干净，branch `v3...origin/v3 [ahead 4]`。重新定位：扩展侧已有 `workingDrafts: Map<string, string>`，但仅由 Generate/Polish/Refine 写入；workbench HTML 的 textarea input 仍只写客户端 `vscode.setState`，`getWorkbenchHtml` 重建时不以 Map 渲染初值，故真机刷新仍丢手写草稿。边界：复用现有 Map，增加节流上报与扩展侧渲染回填；不落 app-data、不改 schema/store，不再修补客户端 getState。
+
+- **2026-07-12 · Codex（F1.3 completion）**：完成 `2ab0299`。首轮 review 发现 500ms debounce 与立即刷新之间的丢失窗口；已加重建前 webview flush 协议，扩展收到全部草稿并写入 Map 后才重设 HTML，复审通过。验收：`npm run compile` 零错误、`npm test` 373/373 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**，验证手写/生成草稿刷新和切换隔离。按用户指示暂停，F1.4 未 claim。
