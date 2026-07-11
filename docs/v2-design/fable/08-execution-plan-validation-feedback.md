@@ -1,6 +1,6 @@
 # 08 · 人工验证反馈修复执行计划（F 批次）
 
-> 来源：用户 2026-07-11 完成 07 计划 §8 人工验证清单后的详细反馈，原文见 `easymail-verification-notes.md`（同目录，逐条对应）。规划者已对全部反馈做代码级根因核实，本文件是 worker 的唯一执行依据。
+> 来源：用户 2026-07-11 完成 `07-execution-plan-remediation.md` 计划 §8 人工验证清单后的详细反馈，原文见 `easymail-verification-notes.md`（同目录，逐条对应）。规划者已对全部反馈做代码级根因核实，本文件是 worker 的唯一执行依据。
 > **协议**：完全沿用 `07-execution-plan-remediation.md` §1 的全部规则（claim 单个 step、pre-work checkpoint、Completion Notes、Handover Log 写回本文件 §5、本地提交不 push、`npm run compile` 零错误 + `npm test` 全绿）。
 > **R3/R4 仍然锁定**：F1/F2 全部完成并通过用户复验之前，不进入 R3/R4。
 
