@@ -164,6 +164,20 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(!html.includes("itemId: currentId || ''"));
   });
 
+  it("uses the working draft as the escaped textarea initial value", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1", draftReply: "Model draft" })] }
+      ]),
+      workingDrafts: new Map([["mail:a1", "Saved & <draft>"]])
+    });
+
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes('<textarea class="draft-textarea">Saved &amp; &lt;draft&gt;</textarea>'));
+    assert.ok(!html.includes('<textarea class="draft-textarea">Model draft</textarea>'));
+  });
+
   it("renders generate draft action for empty single-mail drafts", () => {
     const input = stubInput({
       state: stubState({}, [
@@ -295,20 +309,27 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("data-action=\"composeMail\""));
   });
 
-  it("persists in-progress draft text to webview state and restores it after a rebuild", () => {
+  it("reports in-progress draft text to the extension after a debounce", () => {
     const html = renderWorkbenchHtml(stubInput());
-    assert.ok(html.includes("function restoreDraftState()"));
-    assert.ok(html.includes("draftState"));
-    assert.ok(html.includes("draftState.itemId !== currentId"));
-    assert.ok(html.includes("ta.value !== draftState.draft"));
-    assert.ok(html.includes("itemId: itemId, draft: target.value"));
+    assert.ok(html.includes("var draftReportTimer"));
+    assert.ok(html.includes("clearTimeout(draftReportTimer)"));
+    assert.ok(html.includes("post('updateWorkingDraft', { itemId: itemId, draftText: target.value })"));
+    assert.ok(html.includes("}, 500)"));
+    assert.ok(!html.includes("function restoreDraftState()"));
   });
 
-  it("persists updateDraft messages so restored state does not overwrite generated drafts", () => {
+  it("flushes all current drafts when the extension requests a rebuild", () => {
+    const html = renderWorkbenchHtml(stubInput());
+    assert.ok(html.includes("msg.type === 'requestWorkingDraftFlush'"));
+    assert.ok(html.includes("document.querySelectorAll('.draft-box-editable')"));
+    assert.ok(html.includes("post('workingDraftsFlushed', { requestId: msg.requestId, drafts: drafts })"));
+  });
+
+  it("updates the textarea directly when the extension generates a draft", () => {
     const html = renderWorkbenchHtml(stubInput());
     assert.ok(html.includes("msg.type === 'updateDraft'"));
-    assert.ok(html.includes("draftState = { itemId: msg.itemId, draft: msg.text || '' }"));
-    assert.ok(html.includes("setPersistedState({ draftState: draftState })"));
+    assert.ok(html.includes("if (box) { var ta = box.querySelector('.draft-textarea'); if (ta) ta.value = msg.text || '';"));
+    assert.ok(!html.includes("draftState"));
   });
 
   it("does not include filterQueue or selectItem (no list column)", () => {

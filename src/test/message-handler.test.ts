@@ -38,6 +38,8 @@ function stubContext(overrides?: Partial<MessageHandlerContext>): MessageHandler
     openPromptConfig: mock.fn(async () => {}),
     clearLocalCache: mock.fn(async () => {}),
     openWorkbench: mock.fn(async () => {}),
+    updateWorkingDraft: mock.fn(),
+    completeWorkingDraftFlush: mock.fn(),
     generateDraft: mock.fn(async () => {}),
     polishDraft: mock.fn(async () => {}),
     refineDraft: mock.fn(async () => {}),
@@ -224,6 +226,16 @@ describe("saveConfigFromMessage", () => {
 });
 
 describe("polishDraft", () => {
+  it("updates the working draft reported by the workbench", async () => {
+    const updateWorkingDraft = mock.fn();
+    const ctx = stubContext({ updateWorkingDraft } as any);
+
+    await handleWebviewMessage(ctx, { type: "updateWorkingDraft", itemId: "mail:m1", draftText: "Handwritten draft" });
+
+    assert.equal(updateWorkingDraft.mock.callCount(), 1);
+    assert.deepEqual(updateWorkingDraft.mock.calls[0].arguments, ["mail:m1", "Handwritten draft"]);
+  });
+
   it("dispatches generate draft with item and source ids", async () => {
     const ctx = stubContext();
     await handleWebviewMessage(ctx, { type: "generateDraft", itemId: "mail:m1", sourceId: "m1" } as any);

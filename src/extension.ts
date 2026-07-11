@@ -127,6 +127,8 @@ class EasyMailApp {
   private guidePanel: vscode.WebviewPanel | null = null;
   private workbenchPanel: vscode.WebviewPanel | null = null;
   private workingDrafts: Map<string, string> = new Map();
+  private pendingWorkbenchDraftFlush: { requestId: string; done: Promise<void>; resolve: () => void } | null = null;
+  private workbenchDraftFlushSequence = 0;
 
   public constructor(private readonly context: vscode.ExtensionContext) {
     this.llmProvider = new CopilotProvider();
@@ -200,7 +202,7 @@ class EasyMailApp {
         return;
       }
       this.workbenchPanel.reveal(vscode.ViewColumn.One);
-      this.workbenchPanel.webview.html = await this.getWorkbenchHtml();
+      await this.rebuildWorkbenchHtml();
       this.workbenchPanel.webview.postMessage({ type: "focusItem", id: focusId });
       return;
     }
@@ -216,6 +218,7 @@ class EasyMailApp {
       void this.handleMessage(message);
     });
     panel.onDidDispose(() => {
+      this.completeWorkbenchDraftFlush();
       this.workbenchPanel = null;
     });
     panel.webview.html = await this.getWorkbenchHtml();
@@ -378,6 +381,7 @@ class EasyMailApp {
       threadStore: extendedState.threadStore || emptyThreadStore(),
       threadAnalysis: extendedState.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
       ignoredIds: extendedState.ignoredIds,
+      workingDrafts: this.workingDrafts,
       availableModels,
       busyKind: this.busy?.kind || "",
       isBusy: !!this.busy
@@ -554,6 +558,47 @@ class EasyMailApp {
     await this.runAnalysisWithBusy("analyzeNext", batchSize);
   }
 
+  private completeWorkbenchDraftFlush(requestId?: string): void {
+    const pending = this.pendingWorkbenchDraftFlush;
+    if (!pending || (requestId && pending.requestId !== requestId)) {
+      return;
+    }
+    this.pendingWorkbenchDraftFlush = null;
+    pending.resolve();
+  }
+
+  private async flushWorkbenchDrafts(): Promise<void> {
+    const panel = this.workbenchPanel;
+    if (!panel) {
+      return;
+    }
+    if (this.pendingWorkbenchDraftFlush) {
+      await this.pendingWorkbenchDraftFlush.done;
+      return;
+    }
+    const requestId = String(++this.workbenchDraftFlushSequence);
+    let resolve = () => {};
+    const done = new Promise<void>((finish) => { resolve = finish; });
+    this.pendingWorkbenchDraftFlush = { requestId, done, resolve };
+    const delivered = await panel.webview.postMessage({ type: "requestWorkingDraftFlush", requestId });
+    if (!delivered) {
+      this.completeWorkbenchDraftFlush(requestId);
+    }
+    await done;
+  }
+
+  private async rebuildWorkbenchHtml(): Promise<void> {
+    const panel = this.workbenchPanel;
+    if (!panel) {
+      return;
+    }
+    await this.flushWorkbenchDrafts();
+    const html = await this.getWorkbenchHtml();
+    if (this.workbenchPanel === panel) {
+      panel.webview.html = html;
+    }
+  }
+
   public async analyzeAllAllowed(): Promise<void> {
     await this.runAnalysisWithBusy("analyzeAll", "allAllowed");
   }
@@ -676,9 +721,7 @@ class EasyMailApp {
 
   public async refresh(): Promise<void> {
     await this.dashboardProvider.update();
-    if (this.workbenchPanel) {
-      this.workbenchPanel.webview.html = await this.getWorkbenchHtml();
-    }
+    await this.rebuildWorkbenchHtml();
   }
 
   public async openDigest(): Promise<void> {
@@ -1217,6 +1260,8 @@ class EasyMailApp {
       openPromptConfig: () => this.openPromptConfig(),
       clearLocalCache: () => this.clearLocalCache(),
       openWorkbench: (focusId) => this.openWorkbench(focusId),
+      updateWorkingDraft: (itemId, draftText) => { this.workingDrafts.set(itemId, draftText); },
+      completeWorkingDraftFlush: (requestId) => this.completeWorkbenchDraftFlush(requestId),
       generateDraft: (itemId, sourceId) => this.generateDraft(itemId, sourceId),
       polishDraft: (draftText, itemId) => this.polishDraft(draftText, itemId),
       refineDraft: (draftText, instruction, itemId) => this.refineDraft(draftText, instruction, itemId),
