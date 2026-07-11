@@ -38,7 +38,7 @@
 
 ## 1. Milestone F1 — P0/P1 正确性修复
 
-### [ ] F1.1 修复 Restrict 日期格式（mail + meetings 双脚本，recentHours 与 Meetings 队列空的共同根因）
+### [x] F1.1 修复 Restrict 日期格式（mail + meetings 双脚本，recentHours 与 Meetings 队列空的共同根因，commit `040713d`）
 
 - **根因（已核实）**：
   1. `scripts/collect-outlook-mails.vbs` `FormatRestrictDate`（~L529-543）用**反斜杠**拼日期：`Month & "\" & Day & "\" & Year`，且带秒。Outlook `Items.Restrict` 无法解析 `7\10\2026 1:23:45 AM`，静默返回 0 条——用户实测 `candidateItems=0`、`added=0`。Outlook Restrict 的已知限制还包括**不支持秒**。maxItems 模式不走 Restrict，故正常。
@@ -51,6 +51,14 @@
   4. `IsSentFolder` 加保护：`sentEntryId` 为空串时直接返回 False；并在 FolderScan 行已有 timeProperty 字段，足够观察。
   5. 附带修显示互串（用户点名）：digest 头部与 `FolderScan` 行只输出**当前 mode 生效的参数**（recentHours 模式不打 `maxItems=50`，反之亦然），或明确标注 `inactive`。逻辑本身已核实独立（`capEnabled`/`cutoffEnabled` 各自只看自己 mode），是纯显示误导。
 - **验收**：`--help` 语法检查；`--sample` 双脚本不回归；`npm test` 全绿。**needs user validation**：recentHours=168 能拉到自发测试邮件、`candidateItems` 不再为 0；Meetings 队列出现今天及未来的会议实例；Inbox 的 timeProperty 显示 ReceivedTime。
+
+- **Completion Notes**：
+  - 改动文件：`scripts/collect-outlook-mails.vbs`、`scripts/collect-outlook-meetings.vbs`。
+  - 实现边界：mail formatter 去秒并与 meetings 保持完全相同的 `M/D/YYYY H:MM AM|PM` 实现；所有现有 Restrict 调用前输出实际 `RestrictFilter`；Calendar 跳过可读取开始时间但早于范围下界的实例；空 `sentEntryId` 不再误判 Sent；mail digest 头和 `FolderScan` 只显示当前 range mode 的参数。meetings formatter 在 claim 前已符合目标，未重复修改。
+  - 验收结果：两个 VBS 的 `--help`、`--sample` 通过；recentHours/maxItems sample 头部仅含各自生效参数；`npm run compile` 零错误；`npm test` 367/367 通过；`git diff --check` 通过；task review 已复审通过。
+  - Manual validation：**needs user validation on real Outlook**。设 `recentHours=168` 后 Fetch New，确认自发测试邮件出现且日志 `candidateItems` 非 0、`RestrictFilter` 可读；打开 Meetings，确认今天/未来实例出现；查看 Inbox 的 `FolderScan` 为 `timeProperty=ReceivedTime`。
+  - Known issues：无真实 Outlook/Exchange 邮箱，无法在本机确认 Outlook COM 对 RestrictFilter 与 Sent folder EntryID 的实际行为。
+  - Commit：`040713d`。
 
 ### [ ] F1.2 分析结果 id 对账：送析邮件不得凭空消失（清单#8）
 
@@ -168,9 +176,14 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 ## 5. Current Snapshot
 
 - 2026-07-11 · 计划创建。规划者已完成全部反馈的代码级核实：F1.1（Restrict `\` 日期格式，双脚本同病）与 Meetings 队列空为同源根因；F1.2-F1.7、F2.1-F2.7 已列明现状锚点与做法。全部 `[ ]` 待 claim。R3/R4 锁定不变。
+- 2026-07-12 · F1.1 已完成，代码提交 `040713d`：统一无秒 Restrict 日期格式、补齐 RestrictFilter 诊断与 Calendar 下界防线、修正空 Sent EntryID 误判及 range mode 显示互串。自动验收通过；真实 Outlook 验证仍待用户完成。下一步按用户指定顺序 claim F1.2。
 
 ---
 
 ## 6. Handover Log
 
 - **2026-07-11 · Claude Fable 5（规划者）**：创建本计划。核实过程要点：① `FormatRestrictDate` 在 `collect-outlook-mails.vbs:529` 与 `collect-outlook-meetings.vbs:444` 均以 `\` 拼日期（mail 版还带秒），Outlook Restrict 静默返回 0 → recentHours 空result；meetings 循环无下界守卫 + `pruneMeetingStore`（`meeting-store.ts:71`）剪掉过期已响应会议 → 队列空但 store 有数据。② `FolderScanSummary` 在 `src/` 零引用，采集诊断从未到达 UI。③ 草稿保留依赖 webview `getState` 客户端回填，真机失效，F1.3 改扩展侧持久化。④ `importantSenders` 为 prompt 级模型匹配，无代码匹配——Exchange DN 直接拉低命中，F1.6 从采集源 SMTP 化。⑤ `classification.ts:88` 语义下模型漏返邮件应留 Pending，用户实测消失——F1.2 要求真机复现 + 对账兜底双管齐下。无 dirty state。Next: worker 从 F1.1 开始 claim。
+
+- **2026-07-12 · Codex（F1.1 pre-work checkpoint）**：恢复现场：`git status --short --branch` 干净，branch `v3...origin/v3`；HEAD `4ba7b90`。已通读 08 与 07 协作协议，并重新定位 F1.1 调用链：mail 的 `FormatRestrictDate` 仍含秒（`collect-outlook-mails.vbs:529-543`），recentHours Restrict 在 `315`，且 `FolderScan`/digest 同时展示 inactive 参数（`400`、`988-990`）；`IsSentFolder` 的空 `sentEntryId` 比较在 `444-475`。meetings 的 formatter 现已是目标 `M/D/YYYY H:MM AM|PM`（`444-458`），但 Restrict 前无诊断且 `CollectCalendarItems` 只有上界守卫（`132`、`169`）；将保持两个 formatter 完全一致，不重复改动已满足目标的一侧。边界：仅 F1.1 两个 VBS 与本计划记录；不改 digest/store/schema，不进入 F1.2。开始按 RED/GREEN 最小验证实现。
+
+- **2026-07-12 · Codex（F1.1 completion）**：完成 `040713d`。mail formatter 去秒，与 meetings 的既有目标格式保持字面一致；四个 Restrict 调用均在实际调用前输出 `RestrictFilter`；Calendar 对早于 `rangeStart` 的可读取实例不收；空 `sentEntryId` 直接返回 False；mail digest 头与 `FolderScan` 不再展示 inactive range 参数。验收：双 VBS `--help`/`--sample` 通过，range mode sample 头部断言通过，`npm run compile` 零错误，`npm test` 367/367 通过，`git diff --check` 通过；实现后经 task reviewer 复审，发现的两处遗漏诊断已补齐并复审通过。Manual：**needs user validation on real Outlook**，按 Completion Notes 的三项操作确认 Restrict、Meetings 与 Inbox timeProperty。Known：无本机真实 Outlook/Exchange 可验证 COM 行为。Next：按用户指定顺序 claim F1.2；不进入 F1.3/F1.4 或 R3/R4。
