@@ -210,18 +210,42 @@
   - Known issues：截断标注依据 collector 的 `bodyExcerptChars` 语义；真实 Outlook 采集路径尚待验证。
   - Commit：`615dc17`。
 
-### [ ] F2.4 单封邮件 Analyze 按钮（其他#12）
+### [x] F2.4 单封邮件 Analyze 按钮（其他#12）（commit `d783d5d`）
 
 - Workbench 邮件详情按钮区，`Open in Outlook` 左侧加 `Analyze`，行为 = 现有 `Confirm and Analyze`（analyzeSelected 单封路径）但不需要确认文案；已分析邮件显示为 `Re-analyze`（同一路径，覆盖旧结果）。安全门控照常生效（超密级仍走 manual confirm）。
 
-### [ ] F2.5 Activity Bar 标题（其他#8）
+- **Completion Notes**：
+  - 改动文件：`src/lib/workbench-render.ts`、`src/lib/dashboard-labels.ts` 与 Workbench 渲染单测。
+  - 实现边界：普通未分析邮件在 Open in Outlook 左侧显示 Analyze，已分析邮件显示 Re-analyze；两者均复用既有 `analyzeSelected` 单封路径。manual-confirm 仍只显示 Confirm and Analyze，hard block 不出现按钮；未改安全 gate、分析结果结构或 store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 396/396 通过，`git diff --check` 通过；双 VBS `--help`/`--sample` 通过。独立 review 确认普通、已分析、manual-confirm 与 hard block 路径。
+  - Manual validation：**needs user validation on real Outlook/VS Code**。对普通未分析邮件点 Analyze、对已分析邮件点 Re-analyze，确认分别完成单封分析且新结果覆盖旧结果；高密级邮件仍只显示 Confirm and Analyze。
+  - Known issues：无。
+  - Commit：`d783d5d`。
+
+### [x] F2.5 Activity Bar 标题（其他#8）（commit `d783d5d`）
 
 - `package.json` viewsContainers `title: "Dashboard"` → `"EasyMail"`（~L211）；`views` 内 view `name: "Dashboard"`（~L221）保留（容器已叫 EasyMail，视图叫 Dashboard 合理；若视觉重复 worker 可斟酌，Notes 说明）。
 
-### [ ] F2.6 Guide 弹出策略（其他#6）
+- **Completion Notes**：
+  - 改动文件：`package.json`。
+  - 实现边界：仅将 Activity Bar 容器 title 改为 EasyMail；内部 view name 仍为 Dashboard，未改运行时逻辑或其他 manifest 项。
+  - 验收结果：`package.json` JSON 解析通过，`npm run compile` 零错误，`npm test` 396/396 通过，`git diff --check` 通过；双 VBS `--help`/`--sample` 通过。独立 review 确认仅一行预期改动。
+  - Manual validation：**needs user validation on real VS Code**。重新加载扩展后确认 Activity Bar 容器显示 EasyMail，容器内 view 仍显示 Dashboard。
+  - Known issues：无。
+  - Commit：`d783d5d`。
+
+### [x] F2.6 Guide 弹出策略（其他#6）（commit `d783d5d`）
 
 - **现状（已核实）**：`extension.ts:153` 以 `easyMail.guideShown.<version>` 存 globalState——globalState 在卸载重装后通常保留，同版本重装不再弹。
 - 做法：key 改用 `context.extension.packageJSON.__metadata?.installedTimestamp`（每次安装变化）优先，回落 version；真机验证 `__metadata` 在正式安装场景可用（开发宿主无此字段，需兜底）。Notes 写明 VS Code 无显式 install 事件，此为最可靠近似。
+
+- **Completion Notes**：
+  - 改动文件：`src/extension.ts` 与 extension guide 行为单测。
+  - 实现边界：guide state key 优先使用 `packageJSON.__metadata.installedTimestamp`；metadata 缺失、null 或空值时回落 version，再回落 `0.0.0`。未新增安装事件或持久化结构，未改 store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 396/396 通过，`git diff --check` 通过；双 VBS `--help`/`--sample` 通过。独立 review 后补齐 null/空 timestamp 回退及同一 timestamp 不重复弹出的测试，并复审通过。
+  - Manual validation：**needs user validation on real VS Code installation**。安装同一版本扩展、首次激活确认 Guide 弹出；卸载后重新安装同一版本并再次激活，确认 Guide 再次弹出；开发 Extension Host 缺 metadata 时确认仍按 version 只弹一次。
+  - Known issues：VS Code 没有显式 install event；正式安装包中 `__metadata.installedTimestamp` 的可用性需真机确认，此 key 是当前最可靠近似。
+  - Commit：`d783d5d`。
 
 ### [ ] F2.7 丰富示例数据（其他#7）
 
@@ -256,6 +280,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F1.7 已完成，代码提交 `30c66e5`：取消状态即时可见，token 覆盖模型请求与流读取；真实 Copilot 取消时延待用户执行。F1 已全部完成，下一步按计划进入 F2。
 - 2026-07-12 · F2.1 已完成，代码提交 `d9d2585`：Sidebar 设置栏单列收敛、Settings 引导与模型同步修正，Refresh 入口及说明已删除。下一步可在 F2 批中合并 claim F2.2/F2.3。
 - 2026-07-12 · F2.2/F2.3 已完成，代码提交 `615dc17`：Sidebar 全量时间、Important Senders label/顺序已调整；Workbench 不再展示线程内部 id，原文区占满可用高度，collector 截断有明确标记。两项 Completion Notes 已分项记录。下一步可在 F2 批中 claim F2.4/F2.5/F2.6。
+- 2026-07-12 · F2.4/F2.5/F2.6 已完成，代码提交 `d783d5d`：单封 Analyze/Re-analyze 复用既有安全门控路径，Activity Bar 容器更名 EasyMail，Guide key 以安装时间戳优先并保留开发宿主回退。三个小项 Completion Notes 已分项记录。下一步 claim F2.7。
 
 ---
 
@@ -298,3 +323,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F2.2/F2.3 pre-work checkpoint）**：恢复现场：F2.1 已提交，工作树干净；HEAD `c73b418`。F2.2 重新定位：Sidebar `shortTime` 仅取 `HH:mm`；`importantSender` 已在 dashboard state 中优先，但 sidebar queue order 仍落在 followUp 后，且 Ignored 在 Threads 前；label 仍为 `Important Sender Or Group`。F2.3 重新定位：Workbench 分析详情仍输出裸 threadId，`.wb-body` 固定 `max-height:400px`；timeline 使用完整 `bodyDelta`，未做渲染截断，采集 bodyExcerpt 受配置上限。边界：两个相互独立小项合并 claim，分别写 Completion Notes；不改 category id、采集/store/schema，不做可选排序按钮，不进入 F2.4+ 或 R3/R4。
 
 - **2026-07-12 · Codex（F2.2/F2.3 completion）**：完成 `615dc17`。F2.2：Sidebar 行显示完整时间，tooltip 补全地址+时间，Important Senders 仅改展示 label，顺序为 Must Handle Today 后、Ignored 在 Uncertain 后。F2.3：阅读区移除可见 thread internal id，原文 flex 填满余高；Timeline 不存在渲染截断，collector 上限截断以长度判定并标注。两项均有独立 review；review 发现自然 `...` 结尾误报已修正。验收：`npm run compile` 零错误、`npm test` 393/393 通过、`git diff --check` 通过、双 VBS `--help`/`--sample` 通过。Manual：**needs user validation on real Outlook/VS Code**，按各自 Completion Notes 验证 Sidebar 与 Workbench。Next：F2 可按批次 claim F2.4/F2.5/F2.6，Completion Notes 仍需分项写；R3/R4 继续锁定。
+
+- **2026-07-12 · Codex（F2.4/F2.5/F2.6 pre-work checkpoint）**：恢复现场：F2.2/F2.3 的代码与记录已提交（`615dc17`、`10f9d4e`），工作树干净；HEAD `10f9d4e`。F2.4 重新定位：`renderMailDetail` 的操作区仅有 Open in Outlook 与 Ignore，超密级确认按钮由 `confirmAnalyzeButton` 独立提供；前端 `analyzeSelected` 已直达既有单封 `runAnalysisWithBusy` 路径。F2.5 重新定位：`package.json` activitybar 容器 title 仍为 Dashboard。F2.6 重新定位：`maybeOpenGuide` 仍以 version 组成 `easyMail.guideShown.*` key。边界：三个独立小项按 F2 批次合并 claim，分别写 Completion Notes；F2.4 复用既有安全门控与分析路径，F2.5 仅改容器 title，F2.6 只调整 key 选择与覆盖测试；不改 digest/store/schema，不进入 F2.7 或 R3/R4。
+
+- **2026-07-12 · Codex（F2.4/F2.5/F2.6 completion）**：完成 `d783d5d`。F2.4：Analyze/Re-analyze 均走既有单封路径，manual-confirm/hard block 保持 gate 语义；F2.5：仅 Activity Bar 容器更名 EasyMail，内部 Dashboard 保留；F2.6：安装时间戳优先、version/`0.0.0` 回退，并覆盖 null、空值与同安装不重复弹出。三项均独立 review 通过；F2.6 review 建议的边界测试已补齐并复审。验收：`npm run compile` 零错误、`npm test` 396/396 通过、`git diff --check` 通过、双 VBS `--help`/`--sample` 通过。Manual：**needs user validation on real Outlook/VS Code installation**，按各自 Completion Notes 验证。Next：claim F2.7；R3/R4 继续锁定。
