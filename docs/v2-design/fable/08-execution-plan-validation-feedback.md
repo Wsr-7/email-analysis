@@ -112,7 +112,7 @@
   - Manual validation：**needs user validation on real Outlook**。配置 `Inbox` 与一个错误目录，Fetch 后确认 warning 点名错误目录且 Inbox 仍采集。
   - Commit：`7103500`。
 
-### [ ] F1.5 selectFolders UX 与语义修正（清单#6/#7 衍生）
+### [x] F1.5 selectFolders UX 与语义修正（清单#6/#7 衍生）（commit `1706a48`）
 
 - **现状（已核实）**：`extension.ts` `selectFolders`（~L783-818）无进度提示、超时 30s（用户实测 Outlook 未启动时枚举需 20+s，冷启动会超时报 `timed out after 30000ms`）；list mode 会输出 store 根节点（`username@xxx.com`，是邮箱根目录不是 Inbox，用户已困惑）；本地化真实目录（`.../已发送邮件`）与规范名 `Sent Items` 指向同一物理文件夹，同时勾选会重复采集同一文件夹两遍（store 层按 stableMailId 去重、邮件不会重复，但浪费扫描且 folder 字段各记各的）；`normalizeMailFolders`（`config-utils.ts:21`）的 legacy 规则会把"只选 Inbox"扩展回 Inbox+Sent Items，与 picker 语义冲突。
 - **做法**：
@@ -122,6 +122,14 @@
   4. 删除 `normalizeMailFolders` 的"单 Inbox 扩展为 Inbox+Sent Items" legacy 规则（picker 时代该规则反而篡改用户明确选择；默认值本身已含两者），同步修相关单测。
   5. 回答用户疑问随 Notes 记录：store 根 = 邮箱根目录（非 Inbox 聚合）；`已发送邮件` 即真实 Sent Items；规范名与真实路径重复勾选的问题由本 step 的互认去重解决。
 - **验收**：单测（映射行解析、互认去重、legacy 规则删除）+ `npm test` 全绿。**needs user validation**：关 Outlook 运行命令有进度条且 90s 内完成或给出含提示的报错；列表不再出现邮箱根；`已发送邮件` 条目带 `(Sent Items)` 标注；同选两者只写回一个。
+
+- **Completion Notes**：
+  - 改动文件：`scripts/collect-outlook-mails.vbs`、`src/extension.ts`、`src/lib/config-utils.ts`、`src/test/config-utils.test.ts`、`src/test/message-handler.test.ts`。
+  - 实现边界：list mode 以默认目录 EntryID 与递归枚举目录匹配后才输出 `FolderListDefault`，跳过邮箱 store 根；picker 枚举使用 90s Notification progress，解析映射、显示规范名标记并双向去重后写回规范名；删除单 Inbox 的 legacy 扩展。未改采集/store/schema，也未进入 F1.6。
+  - 验收结果：`npm run compile` 零错误，`npm test` 378/378 通过，VBS `--help` 与 `--list-folders --sample` 通过，`git diff --check` 通过；首轮 review 发现漏用 EntryID 匹配，补齐并复审通过。
+  - Manual validation：**needs user validation on real Outlook**。关闭 Outlook 后运行 Select Outlook Folders，确认全程进度提示、90s 内完成或错误含启动 Outlook 提示；确认邮箱根不出现，`已发送邮件` 标记为 `(Sent Items)`，同时选真实路径与规范名后设置只保存一个规范名。
+  - Known issues：本机未连接真实 Outlook，尚无法验证本地化路径和冷启动耗时。
+  - Commit：`1706a48`。
 
 ### [ ] F1.6 发件人/收件人 SMTP 化（其他#5，兼保 importantSenders 命中率）
 
@@ -203,6 +211,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F1.2 已完成，代码提交 `bd56b6e`：批分析对账兜底覆盖漏返、篡改 id 与 skipped chunk，并向 UI 报告不完整结果。下一步 claim F1.3。
 - 2026-07-12 · F1.3 已完成，代码提交 `2ab0299`：草稿恢复改为扩展侧内存 Map，含刷新前 flush，真实 VS Code 验证待用户执行。按用户指示暂停，F1.4 未 claim。
 - 2026-07-12 · F1.4 已完成，代码提交 `7103500`：采集诊断经 digest 送达 UI。下一步 claim F1.5。
+- 2026-07-12 · F1.5 已完成，代码提交 `1706a48`：目录 picker 增加进度与 90s 超时，list 协议以 EntryID 映射默认目录并排除邮箱根，规范名与真实路径互认去重；真实 Outlook 验证待用户执行。下一步 claim F1.6。
 
 ---
 
@@ -225,3 +234,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F1.4 pre-work checkpoint）**：恢复现场：F1.1-F1.3 已提交，工作树干净。重新定位：collector 仅在 failed/partial 时 stdout 输出 `FolderScanSummary`（`collect-outlook-mails.vbs:248`），digest 未写 scan 汇总；`parseDigest` 只解析固定头字段；`pullMailCore` 解析 digest 后即 merge，没有任何诊断 warning。边界：复用 digest 文件通道，新增可选 ScanSummary 解析和 pull 完成 warning；不动 runProcess、store/schema 或其他 step。
 
 - **2026-07-12 · Codex（F1.4 completion）**：完成 `7103500`。collector 写入 ScanSummary，parser 兼容旧 digest 和仅含当前 range 参数的 header，UI warning 点名失败/partial 目录；review 通过。验收：`npm run compile` 零错误、`npm test` 375/375 通过、VBS `--help`/`--sample` 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**。Next：claim F1.5。
+
+- **2026-07-12 · Codex（F1.5 pre-work checkpoint）**：恢复现场：F1.1-F1.4 已提交，工作树干净。重新定位：`normalizeMailFolders` 仍将单 Inbox 扩成默认双目录；`selectFolders` 使用 30s runProcess、无 progress，parser 丢弃 default mapping；VBS list mode 当前枚举 store 根。边界：仅 F1.5 的 picker、list protocol、legacy 规则与测试，不改采集/store/schema，不进入 F1.6。
+
+- **2026-07-12 · Codex（F1.5 completion）**：完成 `1706a48`。picker 枚举改 Notification progress + 90s，并在失败时提示先启动 Outlook；VBS 排除 store 根，默认目录仅在 EntryID 匹配的递归枚举项输出映射；TS 解析映射，真实路径与规范名预选互认、去重并规范名写回，单 Inbox 不再自动扩展。首轮 review 发现 mapping 漏用 EntryID，已补齐反向互认测试并复审通过。验收：`npm run compile` 零错误、`npm test` 378/378 通过、VBS `--help`/`--list-folders --sample` 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**，验证冷启动进度、邮箱根隐藏、本地化 Sent Items 标记与重复选择去重。Known：无真实 Outlook 验证。Next：claim F1.6；不进入 F1.7/F2 或 R3/R4。
