@@ -356,14 +356,15 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('data-queue-id="meetings"'));
   });
 
-  it("renders two-line rows with tooltip on subject", () => {
+  it("renders only the sender display name and keeps the full address in a tooltip", () => {
     const input = stubInput({
-      queue: { pending: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "alice@test.com", receivedTime: "2024-01-01 14:30" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "alice@test.com", receivedTime: "2024-01-01 14:30" })], ignoredPending: [] }
+      queue: { pending: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "Alice <alice@test.com>", receivedTime: "2024-01-01 14:30" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "Alice <alice@test.com>", receivedTime: "2024-01-01 14:30" })], ignoredPending: [] }
     });
     const html = renderSidebarHtml(input);
     assert.ok(html.includes('title="Long subject line for testing"'), "subject should have tooltip");
     assert.ok(html.includes("sb-line2"), "should have second line");
-    assert.ok(html.includes("alice@test.com"), "second line should show sender");
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'), "sender should retain the full address in a tooltip");
+    assert.ok(html.includes("Alice ·"), "second line should show the sender name only");
     assert.ok(html.includes("14:30"), "second line should show time");
   });
 

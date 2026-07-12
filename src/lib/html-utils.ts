@@ -11,6 +11,16 @@ export function escapeAttr(value: string): string {
   return escapeHtml(value);
 }
 
+export function senderDisplayName(value: string): string {
+  const full = String(value || "").trim();
+  const match = /^(.*?)\s*<[^<>]+>$/.exec(full);
+  return match?.[1]?.trim() || full;
+}
+
+export function recipientDisplayNames(value: string): string {
+  return String(value || "").split(/\s*;\s*/).map(senderDisplayName).join("; ");
+}
+
 export function domIdForMail(mailId: string): string {
   return `mail-${safeDomId(mailId)}`;
 }

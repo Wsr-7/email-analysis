@@ -19,6 +19,7 @@ test("renderEasyMailGuideHtml renders guide content and command buttons", () => 
   assert.match(html, /data-action="loadModels"/);
   assert.match(html, /guideAction/);
   assert.match(html, />4<\/strong>/);
+  assert.match(html, /重点发件人按 prompt 语义由模型判断，建议同时填写显示名和邮箱。/);
 });
 
 test("renderEasyMailGuideHtml escapes dynamic values", () => {

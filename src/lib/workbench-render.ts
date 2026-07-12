@@ -3,7 +3,7 @@ import { classificationFor, normalizeClassificationCache } from "./classificatio
 import { getLocaleFromConfig } from "./config-utils";
 import { getLabels, type DashboardLabels } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard, buildThreadLookup, compareTimelineMessagesForDisplay } from "./dashboard-state";
-import { escapeHtml, escapeAttr, toJsLiteral } from "./html-utils";
+import { escapeHtml, escapeAttr, toJsLiteral, senderDisplayName, recipientDisplayNames } from "./html-utils";
 import type { StoredMail } from "./mail-store";
 import type { SecurityGateDecisionResult } from "./security-types";
 import { emptyThreadStore, type ThreadStore } from "./thread-store";
@@ -33,15 +33,15 @@ function renderGateReasons(title: string, reasons: string[]): string {
 }
 
 function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabels, extra: string, extraActions = "", classifications?: ReturnType<typeof normalizeClassificationCache>): string {
-  const toHtml = item.to ? `<div class="wb-field"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(item.to)}</div>` : "";
-  const ccHtml = item.cc ? `<div class="wb-field"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(item.cc)}</div>` : "";
+  const toHtml = item.to ? `<div class="wb-field" title="${escapeAttr(item.to)}"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(recipientDisplayNames(item.to))}</div>` : "";
+  const ccHtml = item.cc ? `<div class="wb-field" title="${escapeAttr(item.cc)}"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(recipientDisplayNames(item.cc))}</div>` : "";
   const cls = classifications ? classificationFor(item.mailId, classifications) : undefined;
   const clsFromExtra = extra.includes(labels.pending.classification);
   const clsHtml = cls && !clsFromExtra ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(cls))}</div>` : "";
   return `<div class="wb-detail-card">
     <h3>${escapeHtml(item.subject || item.mailId)}</h3>
     <div class="wb-meta-grid">
-      <div class="wb-field"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.from || "-")}</div>
+      <div class="wb-field" title="${escapeAttr(item.from || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.from || "-"))}</div>
       ${toHtml}
       ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
@@ -63,8 +63,8 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
   const draftHtml = renderEditableDraftBox(workingDrafts?.get(itemId) ?? (item.draftReply || ""), labels, { itemId, sourceId: item.mailId, generateAction: "analyzeSelected" });
   const classification = classificationFor(item.mailId, classifications);
   const clsHtml = classification ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>` : "";
-  const toHtml = originalMail?.to ? `<div class="wb-field"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(originalMail.to)}</div>` : "";
-  const ccHtml = originalMail?.cc ? `<div class="wb-field"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(originalMail.cc)}</div>` : "";
+  const toHtml = originalMail?.to ? `<div class="wb-field" title="${escapeAttr(originalMail.to)}"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.to))}</div>` : "";
+  const ccHtml = originalMail?.cc ? `<div class="wb-field" title="${escapeAttr(originalMail.cc)}"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.cc))}</div>` : "";
   const threadLink = threadId
     ? `<div class="wb-field"><strong>${escapeHtml(labels.card.thread)}:</strong> ${escapeHtml(threadId)}</div>`
     : "";
@@ -76,7 +76,7 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
       <span class="wb-priority">${escapeHtml(priority)}</span>
     </div>
     <div class="wb-meta-grid">
-      <div class="wb-field"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.sender || "-")}</div>
+      <div class="wb-field" title="${escapeAttr(item.sender || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.sender || "-"))}</div>
       ${toHtml}
       ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
@@ -161,7 +161,7 @@ function renderThreadDetail(
   const timeline = timelineItems.map((msg) =>
     `<div class="wb-tl-item">
       <div class="wb-tl-head">
-        <strong>${escapeHtml(msg.from || msg.senderEmail || "")}</strong>
+        <strong title="${escapeAttr(msg.from || msg.senderEmail || "")}">${escapeHtml(senderDisplayName(msg.from || msg.senderEmail || ""))}</strong>
         <span class="wb-tl-time">${escapeHtml(msg.receivedTime || msg.sentTime || "")}</span>
       </div>
       <div class="wb-tl-body-wrap">${msg.mailId ? `<button class="wb-tl-open" data-action="openInOutlook" data-mail-id="${escapeAttr(msg.mailId)}" title="${escapeAttr(labels.card.openInOutlook)}">↗</button>` : ""}<div class="wb-tl-body">${escapeHtml(msg.bodyDelta || msg.bodyPreview || "")}</div></div>
@@ -171,7 +171,7 @@ function renderThreadDetail(
   return `<div class="wb-detail-card">
     <h3>${escapeHtml(thread.subject || thread.threadId)}</h3>
     <div class="wb-meta-grid">
-      <div class="wb-field"><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.join(", ") || "-")}</div>
+      <div class="wb-field" title="${escapeAttr(thread.participants.join(", ") || "-")}"><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.map(senderDisplayName).join(", ") || "-")}</div>
       <div class="wb-field"><strong>${escapeHtml(labels.threads.lastTime)}:</strong> ${escapeHtml(thread.lastTime || "-")}</div>
       <div class="wb-field"><strong>${escapeHtml(labels.threads.security)}:</strong> ${escapeHtml(formatThreadSecurity(thread.security))}</div>
     </div>

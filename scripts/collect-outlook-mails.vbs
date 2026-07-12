@@ -696,8 +696,14 @@ Function BuildMailRecord(byRef mail, byVal folderPath, byVal timeProperty, byVal
   record.Add "conversationId", SafeConversationId(mail)
   record.Add "conversationIndex", SafeConversationIndex(mail)
   record.Add "subject", SafeString(mail.Subject)
-  record.Add "senderName", SafeString(mail.SenderName)
-  record.Add "senderEmail", SafeSenderEmail(mail)
+  Dim senderName, senderEmail
+  senderName = SafeString(mail.SenderName)
+  senderEmail = SafeSenderEmail(mail)
+  If senderName = "" Then
+    senderName = senderEmail
+  End If
+  record.Add "senderName", senderName
+  record.Add "senderEmail", senderEmail
   record.Add "receivedTime", FormatDateValue(MailSortDate(mail, timeProperty))
   record.Add "sentTime", SafeDateValue(mail.SentOn)
   record.Add "sortKey", Replace(FormatDateValue(MailSortDate(mail, timeProperty)), " ", "T")
@@ -753,12 +759,39 @@ Function SafeStoreId(byRef mail)
 End Function
 
 Function SafeSenderEmail(byRef mail)
+  Dim address
   On Error Resume Next
-  SafeSenderEmail = SafeString(mail.SenderEmailAddress)
+  address = SafeString(mail.SenderEmailAddress)
   If Err.Number <> 0 Then
     Err.Clear
-    SafeSenderEmail = ""
   End If
+  Dim addressEntry
+  Set addressEntry = mail.Sender
+  If Err.Number = 0 And Not addressEntry Is Nothing Then
+    address = ResolveExchangeSmtpAddress(addressEntry, address)
+  End If
+  Err.Clear
+  SafeSenderEmail = address
+  On Error GoTo 0
+End Function
+
+Function ResolveExchangeSmtpAddress(byRef addressEntry, byVal address)
+  ResolveExchangeSmtpAddress = address
+  If LCase(Left(Trim(CStr(address)), 3)) <> "/o=" Then
+    Exit Function
+  End If
+
+  On Error Resume Next
+  Dim exchangeUser
+  Set exchangeUser = addressEntry.GetExchangeUser()
+  If Err.Number = 0 And Not exchangeUser Is Nothing Then
+    Dim smtp
+    smtp = SafeString(exchangeUser.PrimarySmtpAddress)
+    If smtp <> "" Then
+      ResolveExchangeSmtpAddress = smtp
+    End If
+  End If
+  Err.Clear
   On Error GoTo 0
 End Function
 
@@ -793,23 +826,92 @@ Function SafeDateValue(byVal value)
 End Function
 
 Function SafeTo(byRef mail)
-  On Error Resume Next
-  SafeTo = SafeString(mail.To)
-  If Err.Number <> 0 Then
-    Err.Clear
-    SafeTo = ""
-  End If
-  On Error GoTo 0
+  SafeTo = SafeRecipientsByType(mail, 1) ' olTo
 End Function
 
 Function SafeCc(byRef mail)
+  SafeCc = SafeRecipientsByType(mail, 2) ' olCC
+End Function
+
+Function SafeRecipientsByType(byRef mail, byVal recipientType)
+  SafeRecipientsByType = ""
   On Error Resume Next
-  SafeCc = SafeString(mail.CC)
-  If Err.Number <> 0 Then
+  Dim recipients
+  Set recipients = mail.Recipients
+  If Err.Number <> 0 Or recipients Is Nothing Then
     Err.Clear
-    SafeCc = ""
+    SafeRecipientsByType = SafeRecipientFallback(mail, recipientType)
+    On Error GoTo 0
+    Exit Function
   End If
+
+  Dim values
+  values = ""
+  Dim i
+  For i = 1 To recipients.Count
+    Dim recipient
+    Set recipient = Nothing
+    Err.Clear
+    Set recipient = recipients.Item(i)
+    If Err.Number = 0 And Not recipient Is Nothing Then
+      If recipient.Type = recipientType Then
+        Dim address
+        address = SafeString(recipient.Address)
+        Dim addressEntry
+        Set addressEntry = Nothing
+        Err.Clear
+        Set addressEntry = recipient.AddressEntry
+        If Err.Number = 0 And Not addressEntry Is Nothing Then
+          address = ResolveExchangeSmtpAddress(addressEntry, address)
+        End If
+        Err.Clear
+        values = AppendRecipientAddress(values, SafeString(recipient.Name), address)
+      End If
+    End If
+    Err.Clear
+  Next
+  If values = "" Then
+    values = SafeRecipientFallback(mail, recipientType)
+  End If
+  SafeRecipientsByType = values
   On Error GoTo 0
+End Function
+
+Function SafeRecipientFallback(byRef mail, byVal recipientType)
+  SafeRecipientFallback = ""
+  On Error Resume Next
+  If recipientType = 1 Then
+    SafeRecipientFallback = SafeString(mail.To)
+  ElseIf recipientType = 2 Then
+    SafeRecipientFallback = SafeString(mail.CC)
+  End If
+  Err.Clear
+  On Error GoTo 0
+End Function
+
+Function AppendRecipientAddress(byVal current, byVal displayName, byVal address)
+  Dim formatted
+  formatted = FormatRecipientAddress(displayName, address)
+  If formatted = "" Then
+    AppendRecipientAddress = current
+  ElseIf current = "" Then
+    AppendRecipientAddress = formatted
+  Else
+    AppendRecipientAddress = current & "; " & formatted
+  End If
+End Function
+
+Function FormatRecipientAddress(byVal displayName, byVal address)
+  displayName = Trim(CStr(displayName))
+  address = Trim(CStr(address))
+  If address = "" Then
+    FormatRecipientAddress = displayName
+  Else
+    If displayName = "" Then
+      displayName = address
+    End If
+    FormatRecipientAddress = displayName & " <" & address & ">"
+  End If
 End Function
 
 Function SafeAttachmentCount(byRef mail)

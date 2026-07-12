@@ -185,6 +185,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
           title: "配置建议",
           items: [
             "VS Code Settings 是唯一配置来源；文件夹建议通过选择 Outlook 文件夹命令加载，手写仍可用。",
+            "重点发件人按 prompt 语义由模型判断，建议同时填写显示名和邮箱。",
             "模型列表不会自动刷新，点击加载模型后会缓存到本机，直到你再次手动加载。",
             "如果 Outlook COM 不可用，先用示例数据验证插件和 Copilot 路径。"
           ]
@@ -247,6 +248,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
         title: "Setup",
         items: [
           "VS Code Settings are the single source of truth. Use Select Outlook Folders to load folder choices; manual entry remains available.",
+          "Important senders are judged by the model at prompt time; include both the display name and email address.",
           "Model discovery is manual and cached locally until you click Load Copilot Models again.",
           "If Outlook COM is unavailable, use sample data to validate the extension and Copilot path first."
         ]

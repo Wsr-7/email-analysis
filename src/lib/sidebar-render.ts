@@ -3,7 +3,7 @@ import { classificationFor, normalizeClassificationCache, type ClassificationCac
 import { getLocaleFromConfig, mergeStringLists, parseFolders } from "./config-utils";
 import { getLabels, buildCategoryLabels, type DashboardLabels } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard } from "./dashboard-state";
-import { escapeHtml, escapeAttr, selected } from "./html-utils";
+import { escapeHtml, escapeAttr, selected, senderDisplayName } from "./html-utils";
 import { selectConfiguredModel } from "./llm-provider";
 import { emptyMailIndex, folderOldestReceivedTimes, type StoredMail } from "./mail-store";
 import type { NextActionItem } from "./next-actions";
@@ -76,19 +76,21 @@ function classificationBadge(mailId: string, classifications: ClassificationCach
 
 function renderCompactMailRow(item: StoredMail, queue: string, classifications: ClassificationCache): string {
   const time = shortTime(item.receivedTime || "");
-  const meta = [item.from || "", time].filter(Boolean).join(" · ");
+  const sender = item.from || "";
+  const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
   return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}</div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(sender)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}</div>
   </div>`;
 }
 
 function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ClassificationCache): string {
   const time = shortTime(item.receivedTime || "");
-  const meta = [item.sender || "", time].filter(Boolean).join(" · ");
+  const sender = item.sender || "";
+  const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
   return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(sender)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
   </div>`;
 }
 
@@ -98,10 +100,11 @@ function isThreadIgnored(thread: ThreadStore["items"][number], ignoredIds?: Set<
 
 function renderCompactThreadRow(thread: ThreadStore["items"][number], queue: string, labels: DashboardLabels): string {
   const time = shortTime(thread.lastTime || "");
-  const meta = [thread.participants.slice(0, 2).join(", "), time].filter(Boolean).join(" · ");
+  const participants = thread.participants.slice(0, 2);
+  const meta = [participants.map(senderDisplayName).join(", "), time].filter(Boolean).join(" · ");
   return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-thread-id="${escapeAttr(thread.threadId)}" onclick="openItem('${escapeAttr(thread.threadId)}')">
     <div class="sb-subject" title="${escapeAttr(thread.subject || thread.threadId)}">${escapeHtml(thread.subject || thread.threadId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span><span class="sb-badge">${escapeHtml(labels.card.thread)}</span><span class="sb-badge">${escapeHtml(String(thread.messageCount))}</span></div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(participants.join(", "))}">${escapeHtml(meta)}</span><span class="sb-badge">${escapeHtml(labels.card.thread)}</span><span class="sb-badge">${escapeHtml(String(thread.messageCount))}</span></div>
   </div>`;
 }
 

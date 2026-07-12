@@ -198,7 +198,7 @@ describe("renderWorkbenchHtml", () => {
         items: [{
           threadId: "t1", conversationId: "c1", normalizedSubject: "thread",
           subject: "Thread Subject",
-          participants: ["alice@test.com"],
+          participants: ["Alice <alice@test.com>"],
           folders: ["Inbox"], startTime: "2024-01-01", lastTime: "2024-01-02",
           messageCount: 2, unreadCount: 0, hasAttachments: false,
           sourceMailIds: ["m1", "m2"], timeline: [],
@@ -210,6 +210,8 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes("Thread Subject"));
     assert.ok(html.includes('data-id="t1"'));
+    assert.ok(html.includes("Participants:</strong> Alice</div>"));
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'));
   });
 
   it("renders thread spotlight fields in thread detail", () => {
@@ -251,7 +253,7 @@ describe("renderWorkbenchHtml", () => {
           sourceMailIds: ["m1", "m2"],
           timeline: [{
             mailId: "m1", internetMessageId: "", entryId: "entry-1", conversationId: "c1",
-            conversationIndex: "", subject: "Thread Subject", from: "Alice", senderName: "Alice",
+            conversationIndex: "", subject: "Thread Subject", from: "Alice <alice@test.com>", senderName: "Alice",
             senderEmail: "alice@test.com", receivedTime: "2024-01-02", sentTime: "",
             folder: "Inbox", bodyPreview: "Please confirm.", bodyClean: "Please confirm.",
             bodyDelta: "Please confirm.", bodyHash: "", isDuplicateBody: false,
@@ -276,6 +278,8 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("Reply asking Bob to confirm."));
     assert.ok(html.includes("Partial context; verify against original mail"));
     assert.ok(html.includes('data-action="openInOutlook" data-mail-id="m1"'));
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'), "thread senders should retain full addresses in tooltips");
+    assert.ok(html.includes("<strong title=\"Alice &lt;alice@test.com&gt;\">Alice</strong>"), "timeline should show display name only");
   });
 
   it("handles focusItem message via client-side JS", () => {
@@ -353,8 +357,8 @@ describe("renderWorkbenchHtml", () => {
   it("renders recipients and classification in workbench mail detail", () => {
     const input = stubInput({
       queue: {
-        pending: [stubMail({ mailId: "m1", subject: "Hello", from: "alice@test.com", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })],
-        blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Hello", from: "alice@test.com", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })], ignoredPending: []
+        pending: [stubMail({ mailId: "m1", subject: "Hello", from: "Alice <alice@test.com>", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })],
+        blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Hello", from: "Alice <alice@test.com>", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })], ignoredPending: []
       },
       classifications: normalizeClassificationCache({ items: [{ mailId: "m1", level: 2, label: "REGISTERED" }] })
     });
@@ -362,10 +366,39 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("bob@test.com"), "should show To recipients");
     assert.ok(html.includes("carol@test.com"), "should show Cc recipients");
     assert.ok(html.includes("REGISTERED"), "should show classification");
-    assert.ok(html.includes("alice@test.com"), "should show sender");
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'), "sender should retain the full address in a tooltip");
+    assert.ok(html.includes("From:</strong> Alice</div>"), "should show sender name only");
     assert.ok(html.includes("14:30"), "should show time");
     assert.ok(html.includes(".wb-meta-grid { display: grid;"));
     assert.ok(html.includes("grid-template-columns: 1fr;"));
+  });
+
+  it("renders pending and analyzed recipients as names with full-address tooltips", () => {
+    const pendingTo = "Bob <bob@test.com>;Carol <carol@test.com>";
+    const pendingCc = "Dan <dan@test.com>;Eve <eve@test.com>";
+    const analyzedTo = "Frank <frank@test.com>; Grace <grace@test.com>";
+    const analyzedCc = "Hank <hank@test.com>; Irene <irene@test.com>";
+    const input = stubInput({
+      queue: {
+        pending: [stubMail({ mailId: "m1", to: pendingTo, cc: pendingCc })],
+        blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", to: pendingTo, cc: pendingCc })], ignoredPending: []
+      },
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" })] }
+      ]),
+      store: { ...emptyMailStore(), items: [stubMail({ mailId: "a1", to: analyzedTo, cc: analyzedCc })] }
+    });
+
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes(`title="${pendingTo.replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`));
+    assert.ok(html.includes(`title="${analyzedTo.replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`));
+    assert.ok(html.includes(`title="${pendingCc.replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`));
+    assert.ok(html.includes(`title="${analyzedCc.replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`));
+    assert.ok(html.includes("To:</strong> Bob; Carol</div>"));
+    assert.ok(html.includes("Cc:</strong> Dan; Eve</div>"));
+    assert.ok(html.includes("To:</strong> Frank; Grace</div>"));
+    assert.ok(html.includes("Cc:</strong> Hank; Irene</div>"));
   });
 
   it("renders Outlook actions as a collapsed popover menu", () => {

@@ -4,7 +4,7 @@ import { classificationFor } from "./classification";
 import { getLocaleFromConfig, mergeStringLists, parseFolders, positiveNumber } from "./config-utils";
 import { getLabels, buildCategoryLabels, type DashboardLabels, LABELS } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard, buildThreadLookup, compareTimelineMessagesForDisplay, type DashboardState } from "./dashboard-state";
-import { escapeHtml, escapeAttr, domIdForMail, domIdForThread, domIdForThreadMessage, domIdForCategory, selected } from "./html-utils";
+import { escapeHtml, escapeAttr, domIdForMail, domIdForThread, domIdForThreadMessage, domIdForCategory, selected, senderDisplayName } from "./html-utils";
 import { formatModelLabel, isSelectedModel, modelKey, selectConfiguredModel, type AvailableModel } from "./llm-provider";
 import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, type MailIndex, type MailStore, type StoredMail } from "./mail-store";
 import { normalizePromptConfig, type PromptConfig } from "./prompt-config";
@@ -66,7 +66,7 @@ export function renderPendingPanel(
         ${statusBadge}
       </div>
       <div class="title">${escapeHtml(item.subject || item.mailId)}</div>
-      <div><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.from || "-")}</div>
+      <div title="${escapeAttr(item.from || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.from || "-"))}</div>
       <div><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
       <div><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>
       ${reason}
@@ -94,7 +94,7 @@ export function renderThreadCard(thread: ThreadStore["items"][number], labels: D
         : String(message.attachmentCount || 0);
       return `<div class="timeline-item" id="${escapeAttr(domIdForThreadMessage(thread.threadId, message.mailId))}">
         <div><strong>${escapeHtml(message.subject || message.mailId)}</strong></div>
-        <div class="muted">${escapeHtml(message.receivedTime || message.sentTime || "-")} · ${escapeHtml(message.from || message.senderEmail || "-")}</div>
+        <div class="muted" title="${escapeAttr(message.from || message.senderEmail || "-")}">${escapeHtml(message.receivedTime || message.sentTime || "-")} · ${escapeHtml(senderDisplayName(message.from || message.senderEmail || "-"))}</div>
         <div class="muted">${escapeHtml(labels.threads.attachments)}: ${escapeHtml(attachments)}</div>
         <div class="muted">${escapeHtml(labels.threads.mailIds)}: <a href="#${escapeAttr(domIdForMail(message.mailId))}">${escapeHtml(message.mailId)}</a></div>
         <pre>${escapeHtml(message.bodyDelta || message.bodyPreview || "")}</pre>
@@ -106,7 +106,7 @@ export function renderThreadCard(thread: ThreadStore["items"][number], labels: D
       <div class="title">${escapeHtml(thread.subject || thread.threadId)}</div>
       <div class="badge">${escapeHtml(`${labels.threads.messages}: ${String(thread.messageCount)}`)}</div>
     </div>
-    <div><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.join(", ") || "-")}</div>
+    <div title="${escapeAttr(thread.participants.join(", ") || "-")}"><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.map(senderDisplayName).join(", ") || "-")}</div>
     <div><strong>${escapeHtml(labels.threads.lastTime)}:</strong> ${escapeHtml(thread.lastTime || "-")}</div>
     <div><strong>${escapeHtml(labels.threads.folders)}:</strong> ${escapeHtml(thread.folders.join(", ") || "-")}</div>
     <div><strong>${escapeHtml(labels.threads.contentStatus)}:</strong> ${escapeHtml(thread.contentStatus || "-")}</div>
@@ -283,7 +283,7 @@ export function renderCard(item: AnalysisResult["items"][number], labels: Dashbo
       <div class="title">${escapeHtml(item.subject || item.mailId)}</div>
       <div class="badge">${escapeHtml(formatPriority(item.priority, labels))}</div>
     </div>
-    <div><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.sender || "-")}</div>
+    <div title="${escapeAttr(item.sender || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.sender || "-"))}</div>
     <div><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
     <div><strong>${escapeHtml(labels.card.summary)}:</strong> ${escapeHtml(item.summary || "-")}</div>
     <div><strong>${escapeHtml(labels.card.reason)}:</strong> ${escapeHtml(item.reason || "-")}</div>
