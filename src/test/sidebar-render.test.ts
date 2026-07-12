@@ -136,6 +136,11 @@ describe("renderSidebarHtml", () => {
     assert.ok(!html.includes("post('analyzeSelected',{mailIds:['block-1']})"));
   });
 
+  it("shows immediate cancelling feedback while a task is still winding down", () => {
+    const html = renderSidebarHtml(stubInput({ isBusy: true, busyKind: "cancelling" }));
+    assert.ok(html.includes("Cancelling…"));
+  });
+
   it("renders analyzed items in category queues", () => {
     const input = stubInput({
       state: stubState({}, [

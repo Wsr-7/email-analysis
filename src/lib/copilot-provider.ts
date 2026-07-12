@@ -3,6 +3,7 @@ import {
   normalizeAvailableModel,
   resolveModelSelection,
   isModelRefreshableErrorMessage,
+  readLlmResponseText,
   type AvailableModel,
   type LlmProvider,
   type LlmRequestOptions,
@@ -55,23 +56,11 @@ export class CopilotProvider implements LlmProvider {
       (options.cancellationToken as vscode.CancellationToken | undefined) || this.fallbackCancellation.token
     );
     return {
-      rawText: await readResponseText(response.text),
+      rawText: await readLlmResponseText(response.text, options.cancellationToken),
       model: selectedAvailableModel,
       usedFallback
     };
   }
-}
-
-async function readResponseText(stream: AsyncIterable<unknown>): Promise<string> {
-  let full = "";
-  for await (const part of stream) {
-    if (part && typeof part === "object" && "value" in (part as Record<string, unknown>) && typeof (part as Record<string, unknown>).value === "string") {
-      full += String((part as Record<string, unknown>).value);
-    } else {
-      full += String(part);
-    }
-  }
-  return full;
 }
 
 function isRefreshableModelError(error: unknown, cancellationToken: LlmRequestOptions["cancellationToken"]): boolean {

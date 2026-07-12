@@ -213,7 +213,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   const meetingRows = sortedMeetings.map((m) => renderCompactMeetingRow(m, labels)).join("");
 
   const statusText = isBusy
-    ? `<span class="sb-status-dot busy"></span> ${escapeHtml(busyKind)}`
+    ? `<span class="sb-status-dot busy"></span> ${escapeHtml(busyKind === "cancelling" ? labels.progress.cancelling : busyKind)}`
     : `<span class="sb-status-dot idle"></span> ${escapeHtml(labels.toolbar.refresh)}`;
 
   const lastPull = store.lastPullAt || "-";

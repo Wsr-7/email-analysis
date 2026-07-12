@@ -41,7 +41,7 @@ export type DashboardLabels = {
   threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "attachments" | "mailIds", string>;
   meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
   nextActions: Record<"title" | "owner" | "task" | "deadline" | "source" | "markDone" | "markIgnored" | "reopen" | "noActions", string>;
-  progress: Record<"pullMail" | "loadMore" | "sampleDigest" | "analyze" | "reports" | "loadModels" | "translate", string> & { detail: string };
+  progress: Record<"pullMail" | "loadMore" | "sampleDigest" | "analyze" | "reports" | "loadModels" | "translate" | "cancelling", string> & { detail: string };
   model: Record<"fallback" | "preferred", string>;
 };
 
@@ -223,6 +223,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       reports: "正在生成报告",
       loadModels: "正在加载 Copilot 模型",
       translate: "正在翻译已有分析",
+      cancelling: "正在取消…",
       detail: "任务进行中，请稍候..."
     },
     model: {
@@ -407,6 +408,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       reports: "Generating reports",
       loadModels: "Loading Copilot models",
       translate: "Translating existing analysis",
+      cancelling: "Cancelling…",
       detail: "Task is running. Please wait..."
     },
     model: {

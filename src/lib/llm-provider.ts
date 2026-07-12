@@ -32,6 +32,22 @@ export interface LlmProvider {
   sendPrompt(prompt: string, options: LlmRequestOptions): Promise<LlmResponse>;
 }
 
+export async function readLlmResponseText(stream: AsyncIterable<unknown>, cancellationToken?: CancellationTokenLike): Promise<string> {
+  let full = "";
+  for await (const part of stream) {
+    if (cancellationToken?.isCancellationRequested) {
+      throw new Error("EasyMail task cancelled.");
+    }
+    full += part && typeof part === "object" && "value" in (part as Record<string, unknown>) && typeof (part as Record<string, unknown>).value === "string"
+      ? String((part as Record<string, unknown>).value)
+      : String(part);
+  }
+  if (cancellationToken?.isCancellationRequested) {
+    throw new Error("EasyMail task cancelled.");
+  }
+  return full;
+}
+
 export interface ModelSelectionResult {
   selectedIndex: number;
   usedFallback: boolean;

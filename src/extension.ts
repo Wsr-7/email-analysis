@@ -100,7 +100,7 @@ function extractDraftText(raw: string): string {
   return text;
 }
 
-class EasyMailApp {
+export class EasyMailApp {
   public readonly dashboardProvider: DashboardProvider;
   public readonly data: AppDataStore;
   private readonly llmProvider: LlmProvider;
@@ -606,7 +606,8 @@ class EasyMailApp {
         kind,
         async (token) => await this.analyzeBatchCore(selection, token),
         (analysis) => `EasyMail analysis completed for ${analysis.batchSize} mail(s).`,
-        true
+        true,
+        labels.progress.cancelling
       );
       this.showAnalysisWarning(result);
     } catch (error) {
@@ -650,7 +651,8 @@ class EasyMailApp {
       "analyzeThread",
       async (token) => await this.analyzeThreadCore(threadId, token),
       (result) => `Thread analysis completed for ${result.subject}.`,
-      true
+      true,
+      labels.progress.cancelling
     );
   }
 
@@ -674,7 +676,8 @@ class EasyMailApp {
     kind: string,
     task: (cancellationToken: CancellationTokenLike) => Promise<T>,
     completionMessage?: (result: T) => string,
-    cancellable = false
+    cancellable = false,
+    cancellingDetail = "Cancelling…"
   ): Promise<T> {
     if (this.busy) {
       throw new Error(`Another EasyMail task is already running: ${this.busy.label}`);
@@ -689,7 +692,22 @@ class EasyMailApp {
         { location: vscode.ProgressLocation.Notification, title: label, cancellable },
         async (progress, token) => {
           progress.report({ message: detail });
-          return await task(token);
+          const cancellationSubscription = token.onCancellationRequested(() => {
+            if (this.busy) {
+              this.busy = { ...this.busy, kind: "cancelling", detail: cancellingDetail };
+              progress.report({ message: cancellingDetail });
+              void this.refreshCancellationSidebar(label);
+            }
+          });
+          try {
+            const result = await task(token);
+            if (token.isCancellationRequested) {
+              throw new Error("EasyMail task cancelled.");
+            }
+            return result;
+          } finally {
+            cancellationSubscription.dispose();
+          }
         }
       );
       const elapsedMs = Date.now() - startedAtMs;
@@ -705,6 +723,14 @@ class EasyMailApp {
       this.busy = null;
       await this.refresh();
       await this.log("busy:end", { label, elapsedMs: Date.now() - startedAtMs });
+    }
+  }
+
+  private async refreshCancellationSidebar(label: string): Promise<void> {
+    try {
+      await this.dashboardProvider.update();
+    } catch (error) {
+      await this.log("busy:cancelSidebarError", { label, error: formatError(error) });
     }
   }
 
@@ -782,12 +808,13 @@ class EasyMailApp {
     await this.updateSettings({ ...config, outputLanguage: nextLocale });
     if (choice === translateLabel) {
       await this.runWithBusy(
-        labels.progress.translate,
-        labels.progress.detail,
-        "translate",
-        async (token) => await this.translateExistingAnalysis(nextLocale, token),
-        (result) => `EasyMail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
-        true
+      labels.progress.translate,
+      labels.progress.detail,
+      "translate",
+      async (token) => await this.translateExistingAnalysis(nextLocale, token),
+      (result) => `EasyMail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
+      true,
+      labels.progress.cancelling
       );
     } else {
       await this.refresh();
