@@ -100,6 +100,10 @@ Sub CollectFolderList(byVal outputPath)
 
   Dim content
   content = "EasyMailFolderList: version=1; mode=list-folders" & vbCrLf
+  Dim defaultFolderIds
+  Set defaultFolderIds = CreateObject("Scripting.Dictionary")
+  defaultFolderIds.CompareMode = 1
+  CollectDefaultFolderIds ns, defaultFolderIds
 
   Dim storeCount
   On Error Resume Next
@@ -121,7 +125,7 @@ Sub CollectFolderList(byVal outputPath)
     Else
       On Error GoTo 0
       If Not root Is Nothing Then
-        EnumerateFolderForList root, SafeFolderName(root), content
+        EnumerateFolderForList root, SafeFolderName(root), content, False, defaultFolderIds
       End If
     End If
   Next
@@ -129,7 +133,35 @@ Sub CollectFolderList(byVal outputPath)
   WriteTextFile outputPath, content
 End Sub
 
-Sub EnumerateFolderForList(byRef folder, byVal folderPath, byRef content)
+Sub CollectDefaultFolderIds(byRef ns, byRef defaultFolderIds)
+  CollectDefaultFolderId ns, 6, "Inbox", defaultFolderIds
+  CollectDefaultFolderId ns, 5, "Sent Items", defaultFolderIds
+  CollectDefaultFolderId ns, 16, "Drafts", defaultFolderIds
+End Sub
+
+Sub CollectDefaultFolderId(byRef ns, byVal folderType, byVal defaultName, byRef defaultFolderIds)
+  Dim folder, entryId
+  On Error Resume Next
+  Set folder = ns.GetDefaultFolder(folderType)
+  If Err.Number <> 0 Or folder Is Nothing Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+  End If
+  entryId = CStr(folder.EntryID)
+  If Err.Number <> 0 Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+  End If
+  On Error GoTo 0
+  entryId = Trim(entryId)
+  If entryId <> "" Then
+    defaultFolderIds(entryId) = defaultName
+  End If
+End Sub
+
+Sub EnumerateFolderForList(byRef folder, byVal folderPath, byRef content, byVal includeFolder, byRef defaultFolderIds)
   If folderPath = "" Then
     Exit Sub
   End If
@@ -139,7 +171,8 @@ Sub EnumerateFolderForList(byRef folder, byVal folderPath, byRef content)
     Exit Sub
   End If
 
-  If IsMailFolder(folder) Then
+  If includeFolder And IsMailFolder(folder) Then
+    AppendDefaultFolderListMapping folder, folderPath, defaultFolderIds, content
     content = content & folderPath & vbCrLf
   End If
 
@@ -166,10 +199,26 @@ Sub EnumerateFolderForList(byRef folder, byVal folderPath, byRef content)
     Else
       On Error GoTo 0
       If Not child Is Nothing Then
-        EnumerateFolderForList child, folderPath & "/" & SafeFolderName(child), content
+        EnumerateFolderForList child, folderPath & "/" & SafeFolderName(child), content, True, defaultFolderIds
       End If
     End If
   Next
+End Sub
+
+Sub AppendDefaultFolderListMapping(byRef folder, byVal folderPath, byRef defaultFolderIds, byRef content)
+  Dim entryId
+  On Error Resume Next
+  entryId = CStr(folder.EntryID)
+  If Err.Number <> 0 Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+  End If
+  On Error GoTo 0
+  entryId = Trim(entryId)
+  If entryId <> "" And defaultFolderIds.Exists(entryId) Then
+    content = content & "FolderListDefault: " & defaultFolderIds(entryId) & "=" & folderPath & vbCrLf
+  End If
 End Sub
 
 Function IsMailFolder(byRef folder)
@@ -1081,6 +1130,9 @@ End Sub
 Sub WriteSampleFolderList(byVal outputPath)
   Dim content
   content = "EasyMailFolderList: version=1; mode=list-folders; sample=true" & vbCrLf
+  content = content & "FolderListDefault: Inbox=Inbox" & vbCrLf
+  content = content & "FolderListDefault: Sent Items=Sent Items" & vbCrLf
+  content = content & "FolderListDefault: Drafts=Drafts" & vbCrLf
   content = content & "Inbox" & vbCrLf
   content = content & "Sent Items" & vbCrLf
   content = content & "Mailbox Name/Project Alpha" & vbCrLf

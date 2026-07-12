@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, normalizeMailFolders, parseOutlookFolderList, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
 import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
 
 describe("positiveNumber", () => {
@@ -39,9 +39,9 @@ describe("default folders", () => {
     assert.deepEqual(manifest.contributes.configuration.properties["easyMail.folders"].default, ["Inbox", "Sent Items"]);
   });
 
-  it("migrates old Inbox-only folder settings to the current default", () => {
-    assert.deepEqual(normalizeMailFolders(["Inbox"], ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
-    assert.deepEqual(normalizeMailFolders("Inbox", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
+  it("keeps an explicit Inbox-only folder setting", () => {
+    assert.deepEqual(normalizeMailFolders(["Inbox"], ["Inbox", "Sent Items"]), ["Inbox"]);
+    assert.deepEqual(normalizeMailFolders("Inbox", ["Inbox", "Sent Items"]), ["Inbox"]);
     assert.deepEqual(normalizeMailFolders("Archive", ["Inbox", "Sent Items"]), ["Archive"]);
     assert.deepEqual(normalizeMailFolders("", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
   });
@@ -53,6 +53,8 @@ describe("parseOutlookFolderList", () => {
       "\uFEFFEasyMailFolderList: version=1; mode=list-folders",
       "",
       "Inbox",
+      "FolderListDefault: Inbox=Mailbox Name/Inbox",
+      "FolderListDefault: Sent Items=Mailbox Name/已发送邮件",
       "FolderList: skipped=bad-store",
       "Mailbox Name/Project Alpha",
       "示例邮箱/收件箱",
@@ -60,12 +62,55 @@ describe("parseOutlookFolderList", () => {
       "Sent Items"
     ].join("\r\n");
 
-    assert.deepEqual(parseOutlookFolderList(content), [
+    assert.deepEqual(parseOutlookFolderList(content), {
+      defaults: {
+        Inbox: "Mailbox Name/Inbox",
+        "Sent Items": "Mailbox Name/已发送邮件"
+      },
+      folders: [
       "Inbox",
       "Mailbox Name/Project Alpha",
       "示例邮箱/收件箱",
       "Sent Items"
-    ]);
+      ]
+    });
+  });
+});
+
+describe("Outlook folder picker", () => {
+  const defaults = {
+    Inbox: "Mailbox Name/Inbox",
+    "Sent Items": "Mailbox Name/已发送邮件",
+    Drafts: "Mailbox Name/草稿"
+  };
+
+  it("marks mapped default folders and preselects their canonical names", () => {
+    assert.deepEqual(
+      buildOutlookFolderPickItems(["Mailbox Name/Inbox", "Mailbox Name/已发送邮件", "Mailbox Name/Project Alpha"], ["Inbox", "Sent Items"], defaults),
+      [
+        { label: "Mailbox Name/Inbox", description: "(Inbox)", picked: true },
+        { label: "Mailbox Name/已发送邮件", description: "(Sent Items)", picked: true },
+        { label: "Mailbox Name/Project Alpha", picked: false }
+      ]
+    );
+  });
+
+  it("preselects canonical choices from configured real folder paths", () => {
+    assert.deepEqual(
+      buildOutlookFolderPickItems(["Inbox", "Sent Items", "Mailbox Name/Project Alpha"], ["Mailbox Name/Inbox", "Mailbox Name/已发送邮件"], defaults),
+      [
+        { label: "Inbox", description: "(Inbox)", picked: true },
+        { label: "Sent Items", description: "(Sent Items)", picked: true },
+        { label: "Mailbox Name/Project Alpha", picked: false }
+      ]
+    );
+  });
+
+  it("writes mapped folders back once under their canonical names", () => {
+    assert.deepEqual(
+      normalizeOutlookFolderSelection(["Mailbox Name/Inbox", "Inbox", "Mailbox Name/已发送邮件", "Sent Items", "Mailbox Name/Project Alpha"], defaults),
+      ["Inbox", "Sent Items", "Mailbox Name/Project Alpha"]
+    );
   });
 });
 

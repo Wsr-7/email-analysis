@@ -17,7 +17,7 @@ import { buildThreadReport } from "./lib/report-thread";
 import { CopilotProvider } from "./lib/copilot-provider";
 import { type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./lib/llm-provider";
 import { renderEasyMailGuideHtml } from "./lib/guide-webview";
-import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, parseOutlookFolderList, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
+import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisBatchResult, type AnalysisContext } from "./lib/app-analysis";
@@ -45,22 +45,6 @@ function configuredOutputLanguage(settings: vscode.WorkspaceConfiguration): Loca
   const inspected = settings.inspect<string>("outputLanguage");
   const explicit = inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
   return resolveOutputLanguage(explicit, vscode.env.language);
-}
-
-function buildFolderPickItems(availableFolders: string[], currentFolders: string[]): vscode.QuickPickItem[] {
-  const selected = new Set(currentFolders.map((folder) => folder.toLowerCase()));
-  const seen = new Set<string>();
-  const items: vscode.QuickPickItem[] = [];
-  for (const folder of [...availableFolders, ...currentFolders]) {
-    const label = String(folder || "").trim();
-    const key = label.toLowerCase();
-    if (!label || seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    items.push({ label, picked: selected.has(key) });
-  }
-  return items;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -834,27 +818,33 @@ class EasyMailApp {
     const currentFolders = normalizeMailFolders(config.folders, ["Inbox", "Sent Items"]).map(String);
     const scriptPath = await this.findScript("collect-outlook-mails.vbs");
     const outputPath = path.join(this.context.globalStorageUri.fsPath, "outlook-folder-list.txt");
-    let availableFolders: string[];
+    let folderList;
     await fs.promises.mkdir(this.context.globalStorageUri.fsPath, { recursive: true });
     await deleteFileIfExists(outputPath);
     try {
-      await runProcess("cscript.exe", ["//nologo", scriptPath, "--list-folders", "--output", outputPath], 30000, (event, data) => {
-        void this.log(`listFolders:${event}`, data);
-      });
-      availableFolders = parseOutlookFolderList(await fs.promises.readFile(outputPath, "utf8"));
+      folderList = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Loading Outlook folders…" },
+        async (progress) => {
+          progress.report({ message: "Starting Outlook and reading mail folders…" });
+          await runProcess("cscript.exe", ["//nologo", scriptPath, "--list-folders", "--output", outputPath], 90000, (event, data) => {
+            void this.log(`listFolders:${event}`, data);
+          });
+          return parseOutlookFolderList(await fs.promises.readFile(outputPath, "utf8"));
+        }
+      );
     } catch (err) {
-      await vscode.window.showWarningMessage(`EasyMail could not load Outlook folders: ${err instanceof Error ? err.message : String(err)}`);
+      await vscode.window.showWarningMessage(`EasyMail could not load Outlook folders: ${err instanceof Error ? err.message : String(err)} Tip: start Outlook first for faster loading.`);
       return;
     } finally {
       await deleteFileIfExists(outputPath).catch((error) => void this.log("listFolders:cleanupFailed", { error: formatError(error) }));
     }
 
-    if (!availableFolders.length) {
+    if (!folderList.folders.length) {
       await vscode.window.showWarningMessage("EasyMail did not find any Outlook mail folders. Existing folder settings were not changed.");
       return;
     }
 
-    const picked = await vscode.window.showQuickPick(buildFolderPickItems(availableFolders, currentFolders), {
+    const picked = await vscode.window.showQuickPick(buildOutlookFolderPickItems(folderList.folders, currentFolders, folderList.defaults), {
       canPickMany: true,
       placeHolder: "Select Outlook folders for EasyMail to scan"
     });
@@ -865,7 +855,7 @@ class EasyMailApp {
       await vscode.window.showWarningMessage("No folders selected. EasyMail folder settings were not changed.");
       return;
     }
-    await this.updateSettings({ folders: picked.map((item) => item.label) });
+    await this.updateSettings({ folders: normalizeOutlookFolderSelection(picked.map((item) => item.label), folderList.defaults) });
     await vscode.window.showInformationMessage("EasyMail folder settings updated.");
   }
 
