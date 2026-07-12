@@ -492,7 +492,6 @@ export function renderDashboardHtml(input: DashboardRenderInput): string {
       <button class="${analyzeNextBusy ? "is-busy" : ""}" onclick="post('analyze')"${analysisDisabled}>${escapeHtml(analyzeNextLabel)}${renderButtonSpinner(analyzeNextBusy)}</button>
       <button class="${analyzeSelectedBusy ? "is-busy" : ""}" onclick="analyzeSelected()"${analysisDisabled}>${escapeHtml(labels.toolbar.analyzeSelected)}${renderButtonSpinner(analyzeSelectedBusy)}</button>
       <button class="${analyzeAllBusy ? "is-busy" : ""}" onclick="post('analyzeAllAllowed')"${analysisDisabled}>${escapeHtml(labels.toolbar.analyzeAllAllowed)}${renderButtonSpinner(analyzeAllBusy)}</button>
-      <button onclick="post('refresh')"${busyDisabled}>${escapeHtml(labels.toolbar.refresh)}</button>
     </div>
     <div class="toolbar-group">
       <button class="secondary" onclick="post('openSummary')">${escapeHtml(labels.toolbar.openSummary)}</button>

@@ -9,7 +9,7 @@ import { emptyMailIndex, folderOldestReceivedTimes, type StoredMail } from "./ma
 import type { NextActionItem } from "./next-actions";
 import { normalizePromptConfig } from "./prompt-config";
 import { emptyThreadStore, type ThreadStore } from "./thread-store";
-import { renderButtonSpinner, formatPriority, formatClassification, renderModelOptions, renderRangeValueControl, renderClassificationOptions, formatAnalyzeNextLabel, type DashboardRenderInput } from "./dashboard-render";
+import { renderButtonSpinner, formatPriority, formatClassification, renderModelOptions, renderRangeValueControl, formatAnalyzeNextLabel, type DashboardRenderInput } from "./dashboard-render";
 import { emptyMeetingStore, type StoredMeeting } from "./meeting-store";
 
 const QUEUE_ORDER = [
@@ -429,7 +429,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   /* ── Settings panel (inside bottom) ── */
   .sb-settings { padding: 0 4px; }
   .sb-settings[hidden] { display: none; }
-  .sb-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 0; }
+  .sb-settings-grid { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 8px 0; }
   .sb-settings label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; opacity: 0.8; }
   .sb-settings input, .sb-settings select {
     padding: 5px 8px; border-radius: 4px; font-size: 12px;
@@ -500,7 +500,6 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
         </select>
       </div>
       <button class="sb-secondary" onclick="post('loadMore')"${!hasHistoryAnchors ? " disabled" : busyDisabled} title="${escapeAttr(labels.toolbar.loadMore)}">+</button>
-      <button class="sb-secondary" onclick="post('refresh')"${busyDisabled} title="${escapeAttr(labels.toolbar.refresh)}">↻</button>
     </div>
     ${!canAnalyze ? `<div class="sb-model-hint"><svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M7.5 1a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM6.3 11c0-.5.4-.9.9-.9s.9.4.9.9-.4.9-.9.9-.9-.4-.9-.9zM6.5 4h2v5h-2V4z"/></svg>${escapeHtml(locale === "zh-CN" ? "请先在下方设置中加载模型" : "Load models in settings below to analyze")}</div>` : ""}
   </div>
@@ -548,14 +547,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
         <label><span>${escapeHtml(labels.settings.modelFamily)} <button class="sb-bottom-btn" onclick="post('loadModels')" style="display:inline;padding:1px 6px;">${escapeHtml(labels.toolbar.loadModels)}</button></span>
           <select id="modelFamily">${modelOptions}</select>
         </label>
-        <label>${escapeHtml(labels.settings.maxClassification)}
-          <select id="autoAnalyzeMaxClassificationLevel">
-            ${renderClassificationOptions(Number(config.autoAnalyzeMaxClassificationLevel ?? 2), labels)}
-          </select>
-        </label>
-        <label>${escapeHtml(labels.toolbar.promptConfig)}
-          <button class="sb-bottom-btn" onclick="post('openPromptConfig')" style="text-align:left;padding:4px 6px;">${escapeHtml(locale === "zh-CN" ? "打开配置文件" : "Open config file")}</button>
-        </label>
+        <button class="sb-bottom-btn" onclick="post('openSettings')">${escapeHtml(locale === "zh-CN" ? "更多设置（VS Code Settings）" : "More settings (VS Code Settings)")}</button>
       </div>
     </div>
   </div>
@@ -650,7 +642,7 @@ var rangeLabels = {
   recentHours: '${escapeAttr(labels.settings.recentHours)}',
   maxItems: '${escapeAttr(labels.settings.maxItems)}'
 };
-var configControlIds = ['rangeMode', 'rangeValue', 'modelFamily', 'autoAnalyzeMaxClassificationLevel'];
+var configControlIds = ['rangeMode', 'rangeValue', 'modelFamily'];
 var autoSave = debounce(function() { saveConfig(true, false); }, 450);
 for (var i = 0; i < configControlIds.length; i++) {
   var el = document.getElementById(configControlIds[i]);
@@ -674,8 +666,7 @@ function saveConfig(keepSettingsOpen, silent) {
       outputLanguage: '${escapeAttr(locale)}',
       recentHours: rangeMode === 'recentHours' ? rangeValue.value : undefined,
       maxItems: rangeMode === 'maxItems' ? rangeValue.value : undefined,
-      modelFamily: document.getElementById('modelFamily').value,
-      autoAnalyzeMaxClassificationLevel: document.getElementById('autoAnalyzeMaxClassificationLevel').value
+      modelFamily: document.getElementById('modelFamily').value
     }
   });
 }

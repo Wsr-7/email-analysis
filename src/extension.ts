@@ -62,7 +62,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.commands.registerCommand("easyMail.analyzeAllAllowed", () => app.analyzeAllAllowed()),
-    vscode.commands.registerCommand("easyMail.refreshDashboard", () => app.refresh()),
     vscode.commands.registerCommand("easyMail.openDigest", () => app.openDigest()),
     vscode.commands.registerCommand("easyMail.openSummary", () => app.openSummary()),
     vscode.commands.registerCommand("easyMail.generateReports", () => app.generateReports()),
@@ -1057,7 +1056,7 @@ export class EasyMailApp {
     );
     const modelFamily = shouldMigrateModelFamily
       ? String(legacySettingsModelFamily || "").trim()
-      : resolveModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily);
+      : resolveModelFamily(legacySettingsModelFamily, storedModelFamily, defaults.modelFamily);
     if (shouldMigrateModelFamily) {
       await this.data.writeConfig({ ...storedConfig, modelFamily, modelFamilyMigrated: true });
     }
@@ -1099,9 +1098,6 @@ export class EasyMailApp {
       });
     }
     for (const [key, value] of Object.entries(values)) {
-      if (key === "modelFamily") {
-        continue;
-      }
       await settings.update(key, value, vscode.ConfigurationTarget.Global);
     }
   }

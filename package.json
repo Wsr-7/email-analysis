@@ -96,20 +96,20 @@
         },
         "easyMail.bodyExcerptChars": {
           "type": "number",
-          "order": 8,
+          "order": 5,
           "default": 1500,
           "minimum": 100,
           "description": "Maximum body characters per mail sent to Copilot."
         },
         "easyMail.sampleMode": {
           "type": "boolean",
-          "order": 14,
+          "order": 6,
           "default": false,
           "description": "Generate sample mail data instead of reading Outlook."
         },
         "easyMail.outputLanguage": {
           "type": "string",
-          "order": 5,
+          "order": 11,
           "enum": [
             "zh-CN",
             "en-US"
@@ -123,7 +123,7 @@
         },
         "easyMail.draftLanguage": {
           "type": "string",
-          "order": 6,
+          "order": 12,
           "enum": [
             "auto",
             "en",
@@ -139,7 +139,7 @@
         },
         "easyMail.autoAnalyzeMaxClassificationLevel": {
           "type": "number",
-          "order": 10,
+          "order": 13,
           "enum": [
             0,
             1,
@@ -159,48 +159,54 @@
         },
         "easyMail.mailStoreRetentionDays": {
           "type": "number",
-          "order": 15,
+          "order": 14,
           "default": 7,
           "minimum": 1,
           "description": "Raw local mail queue retention days."
         },
         "easyMail.mailIndexRetentionDays": {
           "type": "number",
-          "order": 16,
+          "order": 15,
           "default": 7,
           "minimum": 1,
           "description": "Local de-duplication index retention days."
         },
         "easyMail.analysisRetentionDays": {
           "type": "number",
-          "order": 17,
+          "order": 16,
           "default": 7,
           "minimum": 1,
           "description": "Analysis summary retention days."
         },
         "easyMail.meetingDaysAhead": {
           "type": "number",
-          "order": 18,
+          "order": 7,
           "default": 2,
           "minimum": 1,
           "description": "Collect meetings within the next N days from Outlook calendar."
         },
         "easyMail.collectorTimeoutSeconds": {
           "type": "number",
-          "order": 19,
+          "order": 8,
           "default": 120,
           "minimum": 10,
           "description": "Timeout in seconds for the Outlook mail/meeting collector scripts. Increase for large mailboxes or slow Outlook cold starts."
         },
         "easyMail.importantSenders": {
           "type": "array",
-          "order": 12,
+          "order": 10,
           "items": {
             "type": "string",
             "default": "name@example.com"
           },
           "default": [],
           "markdownDescription": "Important senders, mail groups, or keywords matched into `importantSender`. Examples: `person@example.com`, `team-alerts@company.com`, `Customer A`, `Project Phoenix`."
+        },
+        "easyMail.modelFamily": {
+          "type": "string",
+          "order": 9,
+          "default": "",
+          "description": "Copilot model identifier. Use EasyMail: Load Copilot Models and the sidebar to choose an available model."
         }
       }
     },
@@ -242,7 +248,7 @@
           {
             "id": "easyMail.configure",
             "title": "Configure Mail Range",
-            "description": "Click Settings File to edit mail range, folders, retention, and security settings. Use EasyMail: Select Outlook Folders to load folder choices from Outlook. Use Load Models and the Analysis Model dropdown in the dashboard for model selection.",
+            "description": "Click Settings, then More Settings (VS Code Settings), to edit mail range, folders, retention, and security settings. Use EasyMail: Select Outlook Folders to load folder choices from Outlook. Use Load Models and the Analysis Model dropdown in the dashboard for model selection.",
             "completionEvents": [
               "onCommand:easyMail.openSettings"
             ]
@@ -295,10 +301,6 @@
       {
         "command": "easyMail.loadModels",
         "title": "EasyMail: Load Copilot Models"
-      },
-      {
-        "command": "easyMail.refreshDashboard",
-        "title": "EasyMail: Refresh Dashboard"
       },
       {
         "command": "easyMail.openDigest",

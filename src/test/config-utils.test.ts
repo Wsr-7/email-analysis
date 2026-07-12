@@ -146,15 +146,15 @@ describe("getLocaleFromConfig", () => {
 });
 
 describe("resolveModelFamily", () => {
-  it("uses private config before legacy settings and defaults", () => {
-    assert.equal(resolveModelFamily("stored-model", "legacy-model", "default-model"), "stored-model");
+  it("uses the registered VS Code setting before private config and defaults", () => {
+    assert.equal(resolveModelFamily("settings-model", "stored-model", "default-model"), "settings-model");
   });
 
-  it("falls back from empty private config to legacy settings", () => {
-    assert.equal(resolveModelFamily(" ", " legacy-model ", "default-model"), "legacy-model");
+  it("falls back from an empty VS Code setting to private config", () => {
+    assert.equal(resolveModelFamily(" ", " stored-model ", "default-model"), "stored-model");
   });
 
-  it("falls back to the default model when neither stored nor legacy settings are set", () => {
+  it("falls back to the default model when neither setting nor private config is set", () => {
     assert.equal(resolveModelFamily(undefined, "", "default-model"), "default-model");
   });
 
@@ -167,6 +167,13 @@ describe("resolveModelFamily", () => {
 
   it("does not re-migrate legacy settings after migration was marked complete", () => {
     assert.equal(shouldMigrateLegacyModelFamily("gpt-5.4", "legacy-model", "gpt-5.4", true, true), false);
+  });
+
+  it("reads the registered setting first and writes sidebar model choices back to it", () => {
+    const extensionSource = fs.readFileSync(path.join(process.cwd(), "src", "extension.ts"), "utf8");
+
+    assert.ok(extensionSource.includes("resolveModelFamily(legacySettingsModelFamily, storedModelFamily, defaults.modelFamily)"));
+    assert.ok(!extensionSource.includes('if (key === "modelFamily") {\n        continue;\n      }'));
   });
 });
 

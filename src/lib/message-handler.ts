@@ -223,11 +223,6 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
     return;
   }
 
-  if (typed.type === "refresh") {
-    await ctx.refresh();
-    return;
-  }
-
   if (typed.type === "openGuide") {
     await ctx.openGuide();
     return;

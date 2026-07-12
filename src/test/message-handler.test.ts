@@ -58,10 +58,10 @@ describe("handleWebviewMessage", () => {
     assert.equal((ctx.log as any).mock.callCount(), 0);
   });
 
-  it("dispatches refresh", async () => {
+  it("ignores removed refresh messages", async () => {
     const ctx = stubContext();
     await handleWebviewMessage(ctx, { type: "refresh" });
-    assert.equal((ctx.refresh as any).mock.callCount(), 1);
+    assert.equal((ctx.refresh as any).mock.callCount(), 0);
   });
 
   it("dispatches pullMail", async () => {

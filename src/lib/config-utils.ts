@@ -122,8 +122,8 @@ export function getLocaleFromConfig(config: Record<string, unknown>): Locale {
   return config.outputLanguage === "zh-CN" ? "zh-CN" : "en-US";
 }
 
-export function resolveModelFamily(stored: unknown, settingsValue: unknown, defaultValue: unknown): string {
-  for (const value of [stored, settingsValue, defaultValue]) {
+export function resolveModelFamily(settingsValue: unknown, stored: unknown, defaultValue: unknown): string {
+  for (const value of [settingsValue, stored, defaultValue]) {
     if (typeof value === "string" && value.trim()) {
       return value.trim();
     }

@@ -1,5 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { renderSidebarHtml } from "../lib/sidebar-render";
 import { normalizeClassificationCache } from "../lib/classification";
 import { normalizePromptConfig } from "../lib/prompt-config";
@@ -215,6 +217,31 @@ describe("renderSidebarHtml", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes('id="settingsPanel"'));
     assert.ok(html.includes("hidden"));
+  });
+
+  it("keeps sidebar settings to range and model controls without a no-op refresh", () => {
+    const html = renderSidebarHtml(stubInput());
+
+    assert.ok(html.includes(".sb-settings-grid { display: grid; grid-template-columns: 1fr;"));
+    assert.ok(html.includes('id="rangeMode"'));
+    assert.ok(html.includes('id="rangeValue"'));
+    assert.ok(html.includes('id="modelFamily"'));
+    assert.ok(!html.includes('id="autoAnalyzeMaxClassificationLevel"'));
+    assert.ok(!html.includes("post('openPromptConfig')"));
+    assert.ok(!html.includes("post('refresh')"));
+    assert.ok(html.includes("post('openSettings')"));
+  });
+
+  it("registers the sidebar model setting between collection and language settings", () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+    const properties = manifest.contributes.configuration.properties;
+
+    assert.equal(properties["easyMail.modelFamily"].type, "string");
+    assert.ok(properties["easyMail.collectorTimeoutSeconds"].order < properties["easyMail.modelFamily"].order);
+    assert.ok(properties["easyMail.modelFamily"].order < properties["easyMail.outputLanguage"].order);
+    assert.ok(properties["easyMail.outputLanguage"].order < properties["easyMail.autoAnalyzeMaxClassificationLevel"].order);
+    assert.ok(properties["easyMail.autoAnalyzeMaxClassificationLevel"].order < properties["easyMail.mailStoreRetentionDays"].order);
+    assert.ok(!manifest.contributes.commands.some((command: { command: string }) => command.command === "easyMail.refreshDashboard"));
   });
 
   it("renders language globe icon with dropdown", () => {

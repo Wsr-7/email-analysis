@@ -356,7 +356,6 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     <button class="wb-action${isBusy && busyKind === "pullMail" ? " is-busy" : ""}" onclick="post('pullMail')"${busyDisabled}>${escapeHtml(labels.toolbar.pullMail)}${renderButtonSpinner(busyKind === "pullMail")}</button>
     <button class="wb-action${isBusy && busyKind === "analyzeNext" ? " is-busy" : ""}" onclick="post('analyze')"${analysisDisabled}>${escapeHtml(locale === "zh-CN" ? "分析" : "Analyze")}${renderButtonSpinner(busyKind === "analyzeNext")}</button>
     <button class="wb-action secondary" onclick="post('generateReports')"${busyDisabled}>${escapeHtml(labels.toolbar.generateReports)}</button>
-    <button class="wb-action secondary" onclick="post('refresh')"${busyDisabled}>↻</button>
   </div>
 
   <div class="wb-columns">
