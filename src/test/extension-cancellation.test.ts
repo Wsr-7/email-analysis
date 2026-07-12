@@ -137,3 +137,48 @@ test("maybeOpenGuide keys first-run state by install timestamp and falls back to
   assert.equal(shown.get("easyMail.guideShown.0.3.2"), true, "empty install timestamp retains version fallback");
   assert.equal(opened, 4, "the same install timestamp opens the guide only once");
 });
+
+test("flushWorkbenchDrafts times out a missing webview response and permits the next flush", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  let requests = 0;
+  (app as any).workbenchPanel = {
+    webview: {
+      postMessage: async () => ++requests > 1 ? false : true
+    }
+  };
+
+  const firstFlush = (app as any).flushWorkbenchDrafts().then(() => true);
+  const completed = await Promise.race([
+    firstFlush,
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2200))
+  ]);
+
+  assert.equal(completed, true, "a missing webview response must not stall the refresh pipeline");
+  assert.equal((app as any).pendingWorkbenchDraftFlush, null);
+  await (app as any).flushWorkbenchDrafts();
+  assert.equal(requests, 2, "a completed timeout must allow a new flush request");
+});
+
+test("a late draft flush response cannot complete a newer request", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  const requestIds: string[] = [];
+  (app as any).workbenchPanel = {
+    webview: {
+      postMessage: async (message: { requestId: string }) => {
+        requestIds.push(message.requestId);
+        return true;
+      }
+    }
+  };
+
+  await (app as any).flushWorkbenchDrafts();
+  const nextFlush = (app as any).flushWorkbenchDrafts();
+  await new Promise((resolve) => setImmediate(resolve));
+  const [timedOutRequestId, currentRequestId] = requestIds;
+
+  (app as any).completeWorkbenchDraftFlush(timedOutRequestId);
+  assert.equal((app as any).pendingWorkbenchDraftFlush.requestId, currentRequestId);
+  (app as any).completeWorkbenchDraftFlush(currentRequestId);
+  await nextFlush;
+  assert.equal((app as any).pendingWorkbenchDraftFlush, null);
+});

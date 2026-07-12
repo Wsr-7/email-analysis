@@ -569,11 +569,13 @@ export class EasyMailApp {
     let resolve = () => {};
     const done = new Promise<void>((finish) => { resolve = finish; });
     this.pendingWorkbenchDraftFlush = { requestId, done, resolve };
+    const timeout = setTimeout(() => this.completeWorkbenchDraftFlush(requestId), 1500);
     const delivered = await panel.webview.postMessage({ type: "requestWorkingDraftFlush", requestId });
     if (!delivered) {
       this.completeWorkbenchDraftFlush(requestId);
     }
     await done;
+    clearTimeout(timeout);
   }
 
   private async rebuildWorkbenchHtml(): Promise<void> {
