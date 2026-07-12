@@ -148,11 +148,19 @@
   - Known issues：本机无真实 Exchange/Outlook，COM 地址解析与模型 prompt 命中均未实机确认。
   - Commit：`8323826`。
 
-### [ ] F1.7 取消响应性（清单#9）
+### [x] F1.7 取消响应性（清单#9）（commit `30c66e5`）
 
 - **现状**：点击取消后按钮 loading 卡 30-40s 才出现 `task canceled`。chunk 循环层已检查 token（R2.4），但正在飞行中的单次 LM 请求取消传播存疑。
 - **做法**：核查 `sendPromptToModel` → provider 链路是否把 `CancellationToken` 真正传入 `model.sendRequest` 与流式读取循环；取消后 UI 立即切换为 "Cancelling…"（busy 态区分 cancel-pending），不等后台真正结束才反馈；后台任务结束后再复原。若 LM API 层无法中断当前请求，Notes 写明该上限（等模型返回当前 chunk 后停止即为可接受下限）。
 - **验收**：`npm test` 全绿。**needs user validation**：点取消后 UI ≤1s 给出 "Cancelling…" 反馈，整体等待时间明显缩短或有明确状态。
+
+- **Completion Notes**：
+  - 改动文件：`src/extension.ts`、`src/lib/copilot-provider.ts`、`src/lib/llm-provider.ts`、`src/lib/sidebar-render.ts`、`src/lib/dashboard-labels.ts`、`package.json` 及取消路径测试。
+  - 实现边界：复核并保留同一 token 到 `sendRequest`；流式读取逐片段与结束后检查取消。取消时只刷新 Sidebar 为 `正在取消…`/`Cancelling…`，不重建 Workbench；任务结束恢复 busy。未改分析/store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 384/384 通过（显式包含新的取消测试），VBS `--help`/`--sample` 通过，`git diff --check` 通过。review 两轮发现并修正 Workbench 重建风险、状态转换覆盖、测试未纳入 npm test 与取消后成功竞态，最终复审通过。
+  - Manual validation：**needs user validation on real Outlook/VS Code**。启动耗时分析后点取消，确认 Sidebar 与通知在 1 秒内显示 `正在取消…`/`Cancelling…`，不发生成功提示，任务结束后按钮恢复。
+  - Known issues：token 已传到 VS Code LM API；若 API 无法中断正在飞行的 `sendRequest`，仍需等当前请求返回或下一流片段，UI 会先给出取消中反馈。
+  - Commit：`30c66e5`。
 
 ---
 
@@ -221,6 +229,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F1.4 已完成，代码提交 `7103500`：采集诊断经 digest 送达 UI。下一步 claim F1.5。
 - 2026-07-12 · F1.5 已完成，代码提交 `1706a48`：目录 picker 增加进度与 90s 超时，list 协议以 EntryID 映射默认目录并排除邮箱根，规范名与真实路径互认去重；真实 Outlook 验证待用户执行。下一步 claim F1.6。
 - 2026-07-12 · F1.6 已完成，代码提交 `8323826`：Exchange DN 在采集端 SMTP 化，界面仅显示名称并保留完整地址 tooltip，guide 明确 importantSenders 的 prompt 匹配语义；真实 Exchange 验证待用户执行。下一步 claim F1.7。
+- 2026-07-12 · F1.7 已完成，代码提交 `30c66e5`：取消状态即时可见，token 覆盖模型请求与流读取；真实 Copilot 取消时延待用户执行。F1 已全部完成，下一步按计划进入 F2。
 
 ---
 
@@ -251,3 +260,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F1.6 pre-work checkpoint）**：恢复现场：F1.1-F1.5 已提交，工作树干净；HEAD `43fb809`。重新定位：`BuildMailRecord` 将 `SenderEmailAddress` 原样写入 senderEmail，`SafeTo`/`SafeCc` 直接读取 Outlook 字符串；`ResolveCurrentUser` 与 `IsCurrentUserRecipient` 已有 `AddressEntry.GetExchangeUser.PrimarySmtpAddress` 的安全兜底模式可复用。sidebar、workbench、legacy dashboard 和 thread timeline 仍直接输出完整邮箱值，guide 未说明 importantSenders 的 prompt 级匹配语义。边界：只做 F1.6 的地址 SMTP 化、展示名称/tooltip 与 guide 文案和测试；不改 digest/store/schema，不进入 F1.7/F2 或 R3/R4。
 
 - **2026-07-12 · Codex（F1.6 completion）**：完成 `8323826`。采集端对 `/O=` DN 以 ExchangeUser PrimarySmtpAddress 解析，失败保留原值；To/Cc 由 Recipients 按类型格式化。sidebar/workbench（含 To/Cc、timeline、participants 与 legacy v1）/dashboard 仅显示名称，完整地址保留 tooltip；guide 中英文说明 importantSenders 是 prompt 级模型判断，建议名+邮箱。两轮 review 分别发现 Workbench To/Cc 漏改、无空格分号 fallback 会泄露首个邮箱，均已修复并复审通过。验收：`npm run compile` 零错误、`npm test` 379/379 通过、VBS `--help`/`--sample` 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**，Exchange Fetch 后确认无 DN、tooltip 与 importantSenders 邮箱命中。Known：无真实 Exchange 验证。Next：claim F1.7；不进入 F2 或 R3/R4。
+
+- **2026-07-12 · Codex（F1.7 pre-work checkpoint）**：恢复现场：F1.1-F1.6 已提交，工作树干净；HEAD `c536003`。重新定位：`sendPromptToModel` 已把 token 传至 provider，Copilot `sendRequest` 已接收该 token，但 `readResponseText` 的流式读取没有主动检查 token；`runWithBusy` 只在任务结束 finally 清 busy，取消请求期间 UI 继续显示原 kind。边界：仅补取消中的 busy 状态、流读取取消检查和对应测试；不改分析/store/schema，不进入 F2 或 R3/R4。
+
+- **2026-07-12 · Codex（F1.7 completion）**：完成 `30c66e5`。同一 CancellationToken 传入 Copilot `sendRequest` 并在流读取中检查；取消时 busy 立即改为 cancelling，仅更新 Sidebar，不触发 Workbench 重建，任务 resolve 后再查 token 防止误报成功。新增可控 extension cancellation 测试与 provider token/stream 测试，并纳入 `npm test`。两轮 review 分别发现取消刷新会并发重建 Workbench、关键测试未纳入全量清单及取消竞态，均已修复并最终复审通过。验收：`npm run compile` 零错误、`npm test` 384/384 通过、VBS `--help`/`--sample` 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook/VS Code**，确认取消后 1 秒内显示取消中、无成功 toast、结束后复原。Known：LM API 是否中断飞行请求需真实 Copilot 验证。Next：F1 完成，按计划进入 F2 批；R3/R4 继续锁定。
