@@ -131,7 +131,7 @@
   - Known issues：本机未连接真实 Outlook，尚无法验证本地化路径和冷启动耗时。
   - Commit：`1706a48`。
 
-### [ ] F1.6 发件人/收件人 SMTP 化（其他#5，兼保 importantSenders 命中率）
+### [x] F1.6 发件人/收件人 SMTP 化（其他#5，兼保 importantSenders 命中率）（commit `8323826`）
 
 - **现状（已核实）**：Exchange 账户下 `SenderEmailAddress`/收件人地址是 X.500 DN（`/O=.../CN=RECIPIENTS/...`），digest 与 UI 原样展示；`importantSenders` 是**注入 prompt 由模型判断**（`prompt-config.ts:164` `renderImportantSenders`，无代码级精确/包含匹配）——DN 会显著降低模型命中概率。R1.2 已有 `GetExchangeUser.PrimarySmtpAddress` 解析模式可复用（`ResolveCurrentUser`）。
 - **做法**：
@@ -139,6 +139,14 @@
   2. UI 展示层（sidebar/workbench/dashboard）：发件人只显示 Display Name，完整 `Name <smtp>` 放 title tooltip——满足用户"全部只显示名称"的建议且不丢信息。
   3. 在 user guide 的 importantSenders 说明中写明匹配语义（prompt 级模型判断，建议同时填显示名与邮箱）。
 - **验收**：`--sample` 不回归（sample 已是 SMTP）；`npm test` 全绿。**needs user validation**：Exchange 邮箱 Fetch 后不再出现 `/O=...` DN；importantSenders 按邮箱配置能命中。
+
+- **Completion Notes**：
+  - 改动文件：`scripts/collect-outlook-mails.vbs`、`src/lib/html-utils.ts`、`src/lib/sidebar-render.ts`、`src/lib/workbench-render.ts`、`src/lib/workbench-render-v1.ts`、`src/lib/dashboard-render.ts`、`src/lib/guide-webview.ts` 及对应渲染/guide 测试。
+  - 实现边界：仅在 `/O=` Exchange DN 时通过 `AddressEntry.GetExchangeUser.PrimarySmtpAddress` 解析 SMTP，失败保留原值；From/To/Cc 使用 `Display Name <address>`；所有现有 mailbox 展示改为名称，完整地址置于 tooltip。未改 digest/store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 379/379 通过，VBS `--help`/`--sample` 通过，`git diff --check` 通过。review 两轮发现并补齐 Workbench To/Cc 的名称化，以及无空格分号 fallback 的逐项处理，最终复审通过。
+  - Manual validation：**needs user validation on real Outlook**。对 Exchange 邮箱执行 Fetch，确认 From/To/Cc 无 `/O=...` DN，界面只显示名称且悬停可见完整地址；在 importantSenders 配置邮箱后确认模型将对应邮件识别为重要发件人。
+  - Known issues：本机无真实 Exchange/Outlook，COM 地址解析与模型 prompt 命中均未实机确认。
+  - Commit：`8323826`。
 
 ### [ ] F1.7 取消响应性（清单#9）
 
@@ -212,6 +220,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F1.3 已完成，代码提交 `2ab0299`：草稿恢复改为扩展侧内存 Map，含刷新前 flush，真实 VS Code 验证待用户执行。按用户指示暂停，F1.4 未 claim。
 - 2026-07-12 · F1.4 已完成，代码提交 `7103500`：采集诊断经 digest 送达 UI。下一步 claim F1.5。
 - 2026-07-12 · F1.5 已完成，代码提交 `1706a48`：目录 picker 增加进度与 90s 超时，list 协议以 EntryID 映射默认目录并排除邮箱根，规范名与真实路径互认去重；真实 Outlook 验证待用户执行。下一步 claim F1.6。
+- 2026-07-12 · F1.6 已完成，代码提交 `8323826`：Exchange DN 在采集端 SMTP 化，界面仅显示名称并保留完整地址 tooltip，guide 明确 importantSenders 的 prompt 匹配语义；真实 Exchange 验证待用户执行。下一步 claim F1.7。
 
 ---
 
@@ -238,3 +247,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F1.5 pre-work checkpoint）**：恢复现场：F1.1-F1.4 已提交，工作树干净。重新定位：`normalizeMailFolders` 仍将单 Inbox 扩成默认双目录；`selectFolders` 使用 30s runProcess、无 progress，parser 丢弃 default mapping；VBS list mode 当前枚举 store 根。边界：仅 F1.5 的 picker、list protocol、legacy 规则与测试，不改采集/store/schema，不进入 F1.6。
 
 - **2026-07-12 · Codex（F1.5 completion）**：完成 `1706a48`。picker 枚举改 Notification progress + 90s，并在失败时提示先启动 Outlook；VBS 排除 store 根，默认目录仅在 EntryID 匹配的递归枚举项输出映射；TS 解析映射，真实路径与规范名预选互认、去重并规范名写回，单 Inbox 不再自动扩展。首轮 review 发现 mapping 漏用 EntryID，已补齐反向互认测试并复审通过。验收：`npm run compile` 零错误、`npm test` 378/378 通过、VBS `--help`/`--list-folders --sample` 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**，验证冷启动进度、邮箱根隐藏、本地化 Sent Items 标记与重复选择去重。Known：无真实 Outlook 验证。Next：claim F1.6；不进入 F1.7/F2 或 R3/R4。
+
+- **2026-07-12 · Codex（F1.6 pre-work checkpoint）**：恢复现场：F1.1-F1.5 已提交，工作树干净；HEAD `43fb809`。重新定位：`BuildMailRecord` 将 `SenderEmailAddress` 原样写入 senderEmail，`SafeTo`/`SafeCc` 直接读取 Outlook 字符串；`ResolveCurrentUser` 与 `IsCurrentUserRecipient` 已有 `AddressEntry.GetExchangeUser.PrimarySmtpAddress` 的安全兜底模式可复用。sidebar、workbench、legacy dashboard 和 thread timeline 仍直接输出完整邮箱值，guide 未说明 importantSenders 的 prompt 级匹配语义。边界：只做 F1.6 的地址 SMTP 化、展示名称/tooltip 与 guide 文案和测试；不改 digest/store/schema，不进入 F1.7/F2 或 R3/R4。
+
+- **2026-07-12 · Codex（F1.6 completion）**：完成 `8323826`。采集端对 `/O=` DN 以 ExchangeUser PrimarySmtpAddress 解析，失败保留原值；To/Cc 由 Recipients 按类型格式化。sidebar/workbench（含 To/Cc、timeline、participants 与 legacy v1）/dashboard 仅显示名称，完整地址保留 tooltip；guide 中英文说明 importantSenders 是 prompt 级模型判断，建议名+邮箱。两轮 review 分别发现 Workbench To/Cc 漏改、无空格分号 fallback 会泄露首个邮箱，均已修复并复审通过。验收：`npm run compile` 零错误、`npm test` 379/379 通过、VBS `--help`/`--sample` 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**，Exchange Fetch 后确认无 DN、tooltip 与 importantSenders 邮箱命中。Known：无真实 Exchange 验证。Next：claim F1.7；不进入 F2 或 R3/R4。
