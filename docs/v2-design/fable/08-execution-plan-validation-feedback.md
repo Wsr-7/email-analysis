@@ -307,11 +307,19 @@
   - Known issues：占位仅定义建议文件名与截取内容，真实截图由用户提供。
   - Commit：`2f8e750`。
 
-### [ ] F3.4 Pending 队列按文件夹分组折叠（用户笔记 Q4）
+### [x] F3.4 Pending 队列按文件夹分组折叠（用户笔记 Q4）（commit `2f19674`）
 
 - **现状（已核实）**：Pending 平铺展示全部待析邮件（`sidebar-render.ts` pending 队列）；`StoredMail` 自带 `folder` 字段，分组无需改数据层。
 - **做法**：Sidebar 的 Pending Email 分类内改为两级：默认展示**所有已配置 folder**（含拉取数为 0 的，显示 `<folderName> (N)`），单击组头展开/收起该 folder 下的 pending 邮件列表（行为与现有邮件行一致）；未在配置内但出现在 store 里的 folder（如历史遗留）归入原名分组。展开状态存 webview state 即可，不落盘。其他队列（blocked/analysed 等）不动。
 - **验收**：单测覆盖分组计数、0 封 folder 显示、未配置 folder 兜底；`npm test` 全绿。**needs user validation**：真机看 Pending 分组、展开/收起、数量与实际一致。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/test/sidebar-render.test.ts`。
+  - 实现边界：Pending 的可分析未分析邮件（`queue.allowed`）按 folder 分组；配置目录先展示且保留 0 计数，历史未配置目录原名追加；默认折叠，展开态仅以 webview `pendingFolders` state 保存。blocked/analysed/ignored 等其余队列保持原渲染，未改 queue/store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 399/399 通过，`git diff --check` 通过。独立 review 确认 queue 语义、队列切换、HTML 转义与状态保存边界正确。
+  - Manual validation：**needs user validation on real VS Code Sidebar**。确认 Pending 显示所有配置文件夹（含 0）、点击组头展开/收起、历史目录独立出现，数量与实际邮件一致。
+  - Known issues：无。
+  - Commit：`2f19674`。
 
 ### [ ] F3.5 ignoredSenders：按发件人自动忽略（用户笔记 Q5，规划者判断值得做）
 
@@ -362,6 +370,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F3.1 已完成，代码提交 `f5165fa`：Workbench 草稿 flush 在 webview 无应答时 1500ms 超时降级并清 pending，旧 requestId 不会误完成后续 flush。下一步 claim F3.2。
 - 2026-07-12 · F3.2 已完成，代码提交 `b85a210`：modelFamily 保持自由 string，Settings 说明明确 Dashboard 选择优先、手填兜底，并锁定无 enum 回归。下一步 claim F3.3。
 - 2026-07-12 · F3.3 已完成，代码提交 `2f8e750`：双 README 已重写为镜像 Marketplace Details，并放入五个中文截图占位；链接校验通过。下一步 claim F3.4。
+- 2026-07-12 · F3.4 已完成，代码提交 `2f19674`：Pending 按文件夹折叠分组，配置目录含 0 计数，历史目录兜底。下一步 claim F3.5。
 
 ---
 
@@ -424,6 +433,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F3.3 pre-work checkpoint）**：恢复现场：F3.1/F3.2 已提交，工作树干净；HEAD `829c8ac`。重新定位：当前中英 README 已有 Features/Quick start/Configuration/Development，但缺少计划要求的明确 tagline、Overview、按核心工作流组织的 Usage、FAQ、Known Limitations、Author，并无 SCREENSHOT placeholder；两份 headings 未完全镜像。现有引用目标 `user guide.md`、`setup.md`、`AGENTS.md`、`releases/` 均存在。边界：仅重写 `README.md` 与 `README_zh.md` 的 Marketplace Details 文案与五个 HTML 截图占位；不生成图片、不修改代码/配置/其他文档，不进入 F3.4+。
 
 - **2026-07-12 · Codex（F3.3 completion）**：完成 `2f8e750`。README.md 与 README_zh.md 结构镜像，五个中文 screenshot placeholder 覆盖计划规定场景；命令、限制与链接均按现有实现核对。独立 review 通过。验收：`npm test` 398/398 通过、`git diff --check` 通过。Manual：用户补图后在 Marketplace 预览确认。Next：claim F3.4；R3/R4 继续锁定。
+
+- **2026-07-12 · Codex（F3.4 pre-work checkpoint）**：恢复现场：F3.1-F3.3 已提交，工作树干净；HEAD `0638bb0`。重新定位：Sidebar 从 `input.queue.pending` 直接平铺渲染 pending 行；`config.folders` 已提供配置目录，`StoredMail.folder` 已提供实际目录，且现有客户端已用 `vscode.setState` 保存界面状态。边界：仅将 Pending 改为文件夹组头+可展开行，配置目录（含 0）先展示，历史未配置目录按原名补入；展开态仅 webview state，blocked 与其他队列不动；不改 queue/store/schema 或 F3.5。
+
+- **2026-07-12 · Codex（F3.4 completion）**：完成 `2f19674`。Pending 以 `queue.allowed` 按文件夹分组，配置文件夹含 0 计数且优先，未配置历史目录原名补入；默认折叠、展开态仅存 webview state。复审确认 blocked/analysed/ignored 未受影响，HTML 转义与按钮语义正确。验收：`npm run compile` 零错误、`npm test` 399/399 通过、`git diff --check` 通过。Manual：**needs user validation on real VS Code Sidebar**，按 Completion Notes 核对分组及数量。Next：claim F3.5；R3/R4 继续锁定。
 
 ---
 
