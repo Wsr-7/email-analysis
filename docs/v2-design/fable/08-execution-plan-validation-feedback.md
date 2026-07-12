@@ -181,18 +181,34 @@
   - Known issues：无。
   - Commit：`d9d2585`。
 
-### [ ] F2.2 Sidebar 列表时间与分类调整（其他#10）
+### [x] F2.2 Sidebar 列表时间与分类调整（其他#10）（commit `615dc17`）
 
 - 邮件行时间显示 `yyyy-MM-dd HH:mm:ss`（当前仅 `HH:mm`）；行 title tooltip 含完整时间。
 - 分类改名：`Important Sender Or Group` → `Important Senders`（中英文 label 同步）。
 - 分类顺序：`Must Handle Today` > `Important Senders` > `Risk` > …；`Ignored` 移到 `Uncertain` 之下。注意 07 计划 R2.6/R2.7 涉及的 category id 不变，只动展示顺序与 label。
 
-### [ ] F2.3 Workbench 展示修复（其他#3/#4/#11）
+- **Completion Notes**：
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/lib/dashboard-labels.ts`、`src/lib/prompt-config.ts`、`prompts/prompt-config.default.json`、`user guide.md` 与 Sidebar 单测。
+  - 实现边界：邮件与分析行均显示原始完整时间，行 tooltip 保留完整地址和时间；仅调整 `importantSender` 的展示 label 与 Sidebar queue 顺序，category id 与用户自定义 prompt 配置不变；未增加排序按钮，未改 store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 393/393 通过，`git diff --check` 通过；双 VBS `--help`/`--sample` 通过。独立 review 确认时间、label 与顺序覆盖完整。
+  - Manual validation：**needs user validation on real VS Code Sidebar**。确认窄侧栏邮件和分析行均显示 `yyyy-MM-dd HH:mm:ss`，tooltip 含完整地址与时间；确认 Important Senders 位于 Must Handle Today 后、Ignored 位于 Uncertain 后。
+  - Known issues：无。
+  - Commit：`615dc17`。
+
+### [x] F2.3 Workbench 展示修复（其他#3/#4/#11）（commit `615dc17`）
 
 - 去掉 `conversation:xxx` 线程内部 id 的展示（阅读面板任何位置不出现裸 conversationId）。
 - 原文内容容器高度自适应：flex 撑满阅读面板剩余空间，仅内容超出时内部滚动，不再固定高度留白。
 - Timeline 原文截断调查：确认是渲染截断（CSS/字符截断）还是数据截断（`bodyDelta`/`bodyChars` 采集上限），修渲染问题；若是采集上限属预期，Notes 说明并在 UI 加 "content truncated" 标注。
 - Timeline 排序切换按钮（从晚到早）：**可选**，复杂就不做，用户已授权降级。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/workbench-render.ts`、`src/lib/dashboard-labels.ts` 与 Workbench 渲染单测。
+  - 实现边界：移除阅读面板可见的 thread internal id；原文区改为 flex 占满剩余阅读高度、仅自身溢出滚动。经定位 Timeline 没有渲染字符截断，截断来自 collector 的 `bodyExcerptChars` 上限；仅在 `bodyPreview` 长度超过当前上限时标注 `Content truncated`，不截断渲染内容。未做可选排序按钮，未改 collector/store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 393/393 通过，`git diff --check` 通过；双 VBS `--help`/`--sample` 通过。独立 review 曾发现自然以 `...` 结尾会误报截断，已改为按 collector 上限长度判断并复审通过。
+  - Manual validation：**needs user validation on real Outlook/VS Code**。打开单封已分析邮件和线程，确认阅读面板不显示 `conversation:` id，原文填满剩余高度且仅长内容滚动；将 `easyMail.bodyExcerptChars` 调小后拉取长邮件，确认 Timeline 显示 `Content truncated`。
+  - Known issues：截断标注依据 collector 的 `bodyExcerptChars` 语义；真实 Outlook 采集路径尚待验证。
+  - Commit：`615dc17`。
 
 ### [ ] F2.4 单封邮件 Analyze 按钮（其他#12）
 
@@ -239,6 +255,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F1.6 已完成，代码提交 `8323826`：Exchange DN 在采集端 SMTP 化，界面仅显示名称并保留完整地址 tooltip，guide 明确 importantSenders 的 prompt 匹配语义；真实 Exchange 验证待用户执行。下一步 claim F1.7。
 - 2026-07-12 · F1.7 已完成，代码提交 `30c66e5`：取消状态即时可见，token 覆盖模型请求与流读取；真实 Copilot 取消时延待用户执行。F1 已全部完成，下一步按计划进入 F2。
 - 2026-07-12 · F2.1 已完成，代码提交 `d9d2585`：Sidebar 设置栏单列收敛、Settings 引导与模型同步修正，Refresh 入口及说明已删除。下一步可在 F2 批中合并 claim F2.2/F2.3。
+- 2026-07-12 · F2.2/F2.3 已完成，代码提交 `615dc17`：Sidebar 全量时间、Important Senders label/顺序已调整；Workbench 不再展示线程内部 id，原文区占满可用高度，collector 截断有明确标记。两项 Completion Notes 已分项记录。下一步可在 F2 批中 claim F2.4/F2.5/F2.6。
 
 ---
 
@@ -277,3 +294,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F2.1 pre-work checkpoint）**：恢复现场：F1.1-F1.7 已提交，工作树干净；HEAD `dbe66b5`。重新定位：Sidebar settings 固定 `1fr 1fr`，默认窄宽度会挤压控件；现有项为范围、模型、密级与 Prompt 配置，顶部仍有 refresh；refresh 的唯一 handler 只是 `ctx.refresh()`，不拉取/不更新数据。`package.json` 现有 order 已交错，且 modelFamily 未作为 VS Code Settings 注册项。边界：仅按 F2.1 收敛设置 UI、refresh 与配置 order/必要注册项及测试，不改 F2.2+、digest/store/schema 或 R3/R4。
 
 - **2026-07-12 · Codex（F2.1 completion）**：完成 `d9d2585`。Sidebar settings 单列只保留范围/模型，语言保留顶栏，More Settings 引导非高频 VS Code Settings；modelFamily 注册且以 Settings 优先、私有旧值 fallback 并双写；Refresh handler/命令/UI/公开说明一并删除，配置 order 重排。review 先后发现 model 设置无效、失效 Refresh 说明、More Settings 与 Prompt 配置文案不一致，均修复并复审通过。验收：`npm run compile` 零错误、`npm test` 387/387 通过、`git diff --check` 通过。Manual：**needs user validation on real VS Code Sidebar**，验证窄宽、模型双向同步与 More Settings。Known：无。Next：F2 允许多个小项一起 claim；可 claim F2.2/F2.3，Completion Notes 分项写；R3/R4 继续锁定。
+
+- **2026-07-12 · Codex（F2.2/F2.3 pre-work checkpoint）**：恢复现场：F2.1 已提交，工作树干净；HEAD `c73b418`。F2.2 重新定位：Sidebar `shortTime` 仅取 `HH:mm`；`importantSender` 已在 dashboard state 中优先，但 sidebar queue order 仍落在 followUp 后，且 Ignored 在 Threads 前；label 仍为 `Important Sender Or Group`。F2.3 重新定位：Workbench 分析详情仍输出裸 threadId，`.wb-body` 固定 `max-height:400px`；timeline 使用完整 `bodyDelta`，未做渲染截断，采集 bodyExcerpt 受配置上限。边界：两个相互独立小项合并 claim，分别写 Completion Notes；不改 category id、采集/store/schema，不做可选排序按钮，不进入 F2.4+ 或 R3/R4。
+
+- **2026-07-12 · Codex（F2.2/F2.3 completion）**：完成 `615dc17`。F2.2：Sidebar 行显示完整时间，tooltip 补全地址+时间，Important Senders 仅改展示 label，顺序为 Must Handle Today 后、Ignored 在 Uncertain 后。F2.3：阅读区移除可见 thread internal id，原文 flex 填满余高；Timeline 不存在渲染截断，collector 上限截断以长度判定并标注。两项均有独立 review；review 发现自然 `...` 结尾误报已修正。验收：`npm run compile` 零错误、`npm test` 393/393 通过、`git diff --check` 通过、双 VBS `--help`/`--sample` 通过。Manual：**needs user validation on real Outlook/VS Code**，按各自 Completion Notes 验证 Sidebar 与 Workbench。Next：F2 可按批次 claim F2.4/F2.5/F2.6，Completion Notes 仍需分项写；R3/R4 继续锁定。
