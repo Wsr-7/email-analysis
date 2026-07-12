@@ -4,6 +4,11 @@ export interface DigestMetadata {
   recentHours: number;
   maxItems: number;
   folders: string[];
+  scanSummary?: {
+    failed: number;
+    partial: number;
+    folders: string[];
+  };
 }
 
 export interface DigestItem {
@@ -43,27 +48,42 @@ export function parseDigest(markdown: string): DigestData {
     rangeMode: "",
     recentHours: 0,
     maxItems: 0,
-    folders: []
+    folders: [],
+    scanSummary: { failed: 0, partial: 0, folders: [] }
   };
 
-  const metadataMatch = text.match(
-    /GeneratedAt:\s*(.+)\nRangeMode:\s*(.+)\nRecentHours:\s*(.+)\nMaxItems:\s*(.+)\nFolders:\n([\s\S]*?)\n---/
-  );
-
-  if (metadataMatch) {
-    metadata.generatedAt = metadataMatch[1].trim();
-    metadata.rangeMode = metadataMatch[2].trim();
-    metadata.recentHours = Number(metadataMatch[3].trim()) || 0;
-    metadata.maxItems = Number(metadataMatch[4].trim()) || 0;
-    metadata.folders = metadataMatch[5]
-      .split("\n")
-      .map((line) => line.replace(/^- /, "").trim())
-      .filter(Boolean);
+  const headerLines = (text.split(/\n---/, 1)[0] || "").split("\n");
+  let readingFolders = false;
+  for (const line of headerLines) {
+    if (line.startsWith("GeneratedAt: ")) metadata.generatedAt = line.slice("GeneratedAt: ".length).trim();
+    if (line.startsWith("RangeMode: ")) metadata.rangeMode = line.slice("RangeMode: ".length).trim();
+    if (line.startsWith("RecentHours: ")) metadata.recentHours = Number(line.slice("RecentHours: ".length).trim()) || 0;
+    if (line.startsWith("MaxItems: ")) metadata.maxItems = Number(line.slice("MaxItems: ".length).trim()) || 0;
+    if (line === "Folders:") {
+      readingFolders = true;
+      continue;
+    }
+    if (line.startsWith("ScanSummary: ")) {
+      metadata.scanSummary = parseScanSummary(line.slice("ScanSummary: ".length));
+      readingFolders = false;
+      continue;
+    }
+    if (readingFolders && line.startsWith("- ")) metadata.folders.push(line.slice(2).trim());
   }
 
   const sections = text.split(/\n## Mail:\s+/).slice(1);
   const items = sections.map((section) => parseMailSection(section)).filter(Boolean) as DigestItem[];
   return { metadata, items };
+}
+
+function parseScanSummary(value: string): DigestMetadata["scanSummary"] {
+  if (value.trim().toLowerCase() === "ok") return { failed: 0, partial: 0, folders: [] };
+  const fields = Object.fromEntries(value.split(";").map((field) => field.trim().split(/=(.*)/, 2)));
+  return {
+    failed: Number(fields.failed) || 0,
+    partial: Number(fields.partial) || 0,
+    folders: String(fields.folders || "").split(",").map((folder) => folder.trim()).filter(Boolean)
+  };
 }
 
 function parseMailSection(section: string): DigestItem | null {

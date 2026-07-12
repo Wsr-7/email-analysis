@@ -98,3 +98,44 @@ Please review and approve the contract.
   assert.equal(result.items[0].attachmentCount, 2);
   assert.deepEqual(result.items[0].attachmentNames, ["contract.pdf", "budget.xlsx"]);
 });
+
+test("parseDigest reads a partial scan summary from a max-items digest", () => {
+  const result = parseDigest(`# Outlook Mail Digest
+
+GeneratedAt: 2026-07-12 10:30:00
+RangeMode: maxItems
+MaxItems: 50
+Folders:
+- Inbox
+- Archive
+ScanSummary: failed=1; partial=1; folders=Archive,Inbox
+
+---`);
+
+  assert.equal(result.metadata.rangeMode, "maxItems");
+  assert.equal(result.metadata.recentHours, 0);
+  assert.equal(result.metadata.maxItems, 50);
+  assert.deepEqual(result.metadata.scanSummary, {
+    failed: 1,
+    partial: 1,
+    folders: ["Archive", "Inbox"]
+  });
+});
+
+test("parseDigest defaults scan summary for legacy digests", () => {
+  const result = parseDigest(`# Outlook Mail Digest
+
+GeneratedAt: 2026-07-12 10:30:00
+RangeMode: recentHours
+RecentHours: 24
+Folders:
+- Inbox
+
+---`);
+
+  assert.deepEqual(result.metadata.scanSummary, {
+    failed: 0,
+    partial: 0,
+    folders: []
+  });
+});

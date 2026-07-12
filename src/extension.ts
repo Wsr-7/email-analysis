@@ -516,6 +516,11 @@ class EasyMailApp {
     await this.log("pullMail:start", { forceSample, loadMore, maxItems, recentHours, rangeMode, folders, collectorTimeoutMs });
     await runProcess("cscript.exe", args, collectorTimeoutMs, (event, data) => void this.log(`process:${event}`, data));
     const digest = parseDigest(await fs.promises.readFile(this.data.getDigestPath(), "utf8"));
+    const { failed, partial, folders: failedFolders } = digest.metadata.scanSummary || { failed: 0, partial: 0, folders: [] };
+    if (failed > 0 || partial > 0) {
+      const folderList = failedFolders.length ? failedFolders.join(", ") : "configured Outlook folders";
+      void vscode.window.showWarningMessage(`EasyMail could not fully scan Outlook folders: ${folderList} (${failed} failed, ${partial} partial). Check easyMail.folders or run EasyMail: Select Outlook Folders.`);
+    }
     const merge = mergeDigestIntoStore(await this.data.readMailStore(), digest, currentIndex.items.map((item) => item.mailId));
     const nextIndex = pruneMailIndex(mergeDigestIntoIndex(currentIndex, digest), Number(config.mailIndexRetentionDays || 7));
     const prunedStore = pruneMailStore(merge.store, Number(config.mailStoreRetentionDays || 1));

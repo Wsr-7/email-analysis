@@ -247,6 +247,11 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
   If folderFailureCount + folderPartialCount > 0 Then
     WScript.Echo "FolderScanSummary: failed=" & folderFailureCount & "; partial=" & folderPartialCount & "; total=" & folderCount & "; folders=" & folderFailures & "; partialFolders=" & folderPartials
   End If
+  Dim scanSummary
+  scanSummary = "ok"
+  If folderFailureCount + folderPartialCount > 0 Then
+    scanSummary = "failed=" & folderFailureCount & "; partial=" & folderPartialCount & "; folders=" & AppendDiagList(folderFailures, folderPartials)
+  End If
 
   Dim beforeGlobalCap
   beforeGlobalCap = collectedCount
@@ -258,7 +263,7 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
   If g_recipientParseFailures > 0 Then
     WScript.Echo "RecipientResolution: parseFailures=" & g_recipientParseFailures & "; toMe/ccMe fell back to true for those mails"
   End If
-  WriteDigest outputPath, target, collected, collectedCount
+  WriteDigest outputPath, target, collected, collectedCount, scanSummary
 End Sub
 
 Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxItems, byVal recentHours, byVal bodyChars, byVal olderThan, byRef collected, byRef collectedCount)
@@ -993,7 +998,7 @@ Sub SortMailRecords(byRef records, byVal recordCount)
   Next
 End Sub
 
-Sub WriteDigest(byVal outputPath, byRef target, byRef records, byVal recordCount)
+Sub WriteDigest(byVal outputPath, byRef target, byRef records, byVal recordCount, byVal scanSummary)
   Dim content
   content = "# Outlook Mail Digest" & vbCrLf & vbCrLf
   content = content & "GeneratedAt: " & FormatDateValue(Now) & vbCrLf
@@ -1011,6 +1016,7 @@ Sub WriteDigest(byVal outputPath, byRef target, byRef records, byVal recordCount
   For i = 0 To UBound(folderNames)
     content = content & "- " & Trim(folderNames(i)) & vbCrLf
   Next
+  content = content & "ScanSummary: " & scanSummary & vbCrLf
 
   content = content & vbCrLf & "---" & vbCrLf
 
@@ -1069,7 +1075,7 @@ Sub WriteSampleDigest(byVal outputPath, byRef target)
   record("conversationIndex") = "0002"
   AddRecordToArray records, recordCount, record
 
-  WriteDigest outputPath, target, records, recordCount
+  WriteDigest outputPath, target, records, recordCount, "ok"
 End Sub
 
 Sub WriteSampleFolderList(byVal outputPath)
