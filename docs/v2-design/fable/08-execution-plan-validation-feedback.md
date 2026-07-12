@@ -52,6 +52,8 @@
   5. 附带修显示互串（用户点名）：digest 头部与 `FolderScan` 行只输出**当前 mode 生效的参数**（recentHours 模式不打 `maxItems=50`，反之亦然），或明确标注 `inactive`。逻辑本身已核实独立（`capEnabled`/`cutoffEnabled` 各自只看自己 mode），是纯显示误导。
 - **验收**：`--help` 语法检查；`--sample` 双脚本不回归；`npm test` 全绿。**needs user validation**：recentHours=168 能拉到自发测试邮件、`candidateItems` 不再为 0；Meetings 队列出现今天及未来的会议实例；Inbox 的 timeProperty 显示 ReceivedTime。
 
+- **规划者复审修正（2026-07-12）**：本 step 根因描述中"反斜杠 `\` 分隔"系规划者笔误——仓库实际一直是 `/` 分隔，mail 脚本的真实缺陷是 Restrict 日期**带秒**（Outlook Restrict 不支持秒），worker 的去秒修复对症，mail 侧根因成立。但 **meetings 脚本的 formatter 本来就没有缺陷**（`/` 分隔、无秒），意味着 Meetings 队列空的根因**并未被确证**——F1.1 对 meetings 只加了 RestrictFilter 诊断与下界守卫（都是正确的防御）。用户复验时若 Meetings 队列仍空，需把日志中 `RestrictFilter:` 与采集输出发回，据此定位真实根因（候选：IncludeRecurrences+Restrict 的已知怪癖、`CollectUnrespondedInvites` 路径、store→队列过滤）。
+
 - **Completion Notes**：
   - 改动文件：`scripts/collect-outlook-mails.vbs`、`scripts/collect-outlook-meetings.vbs`。
   - 实现边界：mail formatter 去秒并与 meetings 保持完全相同的 `M/D/YYYY H:MM AM|PM` 实现；所有现有 Restrict 调用前输出实际 `RestrictFilter`；Calendar 跳过可读取开始时间但早于范围下界的实例；空 `sentEntryId` 不再误判 Sent；mail digest 头和 `FolderScan` 只显示当前 range mode 的参数。meetings formatter 在 claim 前已符合目标，未重复修改。
@@ -247,9 +249,27 @@
   - Known issues：VS Code 没有显式 install event；正式安装包中 `__metadata.installedTimestamp` 的可用性需真机确认，此 key 是当前最可靠近似。
   - Commit：`d783d5d`。
 
-### [ ] F2.7 丰富示例数据（其他#7）
+### [x] F2.7 丰富示例数据（其他#7）（commit `e98ed01`，Completion Notes 由规划者复审后代为回填）
 
 - `WriteSampleDigest`/sample meetings：扩充到每个分类至少 1-2 封（mustHandleToday/risk/waitingForMe/notice/important sender/uncertain 素材）、含中英文、含一组 3+ 封的线程、含带附件标记与高密级样例，会议含未响应邀请与周期实例。分析用的分类由模型/规则产生，sample 只需给足能诱导各分类的素材。同步更新 `--list-folders --sample` 无需改动。
+
+- **Completion Notes**（worker 会话在提交代码后中断，未回填记录；规划者独立复审代码后代为补记）：
+  - 改动文件：`scripts/collect-outlook-mails.vbs`（`WriteSampleDigest` 4 封 → 10 封）、`scripts/collect-outlook-meetings.vbs`（`WriteSampleMeetingDigest` 4 条 → 6 条）。
+  - 实现边界：邮件样例覆盖 mustHandleToday（16:00 截止审批）、risk（证书到期）、waitingForMe（供应商报价确认）、notice（两封维护通知）、uncertain（FYI beta 邀请）、importantSender 素材（CEO 邮件）、高密级素材（HIGHLY RESTRICTED 并购尽调，双附件）；4 封同 `sample-thread-release` 线程（conversationIndex 0001-0004）；中文内容以 `ChrW` 内嵌避免 VBS 源码编码问题。会议样例含未响应邀请（中英文各 1+）、周期实例、organizer、tentative。未改 `--list-folders --sample`、真实采集路径、digest/store/schema。
+  - 验收结果（规划者独立执行）：双 VBS `--help` 通过；`run-sample-validation.ps1` 端到端通过（sample digest 生成 + 解析 + 测试）；`npm run compile` 零错误；`npm test` 396/396 全绿。
+  - Manual validation：needs user validation——Generate Sample Digest 后确认邮件 10 封（中英混合、4 封同线程）、会议 6 条正常显示与分析。
+  - Known issues：无。
+  - Commit：`e98ed01`。
+
+---
+
+## 2.9 Milestone F3 — 规划者复审发现批（2026-07-12，F 批全量复审产出）
+
+### [ ] F3.1 flushWorkbenchDrafts 无超时 → workbench 刷新管线可被永久卡死（F1.3 引入，P1）
+
+- **缺陷（已核实）**：`extension.ts` `flushWorkbenchDrafts`（~L559-577）向 webview post `requestWorkingDraftFlush` 后无限期 `await done`。`postMessage` 返回 true 只代表投递成功，不代表会有应答：若请求恰好落在 `webview.html` 重设后、新文档 `message` 监听器注册前的窗口，消息被静默丢弃，`done` 永不 resolve。后果链：`pendingWorkbenchDraftFlush` 常驻非空 → 之后所有 `rebuildWorkbenchHtml` 都 await 同一个卡死的 promise → workbench 从此不再刷新（仅关闭面板触发 `onDidDispose` 才能解锁）；且 `runWithBusy` 的 `finally` await `refresh()`，对应命令的 promise 也永不 resolve。
+- **做法**：`flushWorkbenchDrafts` 给 `done` 加超时兜底（建议 1500-2000ms）：超时后调用 `completeWorkbenchDraftFlush(requestId)` 清掉 pending 并继续刷新。flush 本就是尽力而为（丢的最多是最后 500ms 的击键，且 input 侧还有 debounce 上报兜底），超时降级远好于管线卡死。补单测：webview 不应答时 flush 在超时后返回、pending 被清空、后续 flush 可正常发起。
+- **验收**：单测 + `npm test` 全绿；`npm run compile` 零错误。无需真机验证（纯时序防御）。
 
 ---
 
@@ -281,6 +301,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F2.1 已完成，代码提交 `d9d2585`：Sidebar 设置栏单列收敛、Settings 引导与模型同步修正，Refresh 入口及说明已删除。下一步可在 F2 批中合并 claim F2.2/F2.3。
 - 2026-07-12 · F2.2/F2.3 已完成，代码提交 `615dc17`：Sidebar 全量时间、Important Senders label/顺序已调整；Workbench 不再展示线程内部 id，原文区占满可用高度，collector 截断有明确标记。两项 Completion Notes 已分项记录。下一步可在 F2 批中 claim F2.4/F2.5/F2.6。
 - 2026-07-12 · F2.4/F2.5/F2.6 已完成，代码提交 `d783d5d`：单封 Analyze/Re-analyze 复用既有安全门控路径，Activity Bar 容器更名 EasyMail，Guide key 以安装时间戳优先并保留开发宿主回退。三个小项 Completion Notes 已分项记录。下一步 claim F2.7。
+- 2026-07-12 · **F2.7 已完成**（代码提交 `e98ed01`；worker 会话中断未回填记录，规划者独立复审后代为补记 Completion Notes）。**F1/F2 全部 14 个 step 完成**。
+- 2026-07-12 · **规划者全量复审 F 批（`608720b..e98ed01`，22 个提交）**：独立复核 `npm test` 396/396 全绿、双 VBS `--help` 通过、`run-sample-validation.ps1` 端到端通过。F1.2 对账、F1.4 诊断、F1.5 picker、F1.6 SMTP、F1.7 取消、F2.1-F2.7 实现均确认正确。两项修正与发现：① F1.1 根因描述修正（mail 真实缺陷是 Restrict 带秒而非分隔符；**meetings 队列空的根因未确证**，复验若仍空需回传 RestrictFilter 日志）；② **F3.1 立项**：F1.3 的 flush 协议无超时，存在 workbench 刷新管线永久卡死风险（P1）。vsix 已重新打包含全部 F 批改动。人工验证清单见 §7。R3/R4 锁定不变：解锁条件 = F3.1 完成 + 用户复验 P0 项通过 + 用户确认 R3 设计方向。
 
 ---
 
@@ -327,3 +349,29 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F2.4/F2.5/F2.6 pre-work checkpoint）**：恢复现场：F2.2/F2.3 的代码与记录已提交（`615dc17`、`10f9d4e`），工作树干净；HEAD `10f9d4e`。F2.4 重新定位：`renderMailDetail` 的操作区仅有 Open in Outlook 与 Ignore，超密级确认按钮由 `confirmAnalyzeButton` 独立提供；前端 `analyzeSelected` 已直达既有单封 `runAnalysisWithBusy` 路径。F2.5 重新定位：`package.json` activitybar 容器 title 仍为 Dashboard。F2.6 重新定位：`maybeOpenGuide` 仍以 version 组成 `easyMail.guideShown.*` key。边界：三个独立小项按 F2 批次合并 claim，分别写 Completion Notes；F2.4 复用既有安全门控与分析路径，F2.5 仅改容器 title，F2.6 只调整 key 选择与覆盖测试；不改 digest/store/schema，不进入 F2.7 或 R3/R4。
 
 - **2026-07-12 · Codex（F2.4/F2.5/F2.6 completion）**：完成 `d783d5d`。F2.4：Analyze/Re-analyze 均走既有单封路径，manual-confirm/hard block 保持 gate 语义；F2.5：仅 Activity Bar 容器更名 EasyMail，内部 Dashboard 保留；F2.6：安装时间戳优先、version/`0.0.0` 回退，并覆盖 null、空值与同安装不重复弹出。三项均独立 review 通过；F2.6 review 建议的边界测试已补齐并复审。验收：`npm run compile` 零错误、`npm test` 396/396 通过、`git diff --check` 通过、双 VBS `--help`/`--sample` 通过。Manual：**needs user validation on real Outlook/VS Code installation**，按各自 Completion Notes 验证。Next：claim F2.7；R3/R4 继续锁定。
+
+- **2026-07-12 · Codex（F2.7 pre-work checkpoint）**：恢复现场：F2.4-F2.6 的代码与记录已提交（`d783d5d`、`556805d`），工作树干净；HEAD `556805d`。重新定位：mail `WriteSampleDigest` 仅 4 封英文邮件，只有两封共享 conversationId，附件仅两条，未覆盖所有分类素材；meeting `WriteSampleMeetingDigest` 仅 4 条，已有未响应 invite 和 recurring，但缺少更丰富的中英文场景。边界：仅扩充两个 `--sample` writer 的记录内容及为输出增加的最小验证；不改 `--list-folders --sample`、真实采集、digest/store/schema 或分类逻辑，不进入 R3/R4。
+
+- **2026-07-12 · Claude Fable 5（规划者全量复审 F 批）**：复审范围 `608720b..e98ed01` 全部 22 个提交。独立验证：`npm test` 396/396 全绿；双 VBS `--help` 通过；`run-sample-validation.ps1` 端到端通过（覆盖 F2.7 新样例的生成与解析）。逐项结论：F1.2 对账（孤儿丢弃+漏返落 uncertain+skipped chunk 持久化兜底）、F1.4 ScanSummary digest 通道、F1.5 picker（EntryID 映射/邮箱根排除/互认去重/legacy 扩展删除）、F1.6 SMTP 化、F1.7 取消（token 传播+cancelling 态+防误报成功竞态）、F2.1-F2.6 实现与各自边界一致；F2.7 代码合格（worker 会话中断未回填记录，已代为补记）。修正与发现：① F1.1 根因描述笔误修正——仓库一直是 `/` 分隔，mail 真实缺陷是 Restrict **带秒**，去秒修复对症；meetings formatter 本无缺陷，**Meetings 队列空的根因未确证**，已在 F1.1 段落加复验指引；② 发现 **F3.1**（P1）：`flushWorkbenchDrafts` 无超时，flush 请求落在 webview 文档重建窗口会被静默丢弃 → pending 永不 resolve → workbench 刷新管线永久卡死，已立项；③ `4ba7b90`（worker 对本计划的措辞澄清）无害接受；④ vsix 打包停留在 F 批之前，已重新 `npm run package:vsix` 并提交。Next: worker claim F3.1（单步、小改动）；用户按 §7 清单做第二轮人工验证；两者都通过且用户确认 R3 设计方向后解锁 R3。
+
+---
+
+## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
+
+> 前置：安装重新打包后的 `releases/easymail-0.3.0.vsix`（含全部 F 批改动）。结果列填 ✅ / ❌ / ⏭️，❌ 请附现象与相关日志行（日志：globalStorage 下 `logs/easy-mail.log`）。
+
+| # | 验证点（来源） | 操作方法 | 预期结果 | 结果 |
+|---|---|---|---|---|
+| 1 | recentHours 修复（F1.1） | range mode 设 recentHours、168h，给自己发封测试邮件后 Fetch New | 能拉到测试邮件；日志 `RestrictFilter:` 为 `M/D/YYYY H:MM AM/PM` 无秒；`FolderScan` 的 `candidateItems` 非 0；Inbox 行 `timeProperty=ReceivedTime` | |
+| 2 | **Meetings 队列（F1.1，根因未确证，重点）** | 日历有今天/未来会议时拉取会议 | 队列出现今天及未来实例；**若仍为空：把日志中 `RestrictFilter:` 与会议采集输出整段发回** | |
+| 3 | 注入邮件不消失（F1.2） | 重发正文含伪造闭合 tag + SYSTEM 指令的邮件并分析 | 邮件出现在 Uncertain（summary 为 analysis incomplete）或正常分类，绝不消失；chunk 失败时右下角有含数量的 warning | |
+| 4 | 草稿保留（F1.3） | ① 手写草稿→点 Fetch New；② Generate Draft→刷新；③ 在两封邮件间切换 | 三种情况草稿都保留且互不串 | |
+| 5 | 坏文件夹提示（F1.4） | `easyMail.folders` 加一个乱写的名字后 Fetch New | 弹 warning 点名坏文件夹，其余文件夹正常采集 | |
+| 6 | 文件夹选择器（F1.5） | ① 关闭 Outlook 后运行 Select Outlook Folders；② 打开 Outlook 再运行并观察列表 | ① 有进度提示，90s 内完成或报错含"先启动 Outlook"提示；② 列表无邮箱根节点，`已发送邮件` 条目标注 `(Sent Items)`，同时勾选规范名与真实路径确认后设置里只有一个 | |
+| 7 | 发件人 SMTP 化（F1.6） | Fetch 后查看列表与详情的发件人/收件人 | 不再出现 `/O=...` DN；只显示姓名，悬停 tooltip 见 `姓名 <邮箱>`；importantSenders 填邮箱后对应邮件能命中 | |
+| 8 | 取消响应（F1.7） | 分析进行中点取消 | ≤1 秒内显示 `正在取消…/Cancelling…`，无成功 toast，任务结束后按钮复原 | |
+| 9 | Sidebar 设置栏（F2.1） | 把侧栏拖窄再看设置区 | 单列布局全部可见；More Settings 打开 VS Code Settings；改模型后 Settings 与 Sidebar 一致；无 Refresh 按钮 | |
+| 10 | 时间与分类（F2.2） | 看 Sidebar 邮件列表与分类 | 时间为 `yyyy-MM-dd HH:mm:ss`，悬停 tooltip 含完整时间；分类名为 Important Senders 且位于 Must Handle Today 之下、Risk 之上；Ignored 在 Uncertain 之下 | |
+| 11 | Workbench（F2.3/F2.4） | 打开已分析邮件与线程详情 | 无 `conversation:xxx` 展示；原文区填满剩余高度、仅长内容内部滚动；长邮件有 Content truncated 标注；普通邮件有 Analyze、已分析邮件有 Re-analyze 按钮且可用；高密级邮件仍只有 Confirm and Analyze | |
+| 12 | Activity Bar 与 Guide（F2.5/F2.6） | ① 看 Activity Bar 图标悬停名；② 卸载后重装同版本 vsix 并激活 | ① 显示 EasyMail；② Guide 再次弹出（若不弹，说明正式安装无 `__metadata.installedTimestamp`，请反馈） | |
+| 13 | 示例数据（F2.7） | 运行 Generate Sample Digest | 邮件 10 封（中英混合、4 封同一线程、含高密级样例），会议 6 条（含中文未响应邀请） | |
