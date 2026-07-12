@@ -96,7 +96,7 @@
   - Known issues：跨扩展进程重启不保留（本 step 按计划只要求进程存活期）。
   - Commit：`2ab0299`。
 
-### [ ] F1.4 采集诊断接通 UI：坏文件夹/partial 必须让用户看见（清单#5）
+### [x] F1.4 采集诊断接通 UI：坏文件夹/partial 必须让用户看见（清单#5，commit `7103500`）
 
 - **现状（已核实）**：VBS 的 `FolderScan:`/`FolderScanSummary:` 只进 stdout，`runProcess` 不回传 stdout（只截 2000 字符进日志文件），`src/` 全库对 `FolderScanSummary` **零引用**——乱写 folder 时 VBS 确实会输出 `error=Outlook folder not found` 并继续采集其他文件夹（R2.7b 行为正确），但用户全程无感知。
 - **做法**：
@@ -104,6 +104,13 @@
   2. TS digest 解析器读取该行；Fetch 完成后 failed/partial 非零 → `showWarningMessage`（列出坏文件夹名，提示检查 `easyMail.folders` 或用 Select Outlook Folders 重选）。
   3. 单测：digest parser 解析 ScanSummary 行（含无该行的旧 digest 兼容）。
 - **验收**：单测 + `npm test` 全绿。**needs user validation**：配置 `Inbox` + 乱写名 → Fetch 后弹 warning 点名坏文件夹，Inbox 正常采集。
+
+- **Completion Notes**：
+  - 改动文件：`scripts/collect-outlook-mails.vbs`、`src/lib/digest.ts`、`src/extension.ts`、`src/test/digest.test.ts`。
+  - 实现边界：digest header 写 `ScanSummary`，解析兼容旧/两种 range header，Pull 完成后对 failed/partial 弹出含目录名的 warning；未改 runProcess、store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 375/375 通过，VBS `--help`/`--sample` 通过，review 通过。
+  - Manual validation：**needs user validation on real Outlook**。配置 `Inbox` 与一个错误目录，Fetch 后确认 warning 点名错误目录且 Inbox 仍采集。
+  - Commit：`7103500`。
 
 ### [ ] F1.5 selectFolders UX 与语义修正（清单#6/#7 衍生）
 
@@ -195,6 +202,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F1.1 已完成，代码提交 `040713d`：统一无秒 Restrict 日期格式、补齐 RestrictFilter 诊断与 Calendar 下界防线、修正空 Sent EntryID 误判及 range mode 显示互串。自动验收通过；真实 Outlook 验证仍待用户完成。下一步按用户指定顺序 claim F1.2。
 - 2026-07-12 · F1.2 已完成，代码提交 `bd56b6e`：批分析对账兜底覆盖漏返、篡改 id 与 skipped chunk，并向 UI 报告不完整结果。下一步 claim F1.3。
 - 2026-07-12 · F1.3 已完成，代码提交 `2ab0299`：草稿恢复改为扩展侧内存 Map，含刷新前 flush，真实 VS Code 验证待用户执行。按用户指示暂停，F1.4 未 claim。
+- 2026-07-12 · F1.4 已完成，代码提交 `7103500`：采集诊断经 digest 送达 UI。下一步 claim F1.5。
 
 ---
 
@@ -213,3 +221,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F1.3 pre-work checkpoint）**：恢复现场：F1.1/F1.2 已提交，工作树干净，branch `v3...origin/v3 [ahead 4]`。重新定位：扩展侧已有 `workingDrafts: Map<string, string>`，但仅由 Generate/Polish/Refine 写入；workbench HTML 的 textarea input 仍只写客户端 `vscode.setState`，`getWorkbenchHtml` 重建时不以 Map 渲染初值，故真机刷新仍丢手写草稿。边界：复用现有 Map，增加节流上报与扩展侧渲染回填；不落 app-data、不改 schema/store，不再修补客户端 getState。
 
 - **2026-07-12 · Codex（F1.3 completion）**：完成 `2ab0299`。首轮 review 发现 500ms debounce 与立即刷新之间的丢失窗口；已加重建前 webview flush 协议，扩展收到全部草稿并写入 Map 后才重设 HTML，复审通过。验收：`npm run compile` 零错误、`npm test` 373/373 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**，验证手写/生成草稿刷新和切换隔离。按用户指示暂停，F1.4 未 claim。
+
+- **2026-07-12 · Codex（F1.4 pre-work checkpoint）**：恢复现场：F1.1-F1.3 已提交，工作树干净。重新定位：collector 仅在 failed/partial 时 stdout 输出 `FolderScanSummary`（`collect-outlook-mails.vbs:248`），digest 未写 scan 汇总；`parseDigest` 只解析固定头字段；`pullMailCore` 解析 digest 后即 merge，没有任何诊断 warning。边界：复用 digest 文件通道，新增可选 ScanSummary 解析和 pull 完成 warning；不动 runProcess、store/schema 或其他 step。
+
+- **2026-07-12 · Codex（F1.4 completion）**：完成 `7103500`。collector 写入 ScanSummary，parser 兼容旧 digest 和仅含当前 range 参数的 header，UI warning 点名失败/partial 目录；review 通过。验收：`npm run compile` 零错误、`npm test` 375/375 通过、VBS `--help`/`--sample` 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook**。Next：claim F1.5。
