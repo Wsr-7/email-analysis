@@ -36,7 +36,7 @@ export type DashboardLabels = {
   meta: Record<"range" | "folders" | "generated" | "requestedModel" | "lastUsedModel" | "lastPull" | "lastImport", string>;
   stats: Record<"pulled" | "pending" | "analysed" | "blocked" | "mustHandle" | "risk" | "waiting" | "notice" | "threads", string>;
   categories: Record<string, string>;
-  card: Record<"from" | "to" | "cc" | "body" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "openInOutlook" | "noItems" | "thread", string>;
+  card: Record<"from" | "to" | "cc" | "body" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "analyze" | "reanalyze" | "openInOutlook" | "noItems" | "thread", string>;
   pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select" | "confirmAnalyze", string>;
   threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "contentTruncated" | "attachments" | "mailIds", string>;
   meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
@@ -147,6 +147,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       openForward: "Outlook 转发",
       ignore: "忽略",
       restore: "恢复",
+      analyze: "分析",
+      reanalyze: "重新分析",
       openInOutlook: "在 Outlook 打开",
       noItems: "暂无邮件",
       thread: "线程"
@@ -334,6 +336,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       openForward: "Open Forward",
       ignore: "Ignore",
       restore: "Restore",
+      analyze: "Analyze",
+      reanalyze: "Re-analyze",
       openInOutlook: "Open in Outlook",
       noItems: "No items",
       thread: "Thread"

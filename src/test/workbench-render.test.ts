@@ -89,6 +89,28 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("wb-detail-card"));
   });
 
+  it("renders Analyze before Open in Outlook for an allowed unanalysed mail", () => {
+    const html = renderWorkbenchHtml(stubInput({
+      queue: { pending: [], blocked: [], analysed: [], allowed: [stubMail({ mailId: "pending-1" })], ignoredPending: [] }
+    }));
+
+    const analyze = '<button class="wb-btn" data-action="analyzeSelected" data-mail-id="pending-1">Analyze</button>';
+    const open = '<button class="wb-btn" data-action="openInOutlook" data-mail-id="pending-1">Open in Outlook</button>';
+    assert.ok(html.includes(analyze));
+    assert.ok(html.indexOf(analyze) < html.indexOf(open));
+  });
+
+  it("renders Re-analyze before Open in Outlook for an analysed mail", () => {
+    const html = renderWorkbenchHtml(stubInput({
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "analysed-1" })] }])
+    }));
+
+    const reanalyze = '<button class="wb-btn" data-action="analyzeSelected" data-mail-id="analysed-1">Re-analyze</button>';
+    const open = '<button class="wb-btn" data-action="openInOutlook" data-mail-id="analysed-1">Open in Outlook</button>';
+    assert.ok(html.includes(reanalyze));
+    assert.ok(html.indexOf(reanalyze) < html.indexOf(open));
+  });
+
   it("renders confirm analyze action for manual-confirm mail detail only", () => {
     const input = stubInput({
       queue: {

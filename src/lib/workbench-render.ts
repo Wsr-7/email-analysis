@@ -18,9 +18,12 @@ function ignoreOrRestore(queue: string, mailId: string, labels: DashboardLabels)
   return `<button class="wb-btn ghost" data-action="ignore" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.card.ignore)}</button>`;
 }
 
+function analyzeButton(mailId: string, label: string): string {
+  return `<button class="wb-btn" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(label)}</button>`;
+}
+
 function confirmAnalyzeButton(mailId: string, decision: SecurityGateDecisionResult | undefined, labels: DashboardLabels): string {
-  if (decision?.decision !== "manual_confirm") return "";
-  return `<button class="wb-btn" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.pending.confirmAnalyze)}</button>`;
+  return decision?.decision === "manual_confirm" ? analyzeButton(mailId, labels.pending.confirmAnalyze) : "";
 }
 
 function isThreadIgnored(thread: ThreadStore["items"][number], ignoredIds?: Set<string>): boolean {
@@ -80,6 +83,7 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
       ${clsHtml}
     </div>
     <div class="wb-actions">
+      ${analyzeButton(item.mailId, labels.card.reanalyze)}
       <button class="wb-btn" data-action="openInOutlook" data-mail-id="${escapeAttr(item.mailId)}">${escapeHtml(labels.card.openInOutlook)}</button>
       ${ignoreOrRestore(queue, item.mailId, labels)}
     </div>
@@ -244,7 +248,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   for (const item of queue.allowed) {
     const classification = classificationFor(item.mailId, classifications);
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>`;
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="pending">${renderMailDetail(item, "pending", labels, extra, "", classifications)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="pending">${renderMailDetail(item, "pending", labels, extra, analyzeButton(item.mailId, labels.card.analyze), classifications)}</div>`);
   }
 
   for (const item of queue.blocked) {

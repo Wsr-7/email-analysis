@@ -105,3 +105,35 @@ test("CopilotProvider passes the same cancellation token to sendRequest and stre
   assert.equal(receivedToken, token);
   assert.equal(response.rawText, "ok");
 });
+
+test("maybeOpenGuide keys first-run state by install timestamp and falls back to version", async () => {
+  const shown = new Map<string, boolean>();
+  let opened = 0;
+  const openGuide = async () => { opened += 1; };
+  const createApp = (packageJSON: unknown) => {
+    const app = new EasyMailApp({
+      globalStorageUri: { fsPath: "" },
+      extensionPath: "",
+      extension: { packageJSON },
+      globalState: {
+        get: (key: string) => shown.get(key),
+        update: async (key: string, value: boolean) => { shown.set(key, value); }
+      },
+      subscriptions: []
+    });
+    (app as any).openGuide = openGuide;
+    return app;
+  };
+
+  await (createApp({ version: "0.3.0", __metadata: { installedTimestamp: "2026-07-12T00:00:00Z" } }) as any).maybeOpenGuide();
+  await (createApp({ version: "0.3.0", __metadata: { installedTimestamp: "2026-07-12T00:00:00Z" } }) as any).maybeOpenGuide();
+  await (createApp({ version: "0.3.0" }) as any).maybeOpenGuide();
+  await (createApp({ version: "0.3.1", __metadata: null }) as any).maybeOpenGuide();
+  await (createApp({ version: "0.3.2", __metadata: { installedTimestamp: "" } }) as any).maybeOpenGuide();
+
+  assert.equal(shown.get("easyMail.guideShown.2026-07-12T00:00:00Z"), true);
+  assert.equal(shown.get("easyMail.guideShown.0.3.0"), true, "development hosts without install metadata retain version fallback");
+  assert.equal(shown.get("easyMail.guideShown.0.3.1"), true, "null metadata retains version fallback");
+  assert.equal(shown.get("easyMail.guideShown.0.3.2"), true, "empty install timestamp retains version fallback");
+  assert.equal(opened, 4, "the same install timestamp opens the guide only once");
+});

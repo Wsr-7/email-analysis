@@ -135,7 +135,8 @@ export class EasyMailApp {
   }
 
   private async maybeOpenGuide(): Promise<void> {
-    const key = `easyMail.guideShown.${this.context.extension.packageJSON?.version || "0.0.0"}`;
+    const packageJSON = this.context.extension.packageJSON;
+    const key = `easyMail.guideShown.${packageJSON?.__metadata?.installedTimestamp || packageJSON?.version || "0.0.0"}`;
     if (this.context.globalState.get<boolean>(key)) {
       return;
     }

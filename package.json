@@ -214,7 +214,7 @@
       "activitybar": [
         {
           "id": "easyMail",
-          "title": "Dashboard",
+          "title": "EasyMail",
           "icon": "media/activity-icon.svg"
         }
       ]
