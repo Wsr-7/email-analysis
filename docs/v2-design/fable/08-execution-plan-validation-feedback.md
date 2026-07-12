@@ -279,11 +279,19 @@
   - Known issues：超时是尽力 flush 降级，极端窗口最多可能丢失最后 500ms 未上报的手写草稿，优于刷新管线永久卡死。
   - Commit：`f5165fa`。
 
-### [ ] F3.2 modelFamily 设置去掉硬编码 enum（用户笔记 Q1，2026-07-12 立项）
+### [x] F3.2 modelFamily 设置去掉硬编码 enum（用户笔记 Q1，2026-07-12 立项）（commit `b85a210`）
 
 - **现状（已核实）**：F2.1 把 `easyMail.modelFamily` 注册为 VS Code 设置时附带了硬编码 `enum`/`enumItemLabels`（八个模型名快照）。真实可用模型由 `vscode.lm` 运行时决定（Load Models 加载、随 Copilot 订阅与版本变化），`selectConfiguredModel`（`llm-provider.ts:76`）按字符串匹配，逻辑本身不依赖 enum。问题：① enum 必然过时；② 用户经 dashboard 选中 enum 外的模型后写回 Settings，Settings UI 会把该值标为非法；③ Settings 下拉给了"这些模型必然可用"的错误暗示。
 - **做法**：删掉 `enum`/`enumItemLabels`，保留 `type: "string"`、`default` 与 description（改为指引：推荐经 dashboard 的 Load Models + 模型下拉选择，Settings 手填仅作兜底）。不动 `resolveModelFamily`/`selectConfiguredModel`/迁移逻辑。
 - **验收**：`npm run compile` 零错误；`npm test` 全绿；Settings 页该项为自由文本框且 dashboard 选择的任意模型写回后不再被标非法（真机确认一眼即可，随下轮复验捎带）。
+
+- **Completion Notes**：
+  - 改动文件：`package.json`、`src/test/sidebar-render.test.ts`。
+  - 实现边界：重新定位确认 enum/enumItemLabels 已在既有实现中删除；本项仅将 description 明确为 Dashboard 的 Load Copilot Models + 模型下拉为推荐路径、Settings 手填为 fallback，并加 manifest 回归断言。未改 `resolveModelFamily`、`selectConfiguredModel`、迁移、store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 398/398 通过，`git diff --check` 通过；独立 review 确认无运行时逻辑改动。
+  - Manual validation：**needs user validation on real VS Code Settings**。打开 Settings，确认 modelFamily 是自由文本框；从 Dashboard 选择 enum 外模型后，Settings 不显示非法值。
+  - Known issues：真实可用模型仍取决于当前 Copilot 订阅与 VS Code 运行时，Settings 手填无可用性保证。
+  - Commit：`b85a210`。
 
 ### [ ] F3.3 重写 README / Marketplace Details（用户笔记 Q3）
 
@@ -344,6 +352,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · **规划者全量复审 F 批（`608720b..e98ed01`，22 个提交）**：独立复核 `npm test` 396/396 全绿、双 VBS `--help` 通过、`run-sample-validation.ps1` 端到端通过。F1.2 对账、F1.4 诊断、F1.5 picker、F1.6 SMTP、F1.7 取消、F2.1-F2.7 实现均确认正确。两项修正与发现：① F1.1 根因描述修正（mail 真实缺陷是 Restrict 带秒而非分隔符；**meetings 队列空的根因未确证**，复验若仍空需回传 RestrictFilter 日志）；② **F3.1 立项**：F1.3 的 flush 协议无超时，存在 workbench 刷新管线永久卡死风险（P1）。vsix 已重新打包含全部 F 批改动。人工验证清单见 §7。R3/R4 锁定不变：解锁条件 = F3.1 完成 + 用户复验 P0 项通过 + 用户确认 R3 设计方向。
 - 2026-07-12 · **规划者核实用户笔记 8 项，扩充 F3 批**：Q1→**F3.2**（modelFamily 去硬编码 enum）、Q3→**F3.3**（README/Details 重写，图片留 placeholder）、Q4→**F3.4**（Pending 按 folder 分组折叠）、Q5→**F3.5**（ignoredSenders 代码级排除）；Q2（分级通用化）为 R3 设计输入、Q6（maxItems=全局时间优先）/Q7（分割规则）/Q8（截断语义）核实后维持现状，结论均记录于 §3 问答核实记录。F3.1-F3.5 全部 `[ ]` 待 claim，互相独立。
 - 2026-07-12 · F3.1 已完成，代码提交 `f5165fa`：Workbench 草稿 flush 在 webview 无应答时 1500ms 超时降级并清 pending，旧 requestId 不会误完成后续 flush。下一步 claim F3.2。
+- 2026-07-12 · F3.2 已完成，代码提交 `b85a210`：modelFamily 保持自由 string，Settings 说明明确 Dashboard 选择优先、手填兜底，并锁定无 enum 回归。下一步 claim F3.3。
 
 ---
 
@@ -398,6 +407,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F3.1 pre-work checkpoint）**：恢复现场：F2.7 已由规划者回填完成，工作树干净；HEAD `f7490fc`。重新定位：`flushWorkbenchDrafts` 创建 `pendingWorkbenchDraftFlush` 后，在 webview `postMessage` 返回 true 的场景无限期等待 `done`；只有对应 complete 消息、投递失败或 panel dispose 会清除 pending，故 HTML 重建期间丢消息会永久阻塞 `rebuildWorkbenchHtml` 与 `runWithBusy` 的 finally refresh。边界：仅为现有 flush 协议增加 1500-2000ms 超时兜底与单测；超时仍复用 `completeWorkbenchDraftFlush(requestId)` 清理 pending，不改草稿 Map、webview 协议、store/schema 或 F3.2+。
 
 - **2026-07-12 · Codex（F3.1 completion）**：完成 `f5165fa`。pending flush 建立后启动 1500ms timer，超时经既有 requestId 守卫的 complete 方法解除等待；正常、投递失败和 dispose 语义保留。两轮 review 通过，第二轮补齐旧 requestId 不得完成新 flush 的竞态测试。验收：`npm run compile` 零错误、`npm test` 398/398 通过、`git diff --check` 通过。Manual：无需真机验证；极端超时仅可能损失最后 500ms 未上报草稿，已记录。Next：claim F3.2；R3/R4 继续锁定。
+
+- **2026-07-12 · Codex（F3.2 pre-work checkpoint）**：恢复现场：F3.1 的代码与记录已提交（`f5165fa`、`e332f8e`），工作树干净；HEAD `e332f8e`。重新定位：当前 `easyMail.modelFamily` 已是 `type: "string"`、空 default，**没有** `enum`/`enumItemLabels`；`resolveModelFamily` 与 `selectConfiguredModel` 仍是运行时字符串匹配，符合不动逻辑的边界。现有 description 仅提示 Load Copilot Models/Sidebar，未明确 Settings 手填是兜底。边界：不重做已满足的 enum 删除，只补齐 description 指引与 manifest 回归断言；不改运行时选择、迁移、store/schema 或 F3.3+。
+
+- **2026-07-12 · Codex（F3.2 completion）**：完成 `b85a210`。确认 enum 删除是既有状态，本次只补 description 与 manifest 防回归断言；Dashboard Load Models/下拉为推荐路径，Settings 手填为 fallback。独立 review 通过。验收：`npm run compile` 零错误、`npm test` 398/398 通过、`git diff --check` 通过。Manual：**needs user validation on real VS Code Settings**，确认自由文本及 runtime 模型写回不报非法。Next：claim F3.3；R3/R4 继续锁定。
 
 ---
 
