@@ -321,11 +321,19 @@
   - Known issues：无。
   - Commit：`2f19674`。
 
-### [ ] F3.5 ignoredSenders：按发件人自动忽略（用户笔记 Q5，规划者判断值得做）
+### [x] F3.5 ignoredSenders：按发件人自动忽略（用户笔记 Q5，规划者判断值得做）（commit `6cc45d5`）
 
 - **现状（已核实）**：单封 ignore 与线程 ignore 已存在（`buildQueueState` 的 `ignoredIds`，`classification.ts:79-96`），但对 no-reply 通知类噪声源需要逐封操作；`importantSenders` 是 prompt 级由模型判断，不适合做排除（排除必须确定性，不能靠模型）。
 - **做法（代码级确定性匹配，与 importantSenders 的 prompt 级机制刻意不同）**：新增设置 `easyMail.ignoredSenders`（string array，默认空）；构建队列时对未分析邮件做大小写不敏感匹配（显示名或邮箱地址包含任一条目），命中者归入现有 `ignoredPending` 队列——仍可见、可恢复（从设置里删掉条目即恢复），不进 pending、不参与分析。匹配逻辑放 `config-utils`/`classification` 纯函数，可单测。Settings description 写明匹配语义（子串包含、大小写不敏感）。
 - **验收**：单测覆盖显示名命中/邮箱命中/大小写/空配置；`npm test` 全绿。**needs user validation**：配置一个真实 no-reply 地址后 Fetch+查看，该发件人邮件全部落 Ignored。
+
+- **Completion Notes**：
+  - 改动文件：`default-config.json`、`package.json`、`src/extension.ts`、`src/lib/classification.ts`、`src/lib/app-analysis.ts` 及分类/分析单测。
+  - 实现边界：新增 `easyMail.ignoredSenders` string array，以显示名或邮箱大小写不敏感子串确定性匹配。仅未分析命中邮件进入既有 Ignored；已分析邮件仍可 Re-analyze。线程仅在临时 prompt 副本中排除命中消息、source IDs 与 participants，全部命中则拒绝调用模型，原线程与安全 gate 不变。
+  - 验收结果：`npm run compile` 零错误，`npm test` 405/405 通过，`git diff --check` 通过。两轮 review 依次发现线程分析绕过、Re-analyze 过度拦截与 participants 显示名残余泄露，均补回归测试并复审通过。
+  - Manual validation：**needs user validation on real Outlook/VS Code**。Settings 添加真实 no-reply 地址后 Fetch，确认新未分析邮件进入 Ignored；已分析邮件仍可 Re-analyze；含该发件人消息的线程分析不携带其内容。
+  - Known issues：配置是子串匹配，过短条目可能误匹配；应使用完整邮箱或明确显示名。
+  - Commit：`6cc45d5`。
 
 ---
 
@@ -371,6 +379,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F3.2 已完成，代码提交 `b85a210`：modelFamily 保持自由 string，Settings 说明明确 Dashboard 选择优先、手填兜底，并锁定无 enum 回归。下一步 claim F3.3。
 - 2026-07-12 · F3.3 已完成，代码提交 `2f8e750`：双 README 已重写为镜像 Marketplace Details，并放入五个中文截图占位；链接校验通过。下一步 claim F3.4。
 - 2026-07-12 · F3.4 已完成，代码提交 `2f19674`：Pending 按文件夹折叠分组，配置目录含 0 计数，历史目录兜底。下一步 claim F3.5。
+- 2026-07-12 · F3.5 已完成，代码提交 `6cc45d5`：ignoredSenders 确定性分流未分析邮件，线程 prompt 也排除命中消息。F3 全部完成。
 
 ---
 
@@ -437,6 +446,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F3.4 pre-work checkpoint）**：恢复现场：F3.1-F3.3 已提交，工作树干净；HEAD `0638bb0`。重新定位：Sidebar 从 `input.queue.pending` 直接平铺渲染 pending 行；`config.folders` 已提供配置目录，`StoredMail.folder` 已提供实际目录，且现有客户端已用 `vscode.setState` 保存界面状态。边界：仅将 Pending 改为文件夹组头+可展开行，配置目录（含 0）先展示，历史未配置目录按原名补入；展开态仅 webview state，blocked 与其他队列不动；不改 queue/store/schema 或 F3.5。
 
 - **2026-07-12 · Codex（F3.4 completion）**：完成 `2f19674`。Pending 以 `queue.allowed` 按文件夹分组，配置文件夹含 0 计数且优先，未配置历史目录原名补入；默认折叠、展开态仅存 webview state。复审确认 blocked/analysed/ignored 未受影响，HTML 转义与按钮语义正确。验收：`npm run compile` 零错误、`npm test` 399/399 通过、`git diff --check` 通过。Manual：**needs user validation on real VS Code Sidebar**，按 Completion Notes 核对分组及数量。Next：claim F3.5；R3/R4 继续锁定。
+
+- **2026-07-12 · Codex（F3.5 pre-work checkpoint）**：恢复现场：F3.4 的代码与记录已提交（`2f19674`、`2826781`），工作树干净；HEAD `2826781`。重新定位：现有 `ignoredPending` 只由 ignored mail IDs 构建；`importantSenders` 仅为 prompt 输入，不能承担确定性排除。`queue.allowed` 已是可分析未分析邮件，故在 `buildQueueState` 以独立纯函数对 sender 显示名/邮箱做大小写不敏感子串匹配即可分流到既有 ignoredPending。边界：新增 string-array 设置及默认值、纯匹配函数、queue 分流和单测；不改变手动 ignore ID 语义，不修改 store/schema 或 R3/R4。
+
+- **2026-07-12 · Codex（F3.5 completion）**：完成 `6cc45d5`。ignoredSenders 以确定性子串匹配分流未分析邮件；已分析 Re-analyze 保持可用。线程 prompt 临时过滤命中 timeline、source IDs 与 participants，全部命中不调用模型。两轮 review 发现并关闭线程绕过、Re-analyze 过度拦截与 participants 名称泄露。验收：`npm run compile` 零错误、`npm test` 405/405 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook/VS Code**。F3 全部完成；R3/R4 仍按用户复验与设计确认条件锁定。
 
 ---
 
