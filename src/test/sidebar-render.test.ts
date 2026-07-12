@@ -103,6 +103,29 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("bob@test.com"));
   });
 
+  it("groups pending mail by configured folder, including empty and legacy folders", () => {
+    const input = stubInput({
+      state: stubState({ folders: ["Inbox", "Sent Items", "Archive"] }),
+      queue: {
+        pending: [],
+        allowed: [
+          stubMail({ mailId: "inbox-1", folder: "Inbox", subject: "Inbox mail" }),
+          stubMail({ mailId: "sent-1", folder: "Sent Items", subject: "Sent mail" }),
+          stubMail({ mailId: "legacy-1", folder: "Legacy Folder", subject: "Legacy mail" })
+        ],
+        blocked: [], analysed: [], ignoredPending: []
+      }
+    });
+
+    const html = renderSidebarHtml(input);
+
+    assert.ok(html.includes('data-pending-folder="Inbox"'));
+    assert.ok(html.includes('>Inbox (1)</button>'));
+    assert.ok(html.includes('>Sent Items (1)</button>'));
+    assert.ok(html.includes('>Archive (0)</button>'));
+    assert.ok(html.includes('>Legacy Folder (1)</button>'));
+  });
+
   it("renders blocked items with reason", () => {
     const input = stubInput({
       queue: { pending: [], blocked: [stubMail({ mailId: "b1", subject: "Classified" })], analysed: [], allowed: [], ignoredPending: [] },

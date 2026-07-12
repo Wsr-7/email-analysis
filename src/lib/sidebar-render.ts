@@ -86,6 +86,22 @@ function renderCompactMailRow(item: StoredMail, queue: string, classifications: 
   </div>`;
 }
 
+function renderPendingFolderGroups(items: StoredMail[], folders: string[], classifications: ClassificationCache): string {
+  const groups = new Map<string, StoredMail[]>();
+  for (const folder of folders) {
+    if (!groups.has(folder)) groups.set(folder, []);
+  }
+  for (const item of items) {
+    const folder = item.folder || "";
+    if (!groups.has(folder)) groups.set(folder, []);
+    groups.get(folder)!.push(item);
+  }
+  return [...groups].map(([folder, folderItems]) => `<section class="sb-pending-folder" data-queue="pending" data-pending-folder="${escapeAttr(folder)}">
+    <button class="sb-pending-folder-header" type="button" aria-expanded="false" onclick="togglePendingFolder(this)">${escapeHtml(folder)} (${folderItems.length})</button>
+    <div class="sb-pending-folder-items" hidden>${folderItems.map((item) => renderCompactMailRow(item, "pending", classifications)).join("")}</div>
+  </section>`).join("");
+}
+
 function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ClassificationCache): string {
   const time = item.receivedTime || "";
   const sender = item.sender || "";
@@ -163,7 +179,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   const analyzeNextBusy = busyKind === "analyzeNext";
   const analyzeNextLabel = formatAnalyzeNextLabel(labels, config);
   const batchSize: number = 5;
-  const configuredFolders = Array.isArray(config.folders) ? config.folders.map(String) : ["Inbox", "Sent Items"];
+  const configuredFolders = Array.isArray(config.folders) ? [...new Set(config.folders.map(String))] : ["Inbox", "Sent Items"];
   const hasHistoryAnchors = Object.keys(folderOldestReceivedTimes(index, configuredFolders)).length > 0;
 
   const queueCounts: Record<string, number> = {};
@@ -200,7 +216,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
 
   const classifications = input.classifications || normalizeClassificationCache({});
 
-  const pendingRows = queue.allowed.map((item) => renderCompactMailRow(item, "pending", classifications)).join("");
+  const pendingRows = renderPendingFolderGroups(queue.allowed, configuredFolders, classifications);
   const blockedRows = queue.blocked.map((item) => renderCompactMailRow(item, "blocked", classifications)).join("");
   const analysisRows = state.categories.map((cat) =>
     cat.items.map((item) => renderCompactAnalysisRow(item, cat.id, labels, classifications)).join("")
@@ -391,6 +407,12 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
 
   .sb-row-dim { opacity: 0.45; }
   .sb-action-status { cursor: pointer; font-size: 10px; padding: 1px 6px; border-radius: 8px; border: none; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); }
+  .sb-pending-folder[hidden] { display: none; }
+  .sb-pending-folder-header { width: 100%; padding: 6px 12px; text-align: left; background: transparent; color: var(--vscode-sideBar-foreground, var(--vscode-foreground, #ccc)); font-size: 11px; font-weight: 600; }
+  .sb-pending-folder-header:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08)); }
+  .sb-pending-folder-header::before { content: "›"; display: inline-block; width: 12px; }
+  .sb-pending-folder-header[aria-expanded="true"]::before { transform: rotate(90deg); }
+  .sb-pending-folder-items { border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, rgba(128,128,128,0.08)); }
 
   /* ── Meeting status badges ── */
   .sb-mtg-warn { background: var(--vscode-editorWarning-foreground, #cca700); color: #000; }
@@ -561,6 +583,7 @@ const prev = vscode.getState() || {};
 let currentQueue = prev.currentQueue || '${escapeAttr(defaultQueue)}';
 
 applyQueue(currentQueue, false);
+restorePendingFolders();
 if (prev.settingsOpen) { document.getElementById('settingsPanel').hidden = false; }
 if (prev.batchSelect) { document.getElementById('batchSelect').value = prev.batchSelect; }
 if (prev.currentItemId) setActiveRow(prev.currentItemId);
@@ -584,12 +607,34 @@ function applyQueue(queueId, smooth) {
     btn.classList.toggle('active', btn.getAttribute('data-queue-id') === queueId);
   }
   let anyVisible = false;
-  for (const row of document.querySelectorAll('.sb-row')) {
+  for (const row of document.querySelectorAll('.sb-row, .sb-pending-folder')) {
     const match = row.getAttribute('data-queue') === queueId;
     row.hidden = !match;
     if (match) anyVisible = true;
   }
   document.getElementById('emptyState').hidden = anyVisible;
+}
+
+function restorePendingFolders() {
+  var expanded = Array.isArray(prev.pendingFolders) ? prev.pendingFolders : [];
+  for (const group of document.querySelectorAll('.sb-pending-folder')) {
+    var open = expanded.indexOf(group.getAttribute('data-pending-folder')) !== -1;
+    group.querySelector('.sb-pending-folder-header').setAttribute('aria-expanded', String(open));
+    group.querySelector('.sb-pending-folder-items').hidden = !open;
+  }
+}
+
+function togglePendingFolder(button) {
+  var group = button.closest('.sb-pending-folder');
+  var folder = group.getAttribute('data-pending-folder');
+  var state = vscode.getState() || {};
+  var expanded = Array.isArray(state.pendingFolders) ? state.pendingFolders.slice() : [];
+  var index = expanded.indexOf(folder);
+  var open = index === -1;
+  if (open) expanded.push(folder); else expanded.splice(index, 1);
+  button.setAttribute('aria-expanded', String(open));
+  group.querySelector('.sb-pending-folder-items').hidden = !open;
+  vscode.setState(Object.assign({}, state, { pendingFolders: expanded }));
 }
 
 function openItem(id) {
