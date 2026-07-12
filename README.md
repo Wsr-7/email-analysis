@@ -1,101 +1,118 @@
 # EasyMail
 
-**EasyMail** is a VS Code extension that turns classic desktop Outlook into a locally-analyzed, AI-triaged inbox. It collects mail and calendar data via VBScript COM automation, analyzes it with GitHub Copilot through the VS Code Language Model API, and presents a triage dashboard — all without sending data to any service other than Copilot itself.
+> Bring classic Outlook mail into a local, Copilot-assisted triage workspace in VS Code.
 
 [简体中文](./README_zh.md)
 
-## How it works
+## Overview
 
-```text
-classic Outlook (Windows)
-  │  VBScript COM automation (cscript.exe)
-  ▼
-mail-digest.md / meeting-digest.md
-  │  parsed by the extension
-  ▼
-mail-store.json / meeting-store.json / thread-store.json
-  │  analyzed by GitHub Copilot (vscode.lm API)
-  ▼
-analysis-result.json / thread-analysis-result.json
-  │
-  ▼
-Sidebar (triage queue) + Workbench (reading pane) + Markdown reports
-```
+EasyMail is a Windows VS Code extension for classic desktop Outlook. It uses local VBScript COM automation to collect mail and meetings, keeps its local data in VS Code storage, and uses the GitHub Copilot Language Model API only when you choose to analyze an item.
 
-Everything runs locally. No mail content leaves your machine except the excerpts sent to the Copilot model you select.
+Mail content is not uploaded by EasyMail to its own service. The excerpt selected for analysis is sent to the Copilot model you select.
 
 ## Features
 
-- **Local collection** — pulls mail and meetings from classic Outlook via COM, no server or mailbox export required
-- **Flexible range** — collect by recent hours or a max item count, across one or more folders
-- **Progressive analysis** — mail lands in a local queue first; analyze it next-batch, selected, or all-allowed
-- **Thread awareness** — groups mail into conversations, trims quoted history, and dedupes repeated bodies before sending to the model
-- **Security classification gate** — mail above a configured classification level (`PUBLIC` → `HIGH REGISTERED`) requires manual confirmation instead of auto-analysis
-- **Draft replies** — Copilot drafts a reply per mail/thread, with polish/refine actions and one-click hand-off to an Outlook compose window (never auto-sends)
-- **Two-panel UI** — a sidebar triage queue (category counts, Next Actions) and a full-width workbench reading pane
-- **Bilingual** — UI and analysis output support English and Simplified Chinese, switchable at runtime
-- **Sample mode** — generates fake mail data so you can try the extension without Outlook or Copilot
-- **No cloud storage** — all data is written to VS Code's `globalStorageUri`, with configurable retention and a one-click local cache clear
+### Collect and organize locally
 
-## Requirements
+- Collect mail from one or more classic Outlook folders, by recent-hours window or maximum item count.
+- Collect upcoming meetings and retain local mail, meeting, thread, and analysis data in VS Code storage.
+- Use Sample mode to explore the workflow with generated data before connecting Outlook.
 
-- Windows, with classic (desktop) Outlook installed and configured
-- VS Code `^1.90.0`
-- A signed-in GitHub Copilot subscription with Language Model API access
+### Triage and analyze
 
-## Installation
+- Review pending mail in the Sidebar with category counts and a focused queue.
+- Analyze the next batch, selected mail, a thread, or all permitted mail with a loaded Copilot model.
+- Group related messages into threads and trim repeated quoted history before analysis.
+- Keep higher-classification mail behind the existing confirmation gate instead of auto-analyzing it.
 
-Download the `.vsix` from [releases/](./releases) and install it:
+### Read and act
 
-```powershell
-code --install-extension releases/easymail-0.3.0.vsix
-```
+- Open a full-width Workbench reading pane for mail, threads, meetings, and analysis details.
+- Generate, polish, and refine reply drafts, then hand them to an Outlook compose window; EasyMail never sends mail automatically.
+- Switch the UI and analysis output between English and Simplified Chinese.
 
-Or build from source — see [Development](#development) below.
+<!-- SCREENSHOT: sidebar-triage-counts.png — Sidebar 分诊队列，需截到分类计数、待分析邮件和当前选中项 -->
 
-## Quick start
+## Quick Start
 
-1. Open the EasyMail view from the Activity Bar.
-2. No Outlook yet? Run **EasyMail: Generate Sample Digest** to try the flow with fake data.
-3. Run **EasyMail: Fetch New Mail** to pull recent mail from Outlook.
-4. Pick an **Analysis Model** in the sidebar, then run **Analyze Next Batch** (or **Analyze All Allowed**).
-5. Review triaged mail in the sidebar queue; open an item to read, draft a reply, or take action in the workbench.
+1. Install a package from [releases/](./releases), then open the **EasyMail** view from the VS Code Activity Bar.
+2. To try the extension without Outlook, run **EasyMail: Generate Sample Digest**.
+3. Otherwise, run **EasyMail: Fetch New Mail** to collect mail from the configured Outlook folders.
+4. Run **EasyMail: Load Copilot Models**, choose an **Analysis Model** in the Sidebar, and use **Analyze Next Batch**.
+5. Open a queue item to read its details and work on a draft in the Workbench.
 
-See [user guide.md](./user%20guide.md) for the full command list, configuration reference, and custom classification prompts.
+<!-- SCREENSHOT: sample-mode-results.png — Generate Sample Digest 后的示例邮件、会议与分诊结果 -->
+
+For source setup and development commands, see [setup.md](./setup.md).
+
+## Usage
+
+### Collect mail and meetings
+
+Set the mail range in VS Code Settings or the Sidebar, then use **Fetch New Mail**. EasyMail collects the configured mail folders and the applicable Outlook calendar range locally. Use **More History** when you need older mail, or **Generate Sample Digest** for generated demo data.
+
+### Analyze the queue
+
+Load an available Copilot model, choose it in the Sidebar, then run **Analyze Next Batch**, **Analyze All Allowed**, or analyze an individual mail or thread from the Workbench. Items above the configured automatic-analysis classification level require the existing confirmation action.
+
+<!-- SCREENSHOT: analysis-in-progress.png — 点击 Analyze Next Batch 后的分析进行中状态，需包含取消按钮或忙碌提示 -->
+
+### Draft replies
+
+Open a mail or thread in the Workbench. Generate a reply draft, edit it directly, then use **Polish** or **Refine** when needed. **Compose in Outlook** opens a compose window with the draft; review and send it in Outlook yourself.
+
+<!-- SCREENSHOT: workbench-draft.png — Workbench 阅读面板，需同时截到邮件正文、分析结果和草稿编辑区 -->
+
+### Choose Outlook folders
+
+Run **EasyMail: Select Outlook Folders** to load folders from the running classic Outlook client and select the folders to scan. The selection is saved to `easyMail.folders`; you can also edit that setting manually when needed.
+
+<!-- SCREENSHOT: select-outlook-folders.png — Select Outlook Folders QuickPick，需截到可多选文件夹和 Sent Items 标记 -->
+
+See [user guide.md](./user%20guide.md) for the complete command list and workflow details.
 
 ## Configuration
 
-All settings live under the `easyMail.*` namespace in VS Code Settings (`easyMail.rangeMode`, `easyMail.folders`, `easyMail.outputLanguage`, `easyMail.autoAnalyzeMaxClassificationLevel`, retention windows, `easyMail.importantSenders`, etc.). The dashboard's Settings panel is a shortcut editor for common fields — VS Code Settings is always the source of truth.
+All settings use the `easyMail.*` namespace in VS Code Settings. Common settings include:
 
-## Project layout
+- `easyMail.rangeMode`, `easyMail.recentHours`, and `easyMail.maxItems` for collection scope.
+- `easyMail.folders` for Outlook folders, preferably populated with **Select Outlook Folders**.
+- `easyMail.modelFamily` for the Copilot model identifier; loading and selecting a currently available model in the Sidebar is the recommended path.
+- `easyMail.outputLanguage` and `easyMail.draftLanguage` for display and reply language.
+- `easyMail.autoAnalyzeMaxClassificationLevel` for the automatic-analysis gate.
+- `easyMail.bodyExcerptChars` for the maximum number of body characters retained per mail for analysis.
 
-```text
-src/         TypeScript extension source (src/lib holds the business logic modules)
-scripts/     VBScript COM automation for Outlook, plus build/validation scripts
-prompts/     Copilot analysis prompt templates
-media/       Extension icon assets
-releases/    Versioned .vsix packages
-docs/        Design and remediation-plan documents
-```
+The Sidebar exposes a small set of common controls. VS Code Settings remains the source of truth; see [user guide.md](./user%20guide.md) for the full reference.
 
-For the full module map and architecture diagram, see [AGENTS.md](./AGENTS.md).
+## FAQ
 
-## Development
+### Can I use EasyMail without Outlook?
 
-```powershell
-npm install
-npm run compile      # clean out/ then tsc
-npm test             # compile + run all tests (node --test)
-npm run package:vsix # build releases/easymail-0.3.0.vsix
-```
+Yes, Sample mode creates generated mail and meeting data for exploring the UI. Collecting real mail and meetings requires classic Outlook on Windows.
 
-Run a single test file after compiling:
+### Does EasyMail send mail automatically?
 
-```powershell
-node --test out/test/digest.test.js
-```
+No. It can open an Outlook compose window with a draft, but sending remains an Outlook action under your control.
 
-See [setup.md](./setup.md) for a step-by-step first-time setup, and [AGENTS.md](./AGENTS.md) for architecture and contribution conventions.
+### Why is a mail not analyzed automatically?
+
+The mail may be pending, not yet selected, or above `easyMail.autoAnalyzeMaxClassificationLevel`. High-classification mail follows the confirmation flow.
+
+### Where is the detailed command and configuration reference?
+
+Read [user guide.md](./user%20guide.md). Contributors can use [setup.md](./setup.md) and the project map in [AGENTS.md](./AGENTS.md).
+
+## Known Limitations
+
+- EasyMail is Windows-only because its collectors use Windows Script Host and Outlook COM automation.
+- It supports classic desktop Outlook, not the new Outlook client or Outlook on the web.
+- Copilot analysis requires an active GitHub Copilot subscription and a VS Code runtime that exposes the Language Model API; the available models depend on that environment.
+- `easyMail.bodyExcerptChars` truncates each mail body during collection (default `1500`, minimum `100`). Very long new content can therefore be incomplete for analysis; increase the setting or use **Open in Outlook** for the full original message.
+- Outlook and Exchange behavior, including folder enumeration and recipient address resolution, can vary by local profile and has to be verified in the target mailbox.
+
+## Author
+
+Wsr-7
 
 ## License
 
