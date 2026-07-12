@@ -366,6 +366,18 @@ describe("renderSidebarHtml", () => {
     assert.ok(pendingIdx < mustHandleIdx, "pending should come before mustHandleToday");
   });
 
+  it("places important senders after must-handle and ignored after uncertain", () => {
+    const html = renderSidebarHtml(stubInput());
+    const mustHandleIdx = html.indexOf('data-queue-id="mustHandleToday"');
+    const importantIdx = html.indexOf('data-queue-id="importantSender"');
+    const riskIdx = html.indexOf('data-queue-id="risk"');
+    const uncertainIdx = html.indexOf('data-queue-id="uncertain"');
+    const ignoredIdx = html.indexOf('data-queue-id="ignored"');
+
+    assert.ok(mustHandleIdx < importantIdx && importantIdx < riskIdx);
+    assert.ok(uncertainIdx < ignoredIdx);
+  });
+
   it("renders compact meeting rows in meetings queue", () => {
     const mtg: StoredMeetingItem = {
       meetingId: "mtg-1", entryId: "e-mtg-1", subject: "Standup", organizer: "Alice",
@@ -390,26 +402,26 @@ describe("renderSidebarHtml", () => {
 
   it("renders only the sender display name and keeps the full address in a tooltip", () => {
     const input = stubInput({
-      queue: { pending: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "Alice <alice@test.com>", receivedTime: "2024-01-01 14:30" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "Alice <alice@test.com>", receivedTime: "2024-01-01 14:30" })], ignoredPending: [] }
+      queue: { pending: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "Alice <alice@test.com>", receivedTime: "2024-01-01 14:30:45" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "Alice <alice@test.com>", receivedTime: "2024-01-01 14:30:45" })], ignoredPending: [] }
     });
     const html = renderSidebarHtml(input);
     assert.ok(html.includes('title="Long subject line for testing"'), "subject should have tooltip");
     assert.ok(html.includes("sb-line2"), "should have second line");
-    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'), "sender should retain the full address in a tooltip");
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt; · 2024-01-01 14:30:45"'), "tooltip should retain the full address and time");
     assert.ok(html.includes("Alice ·"), "second line should show the sender name only");
-    assert.ok(html.includes("14:30"), "second line should show time");
+    assert.ok(html.includes("2024-01-01 14:30:45"), "second line should show the full time");
   });
 
   it("renders analysis rows with sender and priority on second line", () => {
     const input = stubInput({
       state: stubState({}, [
-        { id: "mustHandleToday", items: [stubAnalysisItem({ subject: "Urgent", sender: "ceo@test.com", receivedTime: "2024-01-01 09:15" })] }
+        { id: "mustHandleToday", items: [stubAnalysisItem({ subject: "Urgent", sender: "ceo@test.com", receivedTime: "2024-01-01 09:15:30" })] }
       ])
     });
     const html = renderSidebarHtml(input);
     assert.ok(html.includes("sb-line2"), "should have second line");
     assert.ok(html.includes("ceo@test.com"), "second line should show sender");
-    assert.ok(html.includes("09:15"), "second line should show time");
+    assert.ok(html.includes("2024-01-01 09:15:30"), "second line should show the full time");
     assert.ok(html.includes("sb-badge"), "second line should show priority badge");
   });
 
@@ -423,5 +435,17 @@ describe("renderSidebarHtml", () => {
     const html = renderSidebarHtml(input);
     assert.ok(html.includes("sb-cls-badge"), "analyzed row should show classification badge");
     assert.ok(html.includes("INTERNAL"), "badge should show classification level name");
+  });
+
+  it("uses the renamed important senders label in both locales", () => {
+    const categories = [{ id: "importantSender", items: [stubAnalysisItem()] }];
+    const oldPromptLabel = normalizePromptConfig({
+      categories: [{ id: "importantSender", labelZh: "重点发件人/邮件组", labelEn: "Important Sender or Group", description: "" }]
+    });
+    const htmlEn = renderSidebarHtml(stubInput({ state: stubState({ outputLanguage: "en-US" }, categories), promptConfig: oldPromptLabel }));
+    const htmlZh = renderSidebarHtml(stubInput({ state: stubState({ outputLanguage: "zh-CN" }, categories), promptConfig: oldPromptLabel }));
+
+    assert.ok(htmlEn.includes("Important Senders"));
+    assert.ok(htmlZh.includes("重点发件人"));
   });
 });

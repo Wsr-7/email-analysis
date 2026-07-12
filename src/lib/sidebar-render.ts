@@ -18,19 +18,19 @@ const QUEUE_ORDER = [
   "pending",
   "blocked",
   "mustHandleToday",
+  "importantSender",
   "risk",
   "waitingForMe",
   "followUp",
-  "importantSender",
   "notice",
   "threads",
-  "ignored",
-  "uncertain"
+  "uncertain",
+  "ignored"
 ] as const;
 
 const STABLE_QUEUES = new Set([
-  "meetings", "nextActions", "pending", "blocked", "mustHandleToday", "risk", "waitingForMe",
-  "followUp", "importantSender", "notice", "threads", "ignored", "uncertain"
+  "meetings", "nextActions", "pending", "blocked", "mustHandleToday", "importantSender", "risk",
+  "waitingForMe", "followUp", "notice", "threads", "uncertain", "ignored"
 ]);
 
 function queueIcon(queueId: string): string {
@@ -58,6 +58,7 @@ function queueLabel(queueId: string, labels: DashboardLabels, categoryLabels: Re
   if (queueId === "pending") return labels.pending.title;
   if (queueId === "blocked") return labels.pending.blockedTitle;
   if (queueId === "threads") return labels.threads.title;
+  if (queueId === "importantSender") return labels.categories.importantSender;
   return categoryLabels[queueId] || labels.categories[queueId] || queueId;
 }
 
@@ -75,22 +76,24 @@ function classificationBadge(mailId: string, classifications: ClassificationCach
 }
 
 function renderCompactMailRow(item: StoredMail, queue: string, classifications: ClassificationCache): string {
-  const time = shortTime(item.receivedTime || "");
+  const time = item.receivedTime || "";
   const sender = item.from || "";
   const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
+  const title = [sender, time].filter(Boolean).join(" · ");
   return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(sender)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}</div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}</div>
   </div>`;
 }
 
 function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ClassificationCache): string {
-  const time = shortTime(item.receivedTime || "");
+  const time = item.receivedTime || "";
   const sender = item.sender || "";
   const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
+  const title = [sender, time].filter(Boolean).join(" · ");
   return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(sender)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
   </div>`;
 }
 

@@ -1,8 +1,8 @@
 import type { AnalysisResult } from "./analysis-schema";
 import { classificationFor, normalizeClassificationCache } from "./classification";
-import { getLocaleFromConfig } from "./config-utils";
+import { getLocaleFromConfig, positiveNumber } from "./config-utils";
 import { getLabels, type DashboardLabels } from "./dashboard-labels";
-import { filterVisibleThreadsForDashboard, buildThreadLookup, compareTimelineMessagesForDisplay } from "./dashboard-state";
+import { filterVisibleThreadsForDashboard, compareTimelineMessagesForDisplay } from "./dashboard-state";
 import { escapeHtml, escapeAttr, toJsLiteral, senderDisplayName, recipientDisplayNames } from "./html-utils";
 import type { StoredMail } from "./mail-store";
 import type { SecurityGateDecisionResult } from "./security-types";
@@ -38,7 +38,7 @@ function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabe
   const cls = classifications ? classificationFor(item.mailId, classifications) : undefined;
   const clsFromExtra = extra.includes(labels.pending.classification);
   const clsHtml = cls && !clsFromExtra ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(cls))}</div>` : "";
-  return `<div class="wb-detail-card">
+  return `<div class="wb-detail-card wb-with-body">
     <h3>${escapeHtml(item.subject || item.mailId)}</h3>
     <div class="wb-meta-grid">
       <div class="wb-field" title="${escapeAttr(item.from || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.from || "-"))}</div>
@@ -57,7 +57,7 @@ function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabe
   </div>`;
 }
 
-function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, threadId: string, classifications: ReturnType<typeof normalizeClassificationCache>, originalMail?: StoredMail, workingDrafts?: Map<string, string>): string {
+function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ReturnType<typeof normalizeClassificationCache>, originalMail?: StoredMail, workingDrafts?: Map<string, string>): string {
   const priority = formatPriority(item.priority, labels);
   const itemId = `mail:${item.mailId}`;
   const draftHtml = renderEditableDraftBox(workingDrafts?.get(itemId) ?? (item.draftReply || ""), labels, { itemId, sourceId: item.mailId, generateAction: "analyzeSelected" });
@@ -65,12 +65,9 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
   const clsHtml = classification ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>` : "";
   const toHtml = originalMail?.to ? `<div class="wb-field" title="${escapeAttr(originalMail.to)}"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.to))}</div>` : "";
   const ccHtml = originalMail?.cc ? `<div class="wb-field" title="${escapeAttr(originalMail.cc)}"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.cc))}</div>` : "";
-  const threadLink = threadId
-    ? `<div class="wb-field"><strong>${escapeHtml(labels.card.thread)}:</strong> ${escapeHtml(threadId)}</div>`
-    : "";
   const bodyText = originalMail?.bodyExcerpt || "";
-  const bodyHtml = bodyText ? `<div class="wb-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(bodyText)}</div></div>` : "";
-  return `<div class="wb-detail-card">
+  const bodyHtml = bodyText ? `<div class="wb-section wb-original-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(bodyText)}</div></div>` : "";
+  return `<div class="wb-detail-card wb-with-body">
     <div class="wb-detail-header">
       <h3>${escapeHtml(item.subject || item.mailId)}</h3>
       <span class="wb-priority">${escapeHtml(priority)}</span>
@@ -98,7 +95,6 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
       <div class="wb-field"><strong>${escapeHtml(labels.card.suggestedAction)}:</strong></div>
       <div class="wb-section-body">${escapeHtml(item.suggestedAction || "-")}</div>
     </div>
-    ${threadLink}
     ${draftHtml}
     ${bodyHtml}
   </div>`;
@@ -154,6 +150,7 @@ function renderThreadDetail(
   labels: DashboardLabels,
   analysis: ThreadAnalysisResult["items"][number] | undefined,
   busyKind: string,
+  bodyExcerptChars: number,
   ignoredIds?: Set<string>,
   workingDrafts?: Map<string, string>
 ): string {
@@ -164,12 +161,12 @@ function renderThreadDetail(
         <strong title="${escapeAttr(msg.from || msg.senderEmail || "")}">${escapeHtml(senderDisplayName(msg.from || msg.senderEmail || ""))}</strong>
         <span class="wb-tl-time">${escapeHtml(msg.receivedTime || msg.sentTime || "")}</span>
       </div>
-      <div class="wb-tl-body-wrap">${msg.mailId ? `<button class="wb-tl-open" data-action="openInOutlook" data-mail-id="${escapeAttr(msg.mailId)}" title="${escapeAttr(labels.card.openInOutlook)}">↗</button>` : ""}<div class="wb-tl-body">${escapeHtml(msg.bodyDelta || msg.bodyPreview || "")}</div></div>
+      <div class="wb-tl-body-wrap">${msg.mailId ? `<button class="wb-tl-open" data-action="openInOutlook" data-mail-id="${escapeAttr(msg.mailId)}" title="${escapeAttr(labels.card.openInOutlook)}">↗</button>` : ""}<div class="wb-tl-body">${escapeHtml(msg.bodyDelta || msg.bodyPreview || "")}</div>${msg.bodyPreview.length > bodyExcerptChars ? `<div class="wb-tl-truncated">${escapeHtml(labels.threads.contentTruncated)}</div>` : ""}</div>
     </div>`
   ).join("");
 
   return `<div class="wb-detail-card">
-    <h3>${escapeHtml(thread.subject || thread.threadId)}</h3>
+    <h3>${escapeHtml(thread.subject || "-")}</h3>
     <div class="wb-meta-grid">
       <div class="wb-field" title="${escapeAttr(thread.participants.join(", ") || "-")}"><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.map(senderDisplayName).join(", ") || "-")}</div>
       <div class="wb-field"><strong>${escapeHtml(labels.threads.lastTime)}:</strong> ${escapeHtml(thread.lastTime || "-")}</div>
@@ -202,7 +199,7 @@ function renderMeetingDetail(item: StoredMeeting, labels: DashboardLabels): stri
   const flags: string[] = [];
   if (item.isAllDay) flags.push(labels.meetings.allDay);
   if (item.isRecurring) flags.push(labels.meetings.recurring);
-  return `<div class="wb-detail-card">
+  return `<div class="wb-detail-card wb-with-body">
     <div class="wb-detail-header">
       <h3>${escapeHtml(item.subject || "-")}</h3>
       <span class="wb-priority wb-mtg-${escapeAttr(item.responseStatus)}">${escapeHtml(meetingStatusLabel(item.responseStatus, labels))}</span>
@@ -225,11 +222,11 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   const { state, busyKind } = input;
   const config = state.config as Record<string, unknown>;
   const locale = getLocaleFromConfig(config);
+  const bodyExcerptChars = positiveNumber(config.bodyExcerptChars, 1500);
   const labels = getLabels(locale);
   const threadStore = input.threadStore || emptyThreadStore();
   const visibleThreadStore = filterVisibleThreadsForDashboard(threadStore);
   const threadAnalysis = input.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] };
-  const threadByMailId = buildThreadLookup(visibleThreadStore);
   const queue = input.queue || { pending: [], blocked: [], analysed: [], allowed: [], ignoredPending: [] };
   const classifications = input.classifications || normalizeClassificationCache({});
   const securityDecisions = input.securityDecisions || new Map<string, SecurityGateDecisionResult>();
@@ -263,9 +260,8 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
 
   for (const cat of state.categories) {
     for (const item of cat.items) {
-      const threadId = threadByMailId.get(item.mailId) || "";
       const originalMail = mailById.get(item.mailId);
-      detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="${escapeAttr(cat.id)}">${renderAnalysisDetail(item, cat.id, labels, threadId, classifications, originalMail, input.workingDrafts)}</div>`);
+      detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="${escapeAttr(cat.id)}">${renderAnalysisDetail(item, cat.id, labels, classifications, originalMail, input.workingDrafts)}</div>`);
     }
   }
 
@@ -280,7 +276,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   const sortedThreads = [...(visibleThreadStore.items || [])].sort((a, b) => String(b.lastTime || "").localeCompare(String(a.lastTime || "")));
   for (const thread of sortedThreads) {
     const threadQueue = isThreadIgnored(thread, input.ignoredIds) ? "ignored" : "threads";
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}" data-queue="${escapeAttr(threadQueue)}">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, input.ignoredIds, input.workingDrafts)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}" data-queue="${escapeAttr(threadQueue)}">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, bodyExcerptChars, input.ignoredIds, input.workingDrafts)}</div>`);
   }
 
   return `<!doctype html>
@@ -302,11 +298,12 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   /* ── Full-width reading pane ── */
   .wb-pane { height: 100%; overflow-y: auto; }
   .wb-reader { display: none; }
-  .wb-reader.active { display: block; }
+  .wb-reader.active { display: flex; height: 100%; }
   .wb-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; opacity: 0.3; font-size: 14px; }
 
   /* Detail card styles */
   .wb-detail-card { padding: 24px 28px; }
+  .wb-reader.active .wb-with-body { display: flex; flex-direction: column; height: 100%; min-height: 100%; width: 100%; }
   .wb-detail-card h3 { font-size: 17px; line-height: 1.4; margin-bottom: 4px; font-weight: 600; }
   .wb-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .wb-detail-header h3 { flex: 1; }
@@ -316,8 +313,9 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-warn { color: var(--vscode-errorForeground, #f48771); }
   .wb-gate-reasons { display: grid; gap: 2px; margin-top: 2px; }
   .wb-section { margin-bottom: 12px; }
+  .wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
   .wb-section-body { font-size: 13px; line-height: 1.6; padding: 4px 0; opacity: 0.9; }
-  .wb-body { font-size: 12px; line-height: 1.7; white-space: pre-wrap; padding: 12px 14px; margin: 8px 0; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; border-left: 3px solid var(--vscode-focusBorder, #007fd4); max-height: 400px; overflow-y: auto; }
+  .wb-body { flex: 1 1 auto; min-height: 0; font-size: 12px; line-height: 1.7; white-space: pre-wrap; padding: 12px 14px; margin: 8px 0; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; border-left: 3px solid var(--vscode-focusBorder, #007fd4); overflow-y: auto; }
   .wb-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); flex-wrap: wrap; }
   .wb-btn { padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: 500; background: var(--vscode-button-background, #0e639c); color: var(--vscode-button-foreground, #fff); display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, transform 0.1s; }
   .wb-btn:hover:not(:disabled) { background: var(--vscode-button-hoverBackground, #1177bb); }
@@ -347,6 +345,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-tl-body-wrap:hover .wb-tl-open { opacity: 0.7; }
   .wb-tl-open:hover { opacity: 1 !important; background: var(--vscode-button-hoverBackground, #1177bb); }
   .wb-tl-body { font-size: 12px; line-height: 1.6; white-space: pre-wrap; padding: 8px 36px 8px 12px; border-radius: 4px; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); color: var(--vscode-editor-foreground, #ccc); }
+  .wb-tl-truncated { font-size: 11px; opacity: 0.65; margin-top: 4px; }
 
   /* Draft box */
   .draft-box { position: relative; margin-top: 8px; }

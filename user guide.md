@@ -187,8 +187,8 @@ prompt-config.json
 ```json
 {
   "id": "importantSender",
-  "labelZh": "重点发件人/邮件组",
-  "labelEn": "Important Sender or Group",
+  "labelZh": "重点发件人",
+  "labelEn": "Important Senders",
   "description": "Mail from or containing configured important senders, mail groups, or keywords.",
   "priorityHint": "Usually P0 or P1 unless it is clearly a notice"
 }

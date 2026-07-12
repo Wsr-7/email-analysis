@@ -149,6 +149,80 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("Urgent task"));
   });
 
+  it("does not show a thread internal id in an analyzed mail reader", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" })] }
+      ]),
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "", items: [{
+          threadId: "conversation:private-id", conversationId: "private-id", normalizedSubject: "thread",
+          subject: "Thread subject", participants: [], folders: [], startTime: "", lastTime: "",
+          messageCount: 2, unreadCount: 0, hasAttachments: false, sourceMailIds: ["a1", "a2"], timeline: [], contentStatus: "available"
+        }]
+      }
+    });
+
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(!html.includes("<strong>Thread:</strong> conversation:private-id"));
+  });
+
+  it("uses the remaining reader height for original mail content", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes(".wb-reader.active { display: flex; height: 100%; }"));
+    assert.ok(html.includes(".wb-reader.active .wb-with-body { display: flex; flex-direction: column; height: 100%; min-height: 100%; width: 100%; }"));
+    assert.ok(html.includes(".wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }"));
+    assert.ok(html.includes(".wb-body { flex: 1 1 auto; min-height: 0;"));
+    assert.ok(!html.includes("max-height: 400px"));
+  });
+
+  it("marks a timeline body truncated by collection", () => {
+    const truncatedBody = `${"x".repeat(100)}...`;
+    const input = stubInput({
+      state: stubState({ bodyExcerptChars: 100 }),
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "", items: [{
+          threadId: "conversation:thread-1", conversationId: "thread-1", normalizedSubject: "thread",
+          subject: "Thread subject", participants: [], folders: [], startTime: "", lastTime: "",
+          messageCount: 2, unreadCount: 0, hasAttachments: false, sourceMailIds: ["m1"], contentStatus: "available",
+          security: { totalMessages: 1, allowedMessages: 1, manualConfirmMessages: 0, blockedMessages: 0, highestClassificationLevel: 0, partialContext: false, reasons: [] },
+          timeline: [{
+            mailId: "m1", internetMessageId: "", entryId: "", conversationId: "thread-1", conversationIndex: "",
+            subject: "Thread subject", from: "Alice", senderName: "Alice", senderEmail: "", receivedTime: "", sentTime: "", folder: "Inbox",
+            bodyPreview: truncatedBody, bodyClean: truncatedBody, bodyDelta: truncatedBody, bodyHash: "", isDuplicateBody: false,
+            contentAvailable: true, attachmentCount: 0, attachmentNames: []
+          }]
+        }]
+      }
+    });
+
+    assert.ok(renderWorkbenchHtml(input).includes("Content truncated"));
+  });
+
+  it("does not mark a naturally ellipsized timeline body as truncated", () => {
+    const input = stubInput({
+      state: stubState({ bodyExcerptChars: 100 }),
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "", items: [{
+          threadId: "conversation:thread-2", conversationId: "thread-2", normalizedSubject: "thread",
+          subject: "Thread subject", participants: [], folders: [], startTime: "", lastTime: "",
+          messageCount: 2, unreadCount: 0, hasAttachments: false, sourceMailIds: ["m2"], contentStatus: "available",
+          security: { totalMessages: 1, allowedMessages: 1, manualConfirmMessages: 0, blockedMessages: 0, highestClassificationLevel: 0, partialContext: false, reasons: [] },
+          timeline: [{
+            mailId: "m2", internetMessageId: "", entryId: "", conversationId: "thread-2", conversationIndex: "",
+            subject: "Thread subject", from: "Alice", senderName: "Alice", senderEmail: "", receivedTime: "", sentTime: "", folder: "Inbox",
+            bodyPreview: "Natural ending...", bodyClean: "Natural ending...", bodyDelta: "Natural ending...", bodyHash: "", isDuplicateBody: false,
+            contentAvailable: true, attachmentCount: 0, attachmentNames: []
+          }]
+        }]
+      }
+    });
+
+    assert.ok(!renderWorkbenchHtml(input).includes("Content truncated"));
+  });
+
   it("binds single-mail draft actions to the mail draft key", () => {
     const input = stubInput({
       state: stubState({}, [

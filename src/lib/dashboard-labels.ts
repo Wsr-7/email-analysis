@@ -38,7 +38,7 @@ export type DashboardLabels = {
   categories: Record<string, string>;
   card: Record<"from" | "to" | "cc" | "body" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "openInOutlook" | "noItems" | "thread", string>;
   pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select" | "confirmAnalyze", string>;
-  threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "attachments" | "mailIds", string>;
+  threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "contentTruncated" | "attachments" | "mailIds", string>;
   meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
   nextActions: Record<"title" | "owner" | "task" | "deadline" | "source" | "markDone" | "markIgnored" | "reopen" | "noActions", string>;
   progress: Record<"pullMail" | "loadMore" | "sampleDigest" | "analyze" | "reports" | "loadModels" | "translate" | "cancelling", string> & { detail: string };
@@ -117,6 +117,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       threads: "邮件线程"
     },
     categories: {
+      importantSender: "重点发件人",
       mustHandleToday: "今天必须处理",
       risk: "风险邮件",
       waitingForMe: "等待我回复",
@@ -185,6 +186,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       no: "否",
       draftReply: "回复草稿",
       timeline: "时间线",
+      contentTruncated: "内容已截断",
       attachments: "附件",
       mailIds: "邮件 ID"
     },
@@ -302,6 +304,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       threads: "Threads"
     },
     categories: {
+      importantSender: "Important Senders",
       mustHandleToday: "Must Handle Today",
       risk: "Risk",
       waitingForMe: "Waiting For Me",
@@ -370,6 +373,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       no: "No",
       draftReply: "Draft Reply",
       timeline: "Timeline",
+      contentTruncated: "Content truncated",
       attachments: "Attachments",
       mailIds: "Mail IDs"
     },
