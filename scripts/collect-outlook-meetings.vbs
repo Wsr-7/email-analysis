@@ -387,16 +387,22 @@ Sub WriteSampleMeetingDigest(byVal outputPath, byRef target)
 
   Dim record
 
-  Set record = BuildSampleMeetingRecord(1, "Team Daily Standup", "Alice Johnson", todayDate & " 09:30", todayDate & " 10:00", "Conference Room A", False, True, "bob@example.com; carol@example.com", "dave@example.com", "accepted", "calendar", "Let's sync on sprint progress and blockers.")
+  Set record = BuildSampleMeetingRecord(1, "Team Daily Standup", "Alice Johnson", todayDate & " 09:30", todayDate & " 10:00", "Conference Room A", False, True, "bob@example.com; carol@example.com", "dave@example.com", "accepted", "calendar", "Recurring instance: let's sync on sprint progress and blockers.")
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleMeetingRecord(2, "Client Review - Project Alpha", "External Client", tomorrowDate & " 14:00", tomorrowDate & " 15:30", "Teams Meeting", False, False, "alice@example.com; bob@example.com; client@partner.com", "", "notResponded", "invite", "Please prepare the Q3 progress report for review.")
+  Set record = BuildSampleMeetingRecord(2, "Client Review - Project Alpha", "External Client", tomorrowDate & " 14:00", tomorrowDate & " 15:30", "Teams Meeting", False, False, "alice@example.com; bob@example.com; client@partner.com", "", "notResponded", "invite", "Unanswered invitation: please prepare the Q3 progress report and decide whether you can attend.")
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleMeetingRecord(3, "Company All Hands", "CEO", dayAfterDate & " 16:00", dayAfterDate & " 17:00", "Main Auditorium / Teams", False, False, "all-staff@example.com", "", "tentative", "calendar", "Quarterly results and roadmap update.")
+  Set record = BuildSampleMeetingRecord(3, ChrW(&H4EA7) & ChrW(&H54C1) & ChrW(&H5468) & ChrW(&H4F1A) & ChrW(&HFF1A) & ChrW(&H786E) & ChrW(&H8BA4) & ChrW(&H4E0B) & ChrW(&H5468) & ChrW(&H6F14) & ChrW(&H793A) & ChrW(&H5B89) & ChrW(&H6392), ChrW(&H4EA7) & ChrW(&H54C1) & ChrW(&H8D1F) & ChrW(&H8D23) & ChrW(&H4EBA), tomorrowDate & " 10:00", tomorrowDate & " 10:45", "Teams Meeting", False, False, "product@example.com; design@example.com", "sales@example.com", "notResponded", "invite", ChrW(&H8BF7) & ChrW(&H51C6) & ChrW(&H5907) & ChrW(&H672C) & ChrW(&H5468) & ChrW(&H8FDB) & ChrW(&H5C55) & ChrW(&H4E0E) & ChrW(&H98CE) & ChrW(&H9669) & ChrW(&HFF0C) & ChrW(&H5E76) & ChrW(&H786E) & ChrW(&H8BA4) & ChrW(&H4E0B) & ChrW(&H5468) & ChrW(&H6F14) & ChrW(&H793A) & ChrW(&H5B89) & ChrW(&H6392) & ChrW(&H3002))
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleMeetingRecord(4, "1:1 with Manager", "You", todayDate & " 11:00", todayDate & " 11:30", "Teams Meeting", False, True, "manager@example.com", "", "organizer", "calendar", "")
+  Set record = BuildSampleMeetingRecord(4, "Company All Hands", "CEO", dayAfterDate & " 16:00", dayAfterDate & " 17:00", "Main Auditorium / Teams", False, False, "all-staff@example.com", "", "tentative", "calendar", "Quarterly results and roadmap update.")
+  AddRecordToArray records, recordCount, record
+
+  Set record = BuildSampleMeetingRecord(5, ChrW(&H672A) & ChrW(&H54CD) & ChrW(&H5E94) & ChrW(&H5BA2) & ChrW(&H6237) & ChrW(&H8BC4) & ChrW(&H5BA1) & ChrW(&H9080) & ChrW(&H8BF7), ChrW(&H5BA2) & ChrW(&H6237) & ChrW(&H9879) & ChrW(&H76EE) & ChrW(&H7EC4), dayAfterDate & " 11:00", dayAfterDate & " 12:00", ChrW(&H5BA2) & ChrW(&H6237) & ChrW(&H73B0) & ChrW(&H573A) & " / Teams", False, False, "account@example.com; client@partner.com", "", "notResponded", "invite", "Please confirm attendance and bring the migration decision.")
+  AddRecordToArray records, recordCount, record
+
+  Set record = BuildSampleMeetingRecord(6, "1:1 with Manager", "You", todayDate & " 11:00", todayDate & " 11:30", "Teams Meeting", False, True, "manager@example.com", "", "organizer", "calendar", "Recurring manager check-in instance.")
   AddRecordToArray records, recordCount, record
 
   WriteMeetingDigest outputPath, target, records, recordCount
