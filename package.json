@@ -206,7 +206,7 @@
           "type": "string",
           "order": 9,
           "default": "",
-          "description": "Copilot model identifier. Use EasyMail: Load Copilot Models and the sidebar to choose an available model."
+          "description": "Copilot model identifier. Recommended: choose an available model with EasyMail: Load Copilot Models and the dashboard model dropdown. Manual Settings entry is fallback only."
         }
       }
     },

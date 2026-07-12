@@ -232,11 +232,14 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("post('openSettings')"));
   });
 
-  it("registers the sidebar model setting between collection and language settings", () => {
+  it("registers the sidebar-selected model as a free-text fallback setting", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
     const properties = manifest.contributes.configuration.properties;
 
     assert.equal(properties["easyMail.modelFamily"].type, "string");
+    assert.equal(properties["easyMail.modelFamily"].enum, undefined);
+    assert.equal(properties["easyMail.modelFamily"].enumItemLabels, undefined);
+    assert.match(properties["easyMail.modelFamily"].description, /Load Copilot Models.*dashboard.*Settings.*fallback/i);
     assert.ok(properties["easyMail.collectorTimeoutSeconds"].order < properties["easyMail.modelFamily"].order);
     assert.ok(properties["easyMail.modelFamily"].order < properties["easyMail.outputLanguage"].order);
     assert.ok(properties["easyMail.outputLanguage"].order < properties["easyMail.autoAnalyzeMaxClassificationLevel"].order);
