@@ -265,11 +265,19 @@
 
 ## 2.9 Milestone F3 — 规划者复审发现批（2026-07-12，F 批全量复审产出）
 
-### [ ] F3.1 flushWorkbenchDrafts 无超时 → workbench 刷新管线可被永久卡死（F1.3 引入，P1）
+### [x] F3.1 flushWorkbenchDrafts 无超时 → workbench 刷新管线可被永久卡死（F1.3 引入，P1）（commit `f5165fa`）
 
 - **缺陷（已核实）**：`extension.ts` `flushWorkbenchDrafts`（~L559-577）向 webview post `requestWorkingDraftFlush` 后无限期 `await done`。`postMessage` 返回 true 只代表投递成功，不代表会有应答：若请求恰好落在 `webview.html` 重设后、新文档 `message` 监听器注册前的窗口，消息被静默丢弃，`done` 永不 resolve。后果链：`pendingWorkbenchDraftFlush` 常驻非空 → 之后所有 `rebuildWorkbenchHtml` 都 await 同一个卡死的 promise → workbench 从此不再刷新（仅关闭面板触发 `onDidDispose` 才能解锁）；且 `runWithBusy` 的 `finally` await `refresh()`，对应命令的 promise 也永不 resolve。
 - **做法**：`flushWorkbenchDrafts` 给 `done` 加超时兜底（建议 1500-2000ms）：超时后调用 `completeWorkbenchDraftFlush(requestId)` 清掉 pending 并继续刷新。flush 本就是尽力而为（丢的最多是最后 500ms 的击键，且 input 侧还有 debounce 上报兜底），超时降级远好于管线卡死。补单测：webview 不应答时 flush 在超时后返回、pending 被清空、后续 flush 可正常发起。
 - **验收**：单测 + `npm test` 全绿；`npm run compile` 零错误。无需真机验证（纯时序防御）。
+
+- **Completion Notes**：
+  - 改动文件：`src/extension.ts`、`src/test/extension-cancellation.test.ts`。
+  - 实现边界：flush 建立 pending 后启动 1500ms timeout，超时复用既有 `completeWorkbenchDraftFlush(requestId)` 清理 pending；正常应答、投递失败和 panel dispose 路径保持不变，`await done` 后清理 timer。未改草稿 Map、webview 消息协议、store/schema。
+  - 验收结果：`npm run compile` 零错误，`npm test` 398/398 通过，`git diff --check` 通过。独立 review 后补齐 A 超时、B 发起后旧 A requestId 不得完成 B 的竞态回归测试，并复审通过。
+  - Manual validation：无需真机验证（纯时序防御）；可在真实 VS Code 触发连续刷新，确认 Workbench 不再永久停止刷新。
+  - Known issues：超时是尽力 flush 降级，极端窗口最多可能丢失最后 500ms 未上报的手写草稿，优于刷新管线永久卡死。
+  - Commit：`f5165fa`。
 
 ### [ ] F3.2 modelFamily 设置去掉硬编码 enum（用户笔记 Q1，2026-07-12 立项）
 
@@ -335,6 +343,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · **F2.7 已完成**（代码提交 `e98ed01`；worker 会话中断未回填记录，规划者独立复审后代为补记 Completion Notes）。**F1/F2 全部 14 个 step 完成**。
 - 2026-07-12 · **规划者全量复审 F 批（`608720b..e98ed01`，22 个提交）**：独立复核 `npm test` 396/396 全绿、双 VBS `--help` 通过、`run-sample-validation.ps1` 端到端通过。F1.2 对账、F1.4 诊断、F1.5 picker、F1.6 SMTP、F1.7 取消、F2.1-F2.7 实现均确认正确。两项修正与发现：① F1.1 根因描述修正（mail 真实缺陷是 Restrict 带秒而非分隔符；**meetings 队列空的根因未确证**，复验若仍空需回传 RestrictFilter 日志）；② **F3.1 立项**：F1.3 的 flush 协议无超时，存在 workbench 刷新管线永久卡死风险（P1）。vsix 已重新打包含全部 F 批改动。人工验证清单见 §7。R3/R4 锁定不变：解锁条件 = F3.1 完成 + 用户复验 P0 项通过 + 用户确认 R3 设计方向。
 - 2026-07-12 · **规划者核实用户笔记 8 项，扩充 F3 批**：Q1→**F3.2**（modelFamily 去硬编码 enum）、Q3→**F3.3**（README/Details 重写，图片留 placeholder）、Q4→**F3.4**（Pending 按 folder 分组折叠）、Q5→**F3.5**（ignoredSenders 代码级排除）；Q2（分级通用化）为 R3 设计输入、Q6（maxItems=全局时间优先）/Q7（分割规则）/Q8（截断语义）核实后维持现状，结论均记录于 §3 问答核实记录。F3.1-F3.5 全部 `[ ]` 待 claim，互相独立。
+- 2026-07-12 · F3.1 已完成，代码提交 `f5165fa`：Workbench 草稿 flush 在 webview 无应答时 1500ms 超时降级并清 pending，旧 requestId 不会误完成后续 flush。下一步 claim F3.2。
 
 ---
 
@@ -385,6 +394,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F2.7 pre-work checkpoint）**：恢复现场：F2.4-F2.6 的代码与记录已提交（`d783d5d`、`556805d`），工作树干净；HEAD `556805d`。重新定位：mail `WriteSampleDigest` 仅 4 封英文邮件，只有两封共享 conversationId，附件仅两条，未覆盖所有分类素材；meeting `WriteSampleMeetingDigest` 仅 4 条，已有未响应 invite 和 recurring，但缺少更丰富的中英文场景。边界：仅扩充两个 `--sample` writer 的记录内容及为输出增加的最小验证；不改 `--list-folders --sample`、真实采集、digest/store/schema 或分类逻辑，不进入 R3/R4。
 
 - **2026-07-12 · Claude Fable 5（规划者全量复审 F 批）**：复审范围 `608720b..e98ed01` 全部 22 个提交。独立验证：`npm test` 396/396 全绿；双 VBS `--help` 通过；`run-sample-validation.ps1` 端到端通过（覆盖 F2.7 新样例的生成与解析）。逐项结论：F1.2 对账（孤儿丢弃+漏返落 uncertain+skipped chunk 持久化兜底）、F1.4 ScanSummary digest 通道、F1.5 picker（EntryID 映射/邮箱根排除/互认去重/legacy 扩展删除）、F1.6 SMTP 化、F1.7 取消（token 传播+cancelling 态+防误报成功竞态）、F2.1-F2.6 实现与各自边界一致；F2.7 代码合格（worker 会话中断未回填记录，已代为补记）。修正与发现：① F1.1 根因描述笔误修正——仓库一直是 `/` 分隔，mail 真实缺陷是 Restrict **带秒**，去秒修复对症；meetings formatter 本无缺陷，**Meetings 队列空的根因未确证**，已在 F1.1 段落加复验指引；② 发现 **F3.1**（P1）：`flushWorkbenchDrafts` 无超时，flush 请求落在 webview 文档重建窗口会被静默丢弃 → pending 永不 resolve → workbench 刷新管线永久卡死，已立项；③ `4ba7b90`（worker 对本计划的措辞澄清）无害接受；④ vsix 打包停留在 F 批之前，已重新 `npm run package:vsix` 并提交。Next: worker claim F3.1（单步、小改动）；用户按 §7 清单做第二轮人工验证；两者都通过且用户确认 R3 设计方向后解锁 R3。
+
+- **2026-07-12 · Codex（F3.1 pre-work checkpoint）**：恢复现场：F2.7 已由规划者回填完成，工作树干净；HEAD `f7490fc`。重新定位：`flushWorkbenchDrafts` 创建 `pendingWorkbenchDraftFlush` 后，在 webview `postMessage` 返回 true 的场景无限期等待 `done`；只有对应 complete 消息、投递失败或 panel dispose 会清除 pending，故 HTML 重建期间丢消息会永久阻塞 `rebuildWorkbenchHtml` 与 `runWithBusy` 的 finally refresh。边界：仅为现有 flush 协议增加 1500-2000ms 超时兜底与单测；超时仍复用 `completeWorkbenchDraftFlush(requestId)` 清理 pending，不改草稿 Map、webview 协议、store/schema 或 F3.2+。
+
+- **2026-07-12 · Codex（F3.1 completion）**：完成 `f5165fa`。pending flush 建立后启动 1500ms timer，超时经既有 requestId 守卫的 complete 方法解除等待；正常、投递失败和 dispose 语义保留。两轮 review 通过，第二轮补齐旧 requestId 不得完成新 flush 的竞态测试。验收：`npm run compile` 零错误、`npm test` 398/398 通过、`git diff --check` 通过。Manual：无需真机验证；极端超时仅可能损失最后 500ms 未上报草稿，已记录。Next：claim F3.2；R3/R4 继续锁定。
 
 ---
 
