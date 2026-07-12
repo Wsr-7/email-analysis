@@ -271,6 +271,30 @@
 - **做法**：`flushWorkbenchDrafts` 给 `done` 加超时兜底（建议 1500-2000ms）：超时后调用 `completeWorkbenchDraftFlush(requestId)` 清掉 pending 并继续刷新。flush 本就是尽力而为（丢的最多是最后 500ms 的击键，且 input 侧还有 debounce 上报兜底），超时降级远好于管线卡死。补单测：webview 不应答时 flush 在超时后返回、pending 被清空、后续 flush 可正常发起。
 - **验收**：单测 + `npm test` 全绿；`npm run compile` 零错误。无需真机验证（纯时序防御）。
 
+### [ ] F3.2 modelFamily 设置去掉硬编码 enum（用户笔记 Q1，2026-07-12 立项）
+
+- **现状（已核实）**：F2.1 把 `easyMail.modelFamily` 注册为 VS Code 设置时附带了硬编码 `enum`/`enumItemLabels`（八个模型名快照）。真实可用模型由 `vscode.lm` 运行时决定（Load Models 加载、随 Copilot 订阅与版本变化），`selectConfiguredModel`（`llm-provider.ts:76`）按字符串匹配，逻辑本身不依赖 enum。问题：① enum 必然过时；② 用户经 dashboard 选中 enum 外的模型后写回 Settings，Settings UI 会把该值标为非法；③ Settings 下拉给了"这些模型必然可用"的错误暗示。
+- **做法**：删掉 `enum`/`enumItemLabels`，保留 `type: "string"`、`default` 与 description（改为指引：推荐经 dashboard 的 Load Models + 模型下拉选择，Settings 手填仅作兜底）。不动 `resolveModelFamily`/`selectConfiguredModel`/迁移逻辑。
+- **验收**：`npm run compile` 零错误；`npm test` 全绿；Settings 页该项为自由文本框且 dashboard 选择的任意模型写回后不再被标非法（真机确认一眼即可，随下轮复验捎带）。
+
+### [ ] F3.3 重写 README / Marketplace Details（用户笔记 Q3）
+
+- **要求**：参照主流 VS Code 扩展 Details 页结构重写 `README.md` 与 `README_zh.md`（两者内容同步）：一句话 tagline → Overview → Features（分组、带要点）→ Quick Start → Usage（核心工作流：采集/分析/草稿/文件夹选择）→ Configuration 摘要 → FAQ → Known Limitations（Windows-only、classic Outlook、需 Copilot 订阅、bodyExcerptChars 截断等如实写）→ Author/License。
+- **图片**：在值得配图的位置插入 HTML 注释 placeholder，格式 `<!-- SCREENSHOT: <文件名建议> — <应截什么内容的中文说明> -->`，至少覆盖：sidebar 分诊队列（含分类计数）、workbench 阅读面板（含草稿区）、Select Outlook Folders QuickPick、分析进行中的进度状态、sample 模式效果。用户会自行补图，worker 不生成图片。
+- **验收**：两个 README 结构一致、链接有效（`user guide.md`、`setup.md`、`AGENTS.md`、releases）；`npm test` 全绿（不涉及代码，跑一遍防呆即可）。
+
+### [ ] F3.4 Pending 队列按文件夹分组折叠（用户笔记 Q4）
+
+- **现状（已核实）**：Pending 平铺展示全部待析邮件（`sidebar-render.ts` pending 队列）；`StoredMail` 自带 `folder` 字段，分组无需改数据层。
+- **做法**：Sidebar 的 Pending Email 分类内改为两级：默认展示**所有已配置 folder**（含拉取数为 0 的，显示 `<folderName> (N)`），单击组头展开/收起该 folder 下的 pending 邮件列表（行为与现有邮件行一致）；未在配置内但出现在 store 里的 folder（如历史遗留）归入原名分组。展开状态存 webview state 即可，不落盘。其他队列（blocked/analysed 等）不动。
+- **验收**：单测覆盖分组计数、0 封 folder 显示、未配置 folder 兜底；`npm test` 全绿。**needs user validation**：真机看 Pending 分组、展开/收起、数量与实际一致。
+
+### [ ] F3.5 ignoredSenders：按发件人自动忽略（用户笔记 Q5，规划者判断值得做）
+
+- **现状（已核实）**：单封 ignore 与线程 ignore 已存在（`buildQueueState` 的 `ignoredIds`，`classification.ts:79-96`），但对 no-reply 通知类噪声源需要逐封操作；`importantSenders` 是 prompt 级由模型判断，不适合做排除（排除必须确定性，不能靠模型）。
+- **做法（代码级确定性匹配，与 importantSenders 的 prompt 级机制刻意不同）**：新增设置 `easyMail.ignoredSenders`（string array，默认空）；构建队列时对未分析邮件做大小写不敏感匹配（显示名或邮箱地址包含任一条目），命中者归入现有 `ignoredPending` 队列——仍可见、可恢复（从设置里删掉条目即恢复），不进 pending、不参与分析。匹配逻辑放 `config-utils`/`classification` 纯函数，可单测。Settings description 写明匹配语义（子串包含、大小写不敏感）。
+- **验收**：单测覆盖显示名命中/邮箱命中/大小写/空配置；`npm test` 全绿。**needs user validation**：配置一个真实 no-reply 地址后 Fetch+查看，该发件人邮件全部落 Ignored。
+
 ---
 
 ## 3. 核实后接受不修 / 直接回答的记录
@@ -279,6 +303,13 @@
 - **其他#1（分类逻辑是否被改过）**：核实 R1/R2 全程只动过 normalize 钳制（R2.7e：低 confidence 降 uncertain、category×priority 一致性），分类 prompt 与类别定义未改。周末凌晨拉 100 封没有 mustHandleToday/waitingForMe 属正常样本分布。F1.2 落地后如再有"该命中未命中"，将有对账数据可查。
 - **其他#13（12000 与 100 封的区别）**：`ANALYSIS_CHUNK_TOKEN_BUDGET = 12000`（`app-analysis.ts:20`）是**单个 chunk** 的输入 token 预算（与模型 maxInputTokens 取小）。选 100 封 ≠ 一次塞给模型：R2.2 会按预算切成多个 chunk **串行**发送，每封邮件都会被完整分析（正文本身在采集时已按 `bodyExcerptChars`=1500 截断，这是既有设计）。5 封与 100 封的区别只是请求次数与耗时，不是单封质量。已知风险"某 chunk 解析失败被跳过导致部分邮件未析"由 F1.2 的对账 + toast 解决。
 - **清单#6-Q1（Settings 页为何还是 Add Item）**：VS Code contribution 不支持运行时动态 enum，Settings 原生 UI 无法变成 Outlook 下拉；命令 + QuickPick 是官方推荐替代。已在 07 §3.9 记录，维持。
+
+### 用户笔记问答核实记录（2026-07-12，问题原文见用户笔记，逐条核实后回答；Q1/Q3/Q4/Q5 已立项为 F3.2-F3.5）
+
+- **Q2（classification 分级通用化，仅讨论不实现）**：用户判断正确——`PUBLIC/INTERNAL/REGISTERED/HIGH REGISTERED` 是公司自定义分级，不是 Outlook 固定值。业界现状：① Microsoft Purview（MIP）敏感度标签是租户自定义的（GUID+名称），存于邮件的 `msip_labels` MAPI 命名属性，可用 `PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/string/{00020386-...}/msip_labels/0x0000001F")` 读取——与本项目 VBS 读 internetMessageId 的模式相同，采集侧可行；② 很多公司用主题/正文标记（`[SECRET]` 等）或自定义 X-header。通用化路径（R3 的 S-1/S-3 已有占位）：把分级词表改为**可配置的有序列表**（级别名 + 检测规则），MIP 标签经用户提供的"标签 GUID/名称 → 级别"映射表接入；默认词表保留当前四级作为出厂值。等 R3 设计确认时一并拍板。
+- **Q6（maxItems 语义，已核实代码）**：recentHours 模式 = 每个配置 folder 各自拉时间窗内全部邮件。maxItems 模式 = 每个 folder 先各拉**最新的至多 maxItems 封**（`CollectFolderItems` 内 per-folder cap），全部 folder 采完后**全局按时间降序排序、截断到 maxItems 封**（`CollectFromOutlook` 的 SortMailRecords + 全局 cap，`DigestCap:` 日志行可见 collected/emitted）。即总数 = maxItems，**时间优先、无文件夹优先级**：Inbox 70 + Sent 50、maxItems=50 时，保留的是两者合并后最新的 50 封，丢弃与文件夹无关。这是合理默认，不立项改动。
+- **Q7（线程原文分割策略，已核实代码）**：`thread-timeline.ts:64-130`，纯文本两类规则（COM `.Body` 是纯文本，无 `<hr>`）：① 分隔线/引导行——`--- Original Message ---`、`--- 原始邮件 ---`、`--- 邮件原件 ---`、5 个以上下划线、`On ... wrote:`、`在 ... 写道:`；② Outlook 头块——以 `From:/发件人:` 开头、随后 8 行内出现 `Sent/发送时间`、`To/收件人` 或 `Subject/主题` 即判定为引用历史起点。命中最早位置后截断，保留其上的净新增内容（bodyDelta）。
+- **Q8（bodyExcerptChars 截断，已核实代码）**：是既有设计，`easyMail.bodyExcerptChars` 可在 Settings 配置（默认 1500，最小 100）。语义：**单封邮件各自截断**，且发生在采集时（`BuildMailRecord` 对完整 `.Body` 取前 N 字符，vbs:719）——即"先截断、后去引用"。由于回复的新内容在正文顶部、引用历史在底部，前 1500 字符天然优先保住新内容，去引用只是把截断后残余的历史再剪掉；只有单封邮件**自身新增内容超过 1500 字**时才会丢内容。对分析的影响：存在偏差可能（模型每封最多看 1500 字），超长邮件的结论可能不完整——F2.3 已加 Content truncated 标注提示用户，需要完整分析时可调大设置或用 Open in Outlook 看原文。"先去引用、后截断"的改造需把去引用逻辑前移到 VBS 或采集加倍回传，成本收益不成比例，不立项；若 R3 的 C-3（digest NDJSON 化）重做采集格式，届时一并考虑。
 
 ---
 
@@ -303,6 +334,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F2.4/F2.5/F2.6 已完成，代码提交 `d783d5d`：单封 Analyze/Re-analyze 复用既有安全门控路径，Activity Bar 容器更名 EasyMail，Guide key 以安装时间戳优先并保留开发宿主回退。三个小项 Completion Notes 已分项记录。下一步 claim F2.7。
 - 2026-07-12 · **F2.7 已完成**（代码提交 `e98ed01`；worker 会话中断未回填记录，规划者独立复审后代为补记 Completion Notes）。**F1/F2 全部 14 个 step 完成**。
 - 2026-07-12 · **规划者全量复审 F 批（`608720b..e98ed01`，22 个提交）**：独立复核 `npm test` 396/396 全绿、双 VBS `--help` 通过、`run-sample-validation.ps1` 端到端通过。F1.2 对账、F1.4 诊断、F1.5 picker、F1.6 SMTP、F1.7 取消、F2.1-F2.7 实现均确认正确。两项修正与发现：① F1.1 根因描述修正（mail 真实缺陷是 Restrict 带秒而非分隔符；**meetings 队列空的根因未确证**，复验若仍空需回传 RestrictFilter 日志）；② **F3.1 立项**：F1.3 的 flush 协议无超时，存在 workbench 刷新管线永久卡死风险（P1）。vsix 已重新打包含全部 F 批改动。人工验证清单见 §7。R3/R4 锁定不变：解锁条件 = F3.1 完成 + 用户复验 P0 项通过 + 用户确认 R3 设计方向。
+- 2026-07-12 · **规划者核实用户笔记 8 项，扩充 F3 批**：Q1→**F3.2**（modelFamily 去硬编码 enum）、Q3→**F3.3**（README/Details 重写，图片留 placeholder）、Q4→**F3.4**（Pending 按 folder 分组折叠）、Q5→**F3.5**（ignoredSenders 代码级排除）；Q2（分级通用化）为 R3 设计输入、Q6（maxItems=全局时间优先）/Q7（分割规则）/Q8（截断语义）核实后维持现状，结论均记录于 §3 问答核实记录。F3.1-F3.5 全部 `[ ]` 待 claim，互相独立。
 
 ---
 
