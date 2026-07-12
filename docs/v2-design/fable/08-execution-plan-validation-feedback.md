@@ -293,11 +293,19 @@
   - Known issues：真实可用模型仍取决于当前 Copilot 订阅与 VS Code 运行时，Settings 手填无可用性保证。
   - Commit：`b85a210`。
 
-### [ ] F3.3 重写 README / Marketplace Details（用户笔记 Q3）
+### [x] F3.3 重写 README / Marketplace Details（用户笔记 Q3）（commit `2f8e750`）
 
 - **要求**：参照主流 VS Code 扩展 Details 页结构重写 `README.md` 与 `README_zh.md`（两者内容同步）：一句话 tagline → Overview → Features（分组、带要点）→ Quick Start → Usage（核心工作流：采集/分析/草稿/文件夹选择）→ Configuration 摘要 → FAQ → Known Limitations（Windows-only、classic Outlook、需 Copilot 订阅、bodyExcerptChars 截断等如实写）→ Author/License。
 - **图片**：在值得配图的位置插入 HTML 注释 placeholder，格式 `<!-- SCREENSHOT: <文件名建议> — <应截什么内容的中文说明> -->`，至少覆盖：sidebar 分诊队列（含分类计数）、workbench 阅读面板（含草稿区）、Select Outlook Folders QuickPick、分析进行中的进度状态、sample 模式效果。用户会自行补图，worker 不生成图片。
 - **验收**：两个 README 结构一致、链接有效（`user guide.md`、`setup.md`、`AGENTS.md`、releases）；`npm test` 全绿（不涉及代码，跑一遍防呆即可）。
+
+- **Completion Notes**：
+  - 改动文件：`README.md`、`README_zh.md`。
+  - 实现边界：双 README 重写为镜像 Marketplace 结构，覆盖 tagline、Overview、分组 Features、Quick Start、采集/分析/草稿/文件夹选择 Usage、Configuration、FAQ、Known Limitations、Author/License；各放置五个计划格式的中文 SCREENSHOT placeholder。未生成图片，未改代码/配置/其他文档。
+  - 验收结果：两份 README 的章节、五个占位和九个本地链接均经独立 review 核对；`git diff --check` 通过，`npm test` 398/398 通过。
+  - Manual validation：用户补入真实截图后，在 Marketplace Details 预览中确认版式与图片对应。
+  - Known issues：占位仅定义建议文件名与截取内容，真实截图由用户提供。
+  - Commit：`2f8e750`。
 
 ### [ ] F3.4 Pending 队列按文件夹分组折叠（用户笔记 Q4）
 
@@ -353,6 +361,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · **规划者核实用户笔记 8 项，扩充 F3 批**：Q1→**F3.2**（modelFamily 去硬编码 enum）、Q3→**F3.3**（README/Details 重写，图片留 placeholder）、Q4→**F3.4**（Pending 按 folder 分组折叠）、Q5→**F3.5**（ignoredSenders 代码级排除）；Q2（分级通用化）为 R3 设计输入、Q6（maxItems=全局时间优先）/Q7（分割规则）/Q8（截断语义）核实后维持现状，结论均记录于 §3 问答核实记录。F3.1-F3.5 全部 `[ ]` 待 claim，互相独立。
 - 2026-07-12 · F3.1 已完成，代码提交 `f5165fa`：Workbench 草稿 flush 在 webview 无应答时 1500ms 超时降级并清 pending，旧 requestId 不会误完成后续 flush。下一步 claim F3.2。
 - 2026-07-12 · F3.2 已完成，代码提交 `b85a210`：modelFamily 保持自由 string，Settings 说明明确 Dashboard 选择优先、手填兜底，并锁定无 enum 回归。下一步 claim F3.3。
+- 2026-07-12 · F3.3 已完成，代码提交 `2f8e750`：双 README 已重写为镜像 Marketplace Details，并放入五个中文截图占位；链接校验通过。下一步 claim F3.4。
 
 ---
 
@@ -411,6 +420,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F3.2 pre-work checkpoint）**：恢复现场：F3.1 的代码与记录已提交（`f5165fa`、`e332f8e`），工作树干净；HEAD `e332f8e`。重新定位：当前 `easyMail.modelFamily` 已是 `type: "string"`、空 default，**没有** `enum`/`enumItemLabels`；`resolveModelFamily` 与 `selectConfiguredModel` 仍是运行时字符串匹配，符合不动逻辑的边界。现有 description 仅提示 Load Copilot Models/Sidebar，未明确 Settings 手填是兜底。边界：不重做已满足的 enum 删除，只补齐 description 指引与 manifest 回归断言；不改运行时选择、迁移、store/schema 或 F3.3+。
 
 - **2026-07-12 · Codex（F3.2 completion）**：完成 `b85a210`。确认 enum 删除是既有状态，本次只补 description 与 manifest 防回归断言；Dashboard Load Models/下拉为推荐路径，Settings 手填为 fallback。独立 review 通过。验收：`npm run compile` 零错误、`npm test` 398/398 通过、`git diff --check` 通过。Manual：**needs user validation on real VS Code Settings**，确认自由文本及 runtime 模型写回不报非法。Next：claim F3.3；R3/R4 继续锁定。
+
+- **2026-07-12 · Codex（F3.3 pre-work checkpoint）**：恢复现场：F3.1/F3.2 已提交，工作树干净；HEAD `829c8ac`。重新定位：当前中英 README 已有 Features/Quick start/Configuration/Development，但缺少计划要求的明确 tagline、Overview、按核心工作流组织的 Usage、FAQ、Known Limitations、Author，并无 SCREENSHOT placeholder；两份 headings 未完全镜像。现有引用目标 `user guide.md`、`setup.md`、`AGENTS.md`、`releases/` 均存在。边界：仅重写 `README.md` 与 `README_zh.md` 的 Marketplace Details 文案与五个 HTML 截图占位；不生成图片、不修改代码/配置/其他文档，不进入 F3.4+。
+
+- **2026-07-12 · Codex（F3.3 completion）**：完成 `2f8e750`。README.md 与 README_zh.md 结构镜像，五个中文 screenshot placeholder 覆盖计划规定场景；命令、限制与链接均按现有实现核对。独立 review 通过。验收：`npm test` 398/398 通过、`git diff --check` 通过。Manual：用户补图后在 Marketplace 预览确认。Next：claim F3.4；R3/R4 继续锁定。
 
 ---
 
