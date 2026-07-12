@@ -349,6 +349,7 @@
 - **Q2（classification 分级通用化，仅讨论不实现）**：用户判断正确——`PUBLIC/INTERNAL/REGISTERED/HIGH REGISTERED` 是公司自定义分级，不是 Outlook 固定值。业界现状：① Microsoft Purview（MIP）敏感度标签是租户自定义的（GUID+名称），存于邮件的 `msip_labels` MAPI 命名属性，可用 `PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/string/{00020386-...}/msip_labels/0x0000001F")` 读取——与本项目 VBS 读 internetMessageId 的模式相同，采集侧可行；② 很多公司用主题/正文标记（`[SECRET]` 等）或自定义 X-header。通用化路径（R3 的 S-1/S-3 已有占位）：把分级词表改为**可配置的有序列表**（级别名 + 检测规则），MIP 标签经用户提供的"标签 GUID/名称 → 级别"映射表接入；默认词表保留当前四级作为出厂值。等 R3 设计确认时一并拍板。
 - **Q6（maxItems 语义，已核实代码）**：recentHours 模式 = 每个配置 folder 各自拉时间窗内全部邮件。maxItems 模式 = 每个 folder 先各拉**最新的至多 maxItems 封**（`CollectFolderItems` 内 per-folder cap），全部 folder 采完后**全局按时间降序排序、截断到 maxItems 封**（`CollectFromOutlook` 的 SortMailRecords + 全局 cap，`DigestCap:` 日志行可见 collected/emitted）。即总数 = maxItems，**时间优先、无文件夹优先级**：Inbox 70 + Sent 50、maxItems=50 时，保留的是两者合并后最新的 50 封，丢弃与文件夹无关。这是合理默认，不立项改动。
 - **Q7（线程原文分割策略，已核实代码）**：`thread-timeline.ts:64-130`，纯文本两类规则（COM `.Body` 是纯文本，无 `<hr>`）：① 分隔线/引导行——`--- Original Message ---`、`--- 原始邮件 ---`、`--- 邮件原件 ---`、5 个以上下划线、`On ... wrote:`、`在 ... 写道:`；② Outlook 头块——以 `From:/发件人:` 开头、随后 8 行内出现 `Sent/发送时间`、`To/收件人` 或 `Subject/主题` 即判定为引用历史起点。命中最早位置后截断，保留其上的净新增内容（bodyDelta）。
+- **Q7 追问（公司横幅式分割线，2026-07-12 用户截图核实，不立项）**：用户公司邮件在被引用邮件 From 上方有"居中密级词 + 横线"横幅。对照 Outlook 渲染截图与纯文本复制结果确认：**横线是 HTML 渲染产物（banner 边框/hr），转纯文本后不存在**，实际文本结构为"密级词行（如 INTERNAL/RESTRICTED）→ 空行 → From: → Sent:"——已被现有 `startsOutlookHeaderBlock` 规则覆盖，无需新分隔规则。残留在正文尾部的密级词是分级检测的有效信号（`classification.ts:62-68` 关键词同时覆盖 restricted/registered 两套叫法），不剪。
 - **Q8（bodyExcerptChars 截断，已核实代码）**：是既有设计，`easyMail.bodyExcerptChars` 可在 Settings 配置（默认 1500，最小 100）。语义：**单封邮件各自截断**，且发生在采集时（`BuildMailRecord` 对完整 `.Body` 取前 N 字符，vbs:719）——即"先截断、后去引用"。由于回复的新内容在正文顶部、引用历史在底部，前 1500 字符天然优先保住新内容，去引用只是把截断后残余的历史再剪掉；只有单封邮件**自身新增内容超过 1500 字**时才会丢内容。对分析的影响：存在偏差可能（模型每封最多看 1500 字），超长邮件的结论可能不完整——F2.3 已加 Content truncated 标注提示用户，需要完整分析时可调大设置或用 Open in Outlook 看原文。"先去引用、后截断"的改造需把去引用逻辑前移到 VBS 或采集加倍回传，成本收益不成比例，不立项；若 R3 的 C-3（digest NDJSON 化）重做采集格式，届时一并考虑。
 
 ---
@@ -380,6 +381,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F3.3 已完成，代码提交 `2f8e750`：双 README 已重写为镜像 Marketplace Details，并放入五个中文截图占位；链接校验通过。下一步 claim F3.4。
 - 2026-07-12 · F3.4 已完成，代码提交 `2f19674`：Pending 按文件夹折叠分组，配置目录含 0 计数，历史目录兜底。下一步 claim F3.5。
 - 2026-07-12 · F3.5 已完成，代码提交 `6cc45d5`：ignoredSenders 确定性分流未分析邮件，线程 prompt 也排除命中消息。F3 全部完成。
+- 2026-07-13 · **规划者复审 F3 批通过**（diff `f7490fc..08f6b33`，独立复核 `npm test` 405/405 全绿、VBS `--help` 通过、`run-sample-validation.ps1` 端到端通过）：F3.1 超时降级 + requestId 防串号正确（两条竞态测试齐备）；F3.2 核实 enum 在 F2.1 注册时就已不存在（用户笔记引用的是旧版安装包 manifest），worker 只补 description 属诚实的最小处理；F3.3 双 README 结构完整（Overview/Features/Quick Start/Usage/Configuration/FAQ/Known Limitations/Author，5 个中文截图占位）；F3.4 分组渲染含 0 计数与历史目录兜底、展开态存 webview state；F3.5 `matchesIgnoredSender` 大小写不敏感子串匹配、`ignoredPending` 双来源合并、线程 prompt 过滤含全忽略保护。vsix 已重新打包含 F3 全部改动。§7 验证表已追加 F3 行（14-16）。**08 计划全部 19 个 step 完成，等待用户第二轮人工验证。**
 
 ---
 
@@ -472,3 +474,6 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 | 11 | Workbench（F2.3/F2.4） | 打开已分析邮件与线程详情 | 无 `conversation:xxx` 展示；原文区填满剩余高度、仅长内容内部滚动；长邮件有 Content truncated 标注；普通邮件有 Analyze、已分析邮件有 Re-analyze 按钮且可用；高密级邮件仍只有 Confirm and Analyze | |
 | 12 | Activity Bar 与 Guide（F2.5/F2.6） | ① 看 Activity Bar 图标悬停名；② 卸载后重装同版本 vsix 并激活 | ① 显示 EasyMail；② Guide 再次弹出（若不弹，说明正式安装无 `__metadata.installedTimestamp`，请反馈） | |
 | 13 | 示例数据（F2.7） | 运行 Generate Sample Digest | 邮件 10 封（中英混合、4 封同一线程、含高密级样例），会议 6 条（含中文未响应邀请） | |
+| 14 | Pending 文件夹分组（F3.4） | 打开 Sidebar 的 Pending 队列 | 按已配置 folder 分组显示 `文件夹名 (N)`（含 0 封的显示 (0)），点组头展开/收起邮件列表，切换队列后再回来展开状态仍在 | |
+| 15 | ignoredSenders（F3.5） | Settings 里 `easyMail.ignoredSenders` 加一个真实 no-reply 地址，刷新/Fetch | 该发件人所有未分析邮件移入 Ignored 队列（不再出现在 Pending）；从设置删除该条目后恢复回 Pending | |
+| 16 | 其他小项（F3.2/F3.3） | ① Settings 页看 `easyMail.modelFamily`；② VS Code 扩展详情页看 Details | ① 是自由文本框（无下拉），从 dashboard 选任意模型写回后不标非法；② Details 结构完整（README 渲染正常，5 处截图占位待你补图） | |
