@@ -91,6 +91,44 @@ test("buildQueueState accepts classification level labels from settings", () => 
   assert.deepEqual(queue.blocked.map((item) => item.mailId), ["mail-2"]);
 });
 
+test("buildQueueState routes display-name and email ignored sender matches to ignored pending", () => {
+  const senderMails: StoredMail[] = [
+    { ...mails[0], mailId: "manual-ignore", from: "Alice <alice@example.com>" },
+    { ...mails[0], mailId: "display-name-match", from: "System Notifications <no-reply@example.com>" },
+    { ...mails[0], mailId: "email-match", from: "Alerts <service@alerts.example.com>" }
+  ];
+  const cache = ensureClassifications(senderMails, normalizeClassificationCache({}));
+
+  const queue = buildQueueState(
+    senderMails,
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    ["manual-ignore"],
+    cache,
+    true,
+    2,
+    ["notifications", "ALERTS.EXAMPLE.COM"]
+  );
+
+  assert.deepEqual(queue.ignoredPending.map((item) => item.mailId).sort(), ["display-name-match", "email-match", "manual-ignore"]);
+  assert.deepEqual(queue.pending.map((item) => item.mailId), []);
+  assert.deepEqual(queue.allowed.map((item) => item.mailId), []);
+});
+
+test("buildQueueState keeps senders pending when ignored sender configuration is empty", () => {
+  const cache = ensureClassifications(mails, normalizeClassificationCache({}));
+  const queue = buildQueueState(
+    mails,
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    [],
+    cache,
+    true,
+    2,
+    []
+  );
+
+  assert.deepEqual(queue.pending.map((item) => item.mailId), ["mail-1", "mail-2"]);
+});
+
 test("classification keyword reasons include the matched keyword", () => {
   const cache = ensureClassifications(mails, normalizeClassificationCache({}));
   assert.equal(cache.items.find((item) => item.mailId === "mail-2")?.reason, "keyword match: high registered");

@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { normalizeAnalysis, parseAnalysisJson, stripCodeFence, mergeAnalysisResults, pruneAnalysisResult, type AnalysisItem } from "./analysis-schema";
 import { applyAnalysisTranslation, buildAnalysisTranslationPrompt } from "./analysis-translation";
-import { buildQueueState, ensureClassifications } from "./classification";
+import { buildQueueState, ensureClassifications, matchesIgnoredSender } from "./classification";
 import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "./config-utils";
 import { getLabels, buildCategoryLabels } from "./dashboard-labels";
 import { latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage } from "./language-contract";
@@ -224,6 +224,7 @@ export async function analyzeBatchCore(
   const classificationCache = ensureClassifications(store.items, await ctx.data.readClassificationCache());
   await ctx.data.writeClassificationCache(classificationCache);
   const currentAnalysis = await ctx.data.readAnalysisResult(() => ctx.readConfig());
+  const analysedIds = new Set(currentAnalysis.items.map((item) => item.mailId));
   const ignoredIds = await ctx.data.readIgnoredIds();
   const securitySettings = buildSecuritySettings(config);
   const securityDecisions = buildMailSecurityDecisionMap(store.items, classificationCache, securitySettings);
@@ -233,11 +234,12 @@ export async function analyzeBatchCore(
     ignoredIds,
     classificationCache,
     true,
-    config.autoAnalyzeMaxClassificationLevel
+    config.autoAnalyzeMaxClassificationLevel,
+    config.ignoredSenders
   );
   const batchSize = typeof selection === "number" ? Math.max(1, Math.floor(selection)) : 5;
   const requestedBatch = Array.isArray(selection)
-    ? store.items.filter((item) => selection.includes(item.mailId) && !ignoredIds.includes(item.mailId))
+    ? store.items.filter((item) => selection.includes(item.mailId) && !ignoredIds.includes(item.mailId) && (!matchesIgnoredSender(item.from, config.ignoredSenders) || analysedIds.has(item.mailId)))
     : selection === "allAllowed"
       ? queue.allowed
       : queue.allowed.slice(0, batchSize);
@@ -459,7 +461,27 @@ export async function analyzeThreadCore(
     throw new Error("Thread is blocked by the security gate.");
   }
 
-  const redactedThread = redactThreadForPrompt(thread, buildDefaultRedactionPolicy());
+  const excludedMessageIds = new Set<string>();
+  const filteredTimeline = thread.timeline.filter((message) => {
+    if (!matchesIgnoredSender(`${message.from} ${message.senderName} ${message.senderEmail}`, config.ignoredSenders)) {
+      return true;
+    }
+    excludedMessageIds.add(message.mailId);
+    return false;
+  });
+  const excludedMessages = thread.timeline.length - filteredTimeline.length;
+  if (!filteredTimeline.length) {
+    await ctx.log("threadAnalyze:ignoredSenders", { threadId, excludedMessages, remainingMessages: 0 });
+    throw new Error("Thread has no non-ignored messages available for analysis.");
+  }
+  const promptThread = {
+    ...thread,
+    timeline: filteredTimeline,
+    participants: [...new Set(filteredTimeline.map((message) => message.from).filter(Boolean))],
+    sourceMailIds: thread.sourceMailIds.filter((mailId) => !excludedMessageIds.has(mailId)),
+    contentStatus: excludedMessages ? "partial" as const : thread.contentStatus
+  };
+  const redactedThread = redactThreadForPrompt(promptThread, buildDefaultRedactionPolicy());
   const basePrompt = await fs.promises.readFile(path.join(ctx.extensionPath, "prompts", "thread-base-system.md"), "utf8");
   const analysisPrompt = await fs.promises.readFile(path.join(ctx.extensionPath, "prompts", "thread-analysis-prompt.md"), "utf8");
   const outputSchemaPrompt = await fs.promises.readFile(path.join(ctx.extensionPath, "prompts", "thread-output-schema.md"), "utf8");
@@ -474,7 +496,7 @@ export async function analyzeThreadCore(
     thread: redactedThread
   });
   const configuredModel = typeof config.modelFamily === "string" ? config.modelFamily.trim() : "gpt-5.4";
-  await ctx.log("threadAnalyze:start", { threadId, configuredModel, partialContext: gate.partialContext });
+  await ctx.log("threadAnalyze:start", { threadId, configuredModel, partialContext: gate.partialContext || excludedMessages > 0, ignoredSenderExcluded: excludedMessages });
   const { raw } = await sendPromptToModel(ctx, prompt, configuredModel, "threadAnalyze");
   let parsed = parseThreadAnalysisJson(raw, categoryIds);
   parsed.language = getLocaleFromConfig(config);

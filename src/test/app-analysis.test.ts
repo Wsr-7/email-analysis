@@ -8,6 +8,7 @@ import { analyzeBatchCore, analyzeThreadCore, sendPromptToModel, splitByTokenBud
 import { emptyMailIndex, type StoredMail } from "../lib/mail-store";
 import { MockProvider } from "../lib/mock-provider";
 import type { CancellationTokenLike, LlmProvider, LlmRequestOptions } from "../lib/llm-provider";
+import type { ThreadMessage, ThreadRecord } from "../lib/thread-schema";
 
 function mail(index: number): StoredMail {
   const id = `mail-${String(index).padStart(3, "0")}`;
@@ -50,6 +51,51 @@ function analysisResponse(mailId: string): string {
   });
 }
 
+function threadMessage(mailId: string, from: string, body: string): ThreadMessage {
+  return {
+    mailId,
+    internetMessageId: "",
+    entryId: mailId,
+    conversationId: "thread-ignored-senders",
+    conversationIndex: "",
+    subject: "Thread subject",
+    from,
+    senderName: from,
+    senderEmail: from,
+    receivedTime: "2026-07-02 09:00:00",
+    sentTime: "",
+    folder: "Inbox",
+    bodyPreview: body,
+    bodyClean: body,
+    bodyDelta: body,
+    bodyHash: "",
+    isDuplicateBody: false,
+    contentAvailable: true,
+    attachmentCount: 0,
+    attachmentNames: []
+  };
+}
+
+function threadRecord(messages: ThreadMessage[]): ThreadRecord {
+  return {
+    threadId: "thread-ignored-senders",
+    conversationId: "thread-ignored-senders",
+    normalizedSubject: "thread subject",
+    subject: "Thread subject",
+    participants: messages.map((message) => message.from),
+    folders: ["Inbox"],
+    startTime: "2026-07-02 09:00:00",
+    lastTime: "2026-07-02 09:00:00",
+    messageCount: messages.length,
+    unreadCount: messages.length,
+    hasAttachments: false,
+    sourceMailIds: messages.map((message) => message.mailId),
+    contentStatus: "available",
+    timeline: messages,
+    security: { totalMessages: messages.length, allowedMessages: messages.length, manualConfirmMessages: 0, blockedMessages: 0, highestClassificationLevel: 1, partialContext: false, reasons: [] }
+  };
+}
+
 describe("analyzeBatchCore", () => {
   it("splits mails by token budget without looping on oversized mails", () => {
     const mails = Array.from({ length: 5 }, (_, index) => ({ ...mail(index + 1), bodyExcerpt: "x".repeat(100) }));
@@ -65,6 +111,64 @@ describe("analyzeBatchCore", () => {
     assert.equal(hugeChunks[0].length, 1);
     assert.equal(hugeChunks[0][0].mailId, "mail-099");
     assert.equal(hugeChunks[1][0].mailId, "mail-100");
+  });
+
+  it("does not analyze an explicitly selected ignored sender", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({ generatedAt: "", lastPullAt: "", items: [mail(1)] });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+      const provider = new MockProvider({ responses: [analysisResponse("mail-001")] });
+
+      await assert.rejects(
+        () => analyzeBatchCore({
+          data,
+          llmProvider: provider,
+          extensionPath: process.cwd(),
+          readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, ignoredSenders: ["SENDER1@EXAMPLE.COM"], modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+          log: async () => {},
+          availableModelsCache: null
+        }, ["mail-001"]),
+        /No mail is available/
+      );
+
+      assert.equal(provider.prompts.length, 0);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("allows an explicitly selected ignored sender to be re-analyzed", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({ generatedAt: "", lastPullAt: "", items: [mail(1)] });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAnalysisResult({ generatedAt: "", overview: { totalMails: 1, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 1 }, items: [JSON.parse(analysisResponse("mail-001")).items[0]] });
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+      const provider = new MockProvider({ responses: [analysisResponse("mail-001")] });
+
+      await analyzeBatchCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, ignoredSenders: ["SENDER1@EXAMPLE.COM"], modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+        log: async () => {},
+        availableModelsCache: null
+      }, ["mail-001"]);
+
+      assert.equal(provider.prompts.length, 1);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
   });
 
   it("marks a mail uncertain when the model omits it from a batch response", async () => {
@@ -972,6 +1076,75 @@ describe("analyzeBatchCore", () => {
       assert.equal(result.items[0].openQuestions[0], "是否批准？");
       assert.equal(provider.prompts.length, 1);
       assert.match(provider.prompts[0], /draftReply.*Simplified Chinese/s);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("excludes ignored sender messages from the thread analysis prompt", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      const ignored = { ...mail(1), from: "System Notifications <no-reply@example.com>" };
+      const included = { ...mail(2), from: "Alice <alice@example.com>" };
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({ generatedAt: "", lastPullAt: "", items: [ignored, included] });
+      await data.writeThreadStore({ generatedAt: "", lastBuiltAt: "", items: [threadRecord([
+        threadMessage("mail-001", ignored.from, "ignored sender body"),
+        threadMessage("mail-002", included.from, "included sender body")
+      ])] });
+      await data.writeClassificationCache({ generatedAt: "", items: [
+        { mailId: "mail-001", level: 1, label: "INTERNAL", source: "test", reason: "", updatedAt: "" },
+        { mailId: "mail-002", level: 1, label: "INTERNAL", source: "test", reason: "", updatedAt: "" }
+      ] });
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+      const provider = new MockProvider({ responses: ["{\"generatedAt\":\"\",\"overview\":{},\"items\":[]}"] });
+      const logs: Array<{ event: string; data: Record<string, unknown> }> = [];
+
+      await analyzeThreadCore({
+        data,
+        llmProvider: provider,
+        extensionPath: process.cwd(),
+        readConfig: async () => ({ ignoredSenders: ["NO-REPLY@EXAMPLE.COM"], modelFamily: "mock-model", outputLanguage: "en-US", autoAnalyzeMaxClassificationLevel: 2 }),
+        log: async (event, data) => { logs.push({ event, data }); },
+        availableModelsCache: null
+      }, "thread-ignored-senders");
+
+      assert.doesNotMatch(provider.prompts[0], /mail-001|ignored sender body|System Notifications/);
+      assert.match(provider.prompts[0], /mail-002|included sender body/);
+      assert.ok(logs.some(({ event, data }) => event === "threadAnalyze:start" && data.ignoredSenderExcluded === 1 && data.partialContext === true));
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("does not send a thread when every message matches ignored senders", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      const ignored = { ...mail(1), from: "System Notifications <no-reply@example.com>" };
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({ generatedAt: "", lastPullAt: "", items: [ignored] });
+      await data.writeThreadStore({ generatedAt: "", lastBuiltAt: "", items: [threadRecord([threadMessage("mail-001", ignored.from, "ignored sender body")])] });
+      await data.writeClassificationCache({ generatedAt: "", items: [{ mailId: "mail-001", level: 1, label: "INTERNAL", source: "test", reason: "", updatedAt: "" }] });
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+      const provider = new MockProvider({ responses: ["{\"generatedAt\":\"\",\"overview\":{},\"items\":[]}"] });
+
+      await assert.rejects(
+        () => analyzeThreadCore({
+          data,
+          llmProvider: provider,
+          extensionPath: process.cwd(),
+          readConfig: async () => ({ ignoredSenders: ["no-reply@example.com"], modelFamily: "mock-model", outputLanguage: "en-US", autoAnalyzeMaxClassificationLevel: 2 }),
+          log: async () => {},
+          availableModelsCache: null
+        }, "thread-ignored-senders"),
+        /no non-ignored messages/i
+      );
+
+      assert.equal(provider.prompts.length, 0);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

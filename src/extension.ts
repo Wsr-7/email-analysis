@@ -1079,7 +1079,8 @@ export class EasyMailApp {
       mailIndexRetentionDays: settings.get("mailIndexRetentionDays", defaults.mailIndexRetentionDays),
       analysisRetentionDays: settings.get("analysisRetentionDays", defaults.analysisRetentionDays),
       collectorTimeoutSeconds: settings.get("collectorTimeoutSeconds", defaults.collectorTimeoutSeconds),
-      importantSenders: settings.get("importantSenders", defaults.importantSenders)
+      importantSenders: settings.get("importantSenders", defaults.importantSenders),
+      ignoredSenders: settings.get("ignoredSenders", defaults.ignoredSenders)
     };
   }
 
@@ -1213,7 +1214,8 @@ export class EasyMailApp {
       ignoredIds,
       classifications,
       true,
-      config.autoAnalyzeMaxClassificationLevel
+      config.autoAnalyzeMaxClassificationLevel,
+      config.ignoredSenders
     );
     const state = buildDashboardState(config, digest, analysis, ignoredIds, allowedCategoryIds(promptConfig), securedThreadStore) as DashboardState & {
       modelInfo?: Record<string, unknown>;

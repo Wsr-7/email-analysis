@@ -1,5 +1,5 @@
 import type { AnalysisResult } from "./analysis-schema";
-import { parseClassificationLevel } from "./config-utils";
+import { parseClassificationLevel, parseFolders } from "./config-utils";
 import type { StoredMail } from "./mail-store";
 
 export interface MailClassification {
@@ -79,21 +79,30 @@ export function buildQueueState(
   ignoredIds: string[],
   classifications: ClassificationCache,
   autoAnalyzeEnabled: boolean,
-  maxAutoLevel: unknown
+  maxAutoLevel: unknown,
+  ignoredSenders: unknown = []
 ): AnalysisQueueState {
   const analysedIds = new Set((analysis.items || []).map((item) => item.mailId));
   const ignored = new Set(ignoredIds || []);
+  const ignoredBySender = new Set(
+    storeItems.filter((item) => matchesIgnoredSender(item.from, ignoredSenders)).map((item) => item.mailId)
+  );
   const classificationById = new Map(classifications.items.map((item) => [item.mailId, item]));
   const allowedMaxLevel = parseClassificationLevel(maxAutoLevel, 2);
-  const pending = storeItems.filter((item) => !analysedIds.has(item.mailId) && !ignored.has(item.mailId));
+  const pending = storeItems.filter((item) => !analysedIds.has(item.mailId) && !ignored.has(item.mailId) && !ignoredBySender.has(item.mailId));
   const allowed = pending.filter((item) => {
     const classification = classificationById.get(item.mailId);
     return Number(classification?.level || 0) <= allowedMaxLevel;
   });
   const blocked = pending.filter((item) => !allowed.includes(item));
   const analysed = storeItems.filter((item) => analysedIds.has(item.mailId) && !ignored.has(item.mailId));
-  const ignoredPending = storeItems.filter((item) => !analysedIds.has(item.mailId) && ignored.has(item.mailId));
+  const ignoredPending = storeItems.filter((item) => !analysedIds.has(item.mailId) && (ignored.has(item.mailId) || ignoredBySender.has(item.mailId)));
   return { pending, blocked, analysed, allowed, ignoredPending };
+}
+
+export function matchesIgnoredSender(sender: string, ignoredSenders: unknown): boolean {
+  const normalizedSender = String(sender || "").toLowerCase();
+  return parseFolders(ignoredSenders, []).some((item) => normalizedSender.includes(item.toLowerCase()));
 }
 
 export function classificationFor(mailId: string, cache: ClassificationCache): MailClassification | undefined {

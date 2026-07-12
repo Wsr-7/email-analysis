@@ -202,6 +202,16 @@
           "default": [],
           "markdownDescription": "Important senders, mail groups, or keywords matched into `importantSender`. Examples: `person@example.com`, `team-alerts@company.com`, `Customer A`, `Project Phoenix`."
         },
+        "easyMail.ignoredSenders": {
+          "type": "array",
+          "order": 17,
+          "items": {
+            "type": "string",
+            "default": "no-reply@example.com"
+          },
+          "default": [],
+          "markdownDescription": "Unanalysed mail whose sender display name or email address contains any entry is placed in Ignored. Matching is case-insensitive. Examples: `no-reply@example.com`, `System Notifications`."
+        },
         "easyMail.modelFamily": {
           "type": "string",
           "order": 9,
