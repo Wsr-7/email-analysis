@@ -166,12 +166,20 @@
 
 ## 2. Milestone F2 — P2 UI/UX 打磨批（改动小，可多个一起 claim，但 Completion Notes 分项写）
 
-### [ ] F2.1 Sidebar 设置栏重构 + 宽度修复（其他#2/#9）
+### [x] F2.1 Sidebar 设置栏重构 + 宽度修复（其他#2/#9）（commit `d9d2585`）
 
 - 修宽度 bug：默认 sidebar 宽度下设置区左列（最多邮件数/允许分析最高密级等）不可见，右列（范围/分析模型）固定宽度异常——改为自适应两列或单列堆叠，窄宽度不丢字段。
 - 只保留高频项（范围模式/值、分析模型、输出语言等，worker 按现有使用频率判断并在 Notes 列出取舍）；其余引导到 VS Code Settings；**sidebar 出现的每一项必须在 VS Code Settings 有对应注册项**（加载模型是动作不是配置，保留）。
 - 删除无实际作用的 refresh 按钮（先核实其 handler 确实冗余再删，Notes 写明依据）。
 - `package.json` 配置项 `order` 重排：同类相邻（范围/采集 → 分析/模型 → 语言 → 安全 → 保留期）。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/lib/message-handler.ts`、`src/extension.ts`、`package.json`、相关 tests 与现行 user/design/acceptance 文档。
+  - 实现边界：Sidebar settings 改为单列，只保留范围、模型及顶栏语言；密级等其余设置经 More Settings 进入原生 Settings，Prompt 配置继续经既有命令；移除仅重新渲染的 refresh 入口及其公开说明；modelFamily 同步为 VS Code Settings 优先、私有配置旧值 fallback。未改 store/schema，未进入 F2.2+。
+  - 验收结果：`npm run compile` 零错误，`npm test` 387/387 通过，`git diff --check` 通过。review 发现模型设置优先级冲突、失效 Refresh 文档与 Settings 引导缺失，均已补齐并复审通过。
+  - Manual validation：**needs user validation on real VS Code Sidebar**。将侧栏缩窄，确认设置单列且范围/模型/语言可见；More Settings 打开 VS Code Settings；切换模型后 Settings 与 Sidebar 一致；不再出现 Refresh。
+  - Known issues：无。
+  - Commit：`d9d2585`。
 
 ### [ ] F2.2 Sidebar 列表时间与分类调整（其他#10）
 
@@ -230,6 +238,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F1.5 已完成，代码提交 `1706a48`：目录 picker 增加进度与 90s 超时，list 协议以 EntryID 映射默认目录并排除邮箱根，规范名与真实路径互认去重；真实 Outlook 验证待用户执行。下一步 claim F1.6。
 - 2026-07-12 · F1.6 已完成，代码提交 `8323826`：Exchange DN 在采集端 SMTP 化，界面仅显示名称并保留完整地址 tooltip，guide 明确 importantSenders 的 prompt 匹配语义；真实 Exchange 验证待用户执行。下一步 claim F1.7。
 - 2026-07-12 · F1.7 已完成，代码提交 `30c66e5`：取消状态即时可见，token 覆盖模型请求与流读取；真实 Copilot 取消时延待用户执行。F1 已全部完成，下一步按计划进入 F2。
+- 2026-07-12 · F2.1 已完成，代码提交 `d9d2585`：Sidebar 设置栏单列收敛、Settings 引导与模型同步修正，Refresh 入口及说明已删除。下一步可在 F2 批中合并 claim F2.2/F2.3。
 
 ---
 
@@ -264,3 +273,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-12 · Codex（F1.7 pre-work checkpoint）**：恢复现场：F1.1-F1.6 已提交，工作树干净；HEAD `c536003`。重新定位：`sendPromptToModel` 已把 token 传至 provider，Copilot `sendRequest` 已接收该 token，但 `readResponseText` 的流式读取没有主动检查 token；`runWithBusy` 只在任务结束 finally 清 busy，取消请求期间 UI 继续显示原 kind。边界：仅补取消中的 busy 状态、流读取取消检查和对应测试；不改分析/store/schema，不进入 F2 或 R3/R4。
 
 - **2026-07-12 · Codex（F1.7 completion）**：完成 `30c66e5`。同一 CancellationToken 传入 Copilot `sendRequest` 并在流读取中检查；取消时 busy 立即改为 cancelling，仅更新 Sidebar，不触发 Workbench 重建，任务 resolve 后再查 token 防止误报成功。新增可控 extension cancellation 测试与 provider token/stream 测试，并纳入 `npm test`。两轮 review 分别发现取消刷新会并发重建 Workbench、关键测试未纳入全量清单及取消竞态，均已修复并最终复审通过。验收：`npm run compile` 零错误、`npm test` 384/384 通过、VBS `--help`/`--sample` 通过、`git diff --check` 通过。Manual：**needs user validation on real Outlook/VS Code**，确认取消后 1 秒内显示取消中、无成功 toast、结束后复原。Known：LM API 是否中断飞行请求需真实 Copilot 验证。Next：F1 完成，按计划进入 F2 批；R3/R4 继续锁定。
+
+- **2026-07-12 · Codex（F2.1 pre-work checkpoint）**：恢复现场：F1.1-F1.7 已提交，工作树干净；HEAD `dbe66b5`。重新定位：Sidebar settings 固定 `1fr 1fr`，默认窄宽度会挤压控件；现有项为范围、模型、密级与 Prompt 配置，顶部仍有 refresh；refresh 的唯一 handler 只是 `ctx.refresh()`，不拉取/不更新数据。`package.json` 现有 order 已交错，且 modelFamily 未作为 VS Code Settings 注册项。边界：仅按 F2.1 收敛设置 UI、refresh 与配置 order/必要注册项及测试，不改 F2.2+、digest/store/schema 或 R3/R4。
+
+- **2026-07-12 · Codex（F2.1 completion）**：完成 `d9d2585`。Sidebar settings 单列只保留范围/模型，语言保留顶栏，More Settings 引导非高频 VS Code Settings；modelFamily 注册且以 Settings 优先、私有旧值 fallback 并双写；Refresh handler/命令/UI/公开说明一并删除，配置 order 重排。review 先后发现 model 设置无效、失效 Refresh 说明、More Settings 与 Prompt 配置文案不一致，均修复并复审通过。验收：`npm run compile` 零错误、`npm test` 387/387 通过、`git diff --check` 通过。Manual：**needs user validation on real VS Code Sidebar**，验证窄宽、模型双向同步与 More Settings。Known：无。Next：F2 允许多个小项一起 claim；可 claim F2.2/F2.3，Completion Notes 分项写；R3/R4 继续锁定。
