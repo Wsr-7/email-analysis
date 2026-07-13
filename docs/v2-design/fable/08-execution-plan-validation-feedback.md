@@ -445,11 +445,19 @@
     - Known issues：预估基于本次运行已完成 chunk 的平均耗时，模型响应波动大时仅作近似参考。
     - Commit：`f27ce88`。
 
-### [ ] F4.9 模型分类为 ignored 的邮件掉进渲染黑洞（§7#3 消失之谜的真正根因，P0，已确证）
+### [x] F4.9 模型分类为 ignored 的邮件掉进渲染黑洞（§7#3 消失之谜的真正根因，P0，已确证） — `3f71ea8`
 
 - **根因（已确证，2026-07-13 用户新构建复测 + 规划者代码定位）**：用户复测注入邮件，日志全绿（无漏返无孤儿、id 匹配、`mergedItems:1`），analysis-result.json 显示模型将其分类为 `category: "ignored"`（判断合理：test 邮件无业务内容；**注入防御成功**——模型未被劫持，输出规范 JSON 并把注入文本引为 evidence）。但 `dashboard-state.ts:49-53` 构建分类桶时，`ignored` 桶被特殊处理为**仅含 `ignoredIds`（手动 ignore）命中的分析项**，其他桶又只收 `item.category === 自身` 的项——**模型分类为 ignored 且未被手动 ignore 的邮件不属于任何桶**，UI 上凭空消失。两轮"注入邮件消失"（07 §8#8 与本文件 §7#3）的真正根因即此，与注入无关。
 - **做法**：`dashboard-state.ts` 的 ignored 桶改为**并集**：`ignoredIds` 命中的分析项 ∪ `category === "ignored"` 的分析项（按 mailId 去重）。核对 `sidebar-render.ts:200` 的 `queueCounts["ignored"]` 与渲染行随分类桶补齐后自动可见、计数不重不漏。单测：① 模型返回 category=ignored 且不在 ignoredIds → 出现在 ignored 桶且计数正确；② 同一邮件既被手动 ignore 又被模型分类 ignored → 只出现一次。
 - **验收**：`npm test` 全绿。**needs user validation**：重析注入测试邮件 → 出现在 Ignored 队列（含 summary/evidence）；手动 ignore 其他邮件不回归。
+
+  - Completion Notes（2026-07-13）：
+    - 改动文件：`src/lib/dashboard-state.ts`、`src/test/dashboard-state.test.ts`、`src/test/sidebar-render.test.ts`。
+    - 实现边界：ignored 桶改为手动 ignoredIds 与模型 `category === "ignored"` 的并集，按 mailId 去重；未改模型分类、手动 ignore、store/schema 或打包。
+    - 验收结果：两项回归测试先 RED 后 GREEN；模型 ignored 非手动可见于 ignored 桶和 Sidebar count/row，双来源同邮件只出现一次。`npm run compile` 零错误、定向 44/44、完整 `npm test` 419/419、`git diff --check` 均通过；独立 review 通过。
+    - Manual validation：**needs user validation on real VS Code**：重析注入测试邮件，确认其出现在 Ignored 队列且保留 summary/evidence；手动忽略其他邮件不回归。
+    - Known issues：未运行真实 VS Code/Outlook 注入复测。
+    - Commit：`3f71ea8`。
 
 ---
 
@@ -513,6 +521,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F4.6 已完成，代码提交 `077a939`：Guide key 在本地 vsix 无 metadata 时改用扩展目录创建时间，同安装稳定、重装变更；stat 失败才回落 version。真实卸载重装验证待用户执行。下一步按序 claim F4.7。
 - 2026-07-13 · F4.7 已完成，代码提交 `9b2b434`：Marketplace Details 已与 GitHub README 解耦，重新打包的 VSIX Details 与 manifest 均无外链。下一步按序 claim F4.8。
 - 2026-07-13 · F4.8 已完成，代码提交 `f27ce88`：分析按 chunk 报告总数与基于已完成 chunk 的剩余预估，Folder picker 立即提示先启动 Outlook。F4.1-F4.8 均已完成，等待用户真机验证。
+- 2026-07-13 · F4.9 已完成，代码提交 `3f71ea8`：模型分类为 ignored 的邮件与手动 ignored 邮件共同进入 Ignored 队列并按 mailId 去重；Sidebar 计数/行可见。F4 批全部完成，等待用户真机验证；按用户要求未刷新 F4.8 后的 VSIX。
 
 ---
 
@@ -619,6 +628,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.8 pre-work checkpoint）**：恢复现场：F4.7 代码与记录已提交（`9b2b434`、`a0363ca`），工作树干净；HEAD `a0363ca`。已重新定位：`analyzeBatchCore` 已在 chunk loop 写 `analyze:chunkStart/chunkDone` 日志（`src/lib/app-analysis.ts:312-395`），但 `runWithBusy` 的 progress 只在开始显示固定 `labels.progress.detail`（`src/extension.ts:641-663`、`741-744`），两层之间没有 progress 回调；`selectFolders` 当前首条文案为“Starting Outlook and reading mail folders…”（`894-910`），需按计划提前明确启动 Outlook 会显著加快加载。边界：仅复用现有分析上下文增加 progress 回调与文案/测试，不改 chunk 串行模型、草稿生成、store/schema 或 R3 提速决策。
 
 - **2026-07-13 · Codex（F4.8 completion）**：完成 `f27ce88`。批分析首 chunk 前显示总数；从第二个 chunk 起按已完成 chunk 平均耗时×剩余数报告预估，保留串行、取消和失败语义。review 发现首 chunk 的 0 分钟误导性提示，已在 `index > 0` 后才估时并复审通过；Folder picker 首条文案已提示先启动 Outlook。验收：`npm run compile` 零错误、定向 40/40、全量 `npm test` 417/417、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，观察多 chunk 进度与首条 picker 提示。F4 批全部完成。
+
+- **2026-07-13 · Codex（F4.9 pre-work checkpoint）**：恢复现场：用户要求不再打包，已用可追溯 revert `01a9f26` 撤销刚生成的 F4.8 VSIX 更新，工作树干净；HEAD `01a9f26`。已重新定位：`buildDashboardState` 先将手动 ignored 从正常 `items` 排除，再将 ignored 桶唯一赋为 `ignoredItems`（`src/lib/dashboard-state.ts:44-55`）；因此模型 `category === "ignored"` 且未手动 ignore 的邮件既不在正常 items 也不在 ignoredItems，确实没有任何分类桶。边界：仅把 ignored 桶改为两来源 union 按 mailId 去重，并加状态/渲染计数回归测试；不改模型分类、手动 ignore 语义、store/schema 或重新打包。
+
+- **2026-07-13 · Codex（F4.9 completion）**：完成 `3f71ea8`。ignored 桶从排序后的 allItems 合并手动 ignored 与模型 ignored，再按 mailId 去重；正常 items、overview 和手动 ignore 语义未变。Sidebar 直接消费该分类桶，模型 ignored 已有 queue count/row 回归覆盖；review 无 P0/P1/P2。验收：`npm run compile` 零错误、定向 44/44、全量 `npm test` 419/419、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，重析注入测试邮件并确认 Ignored 队列可见。F4 批全部完成；按用户要求未重新打包。
 
 ---
 
