@@ -176,7 +176,15 @@ export class EasyMailApp {
 
   private async maybeOpenGuide(): Promise<void> {
     const packageJSON = this.context.extension.packageJSON;
-    const key = `easyMail.guideShown.${packageJSON?.__metadata?.installedTimestamp || packageJSON?.version || "0.0.0"}`;
+    let installSignature = packageJSON?.__metadata?.installedTimestamp;
+    if (!installSignature) {
+      try {
+        installSignature = String((await fs.promises.stat(this.context.extensionPath)).birthtimeMs);
+      } catch {
+        installSignature = packageJSON?.version || "0.0.0";
+      }
+    }
+    const key = `easyMail.guideShown.${installSignature}`;
     if (this.context.globalState.get<boolean>(key)) {
       return;
     }

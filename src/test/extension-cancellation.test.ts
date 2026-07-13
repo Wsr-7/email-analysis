@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import * as fs from "node:fs";
 import Module from "node:module";
 import test from "node:test";
 
@@ -156,14 +157,14 @@ test("CopilotProvider passes the same cancellation token to sendRequest and stre
   assert.equal(response.rawText, "ok");
 });
 
-test("maybeOpenGuide keys first-run state by install timestamp and falls back to version", async () => {
+test("maybeOpenGuide uses install metadata, directory birth time, then version as its install signature", async () => {
   const shown = new Map<string, boolean>();
   let opened = 0;
   const openGuide = async () => { opened += 1; };
-  const createApp = (packageJSON: unknown) => {
+  const createApp = (packageJSON: unknown, extensionPath: string) => {
     const app = new EasyMailApp({
       globalStorageUri: { fsPath: "" },
-      extensionPath: "",
+      extensionPath,
       extension: { packageJSON },
       globalState: {
         get: (key: string) => shown.get(key),
@@ -175,17 +176,34 @@ test("maybeOpenGuide keys first-run state by install timestamp and falls back to
     return app;
   };
 
-  await (createApp({ version: "0.3.0", __metadata: { installedTimestamp: "2026-07-12T00:00:00Z" } }) as any).maybeOpenGuide();
-  await (createApp({ version: "0.3.0", __metadata: { installedTimestamp: "2026-07-12T00:00:00Z" } }) as any).maybeOpenGuide();
-  await (createApp({ version: "0.3.0" }) as any).maybeOpenGuide();
-  await (createApp({ version: "0.3.1", __metadata: null }) as any).maybeOpenGuide();
-  await (createApp({ version: "0.3.2", __metadata: { installedTimestamp: "" } }) as any).maybeOpenGuide();
+  const originalStat = fs.promises.stat;
+  const statPaths: string[] = [];
+  (fs.promises as any).stat = async (extensionPath: string) => {
+    statPaths.push(extensionPath);
+    if (extensionPath === "broken-install") {
+      throw new Error("stat failed");
+    }
+    return { birthtimeMs: extensionPath === "vsix-a" ? 100 : 200 };
+  };
 
-  assert.equal(shown.get("easyMail.guideShown.2026-07-12T00:00:00Z"), true);
-  assert.equal(shown.get("easyMail.guideShown.0.3.0"), true, "development hosts without install metadata retain version fallback");
-  assert.equal(shown.get("easyMail.guideShown.0.3.1"), true, "null metadata retains version fallback");
-  assert.equal(shown.get("easyMail.guideShown.0.3.2"), true, "empty install timestamp retains version fallback");
-  assert.equal(opened, 4, "the same install timestamp opens the guide only once");
+  try {
+    await (createApp({ version: "0.3.0", __metadata: { installedTimestamp: "2026-07-12T00:00:00Z" } }, "marketplace") as any).maybeOpenGuide();
+    await (createApp({ version: "0.3.0", __metadata: { installedTimestamp: "2026-07-12T00:00:00Z" } }, "marketplace") as any).maybeOpenGuide();
+    await (createApp({ version: "0.3.0" }, "vsix-a") as any).maybeOpenGuide();
+    await (createApp({ version: "0.3.0", __metadata: { installedTimestamp: "" } }, "vsix-a") as any).maybeOpenGuide();
+    await (createApp({ version: "0.3.0", __metadata: null }, "vsix-b") as any).maybeOpenGuide();
+    await (createApp({ version: "0.3.0" }, "broken-install") as any).maybeOpenGuide();
+    await (createApp({ version: "0.3.0" }, "broken-install") as any).maybeOpenGuide();
+  } finally {
+    (fs.promises as any).stat = originalStat;
+  }
+
+  assert.equal(shown.get("easyMail.guideShown.2026-07-12T00:00:00Z"), true, "Marketplace metadata takes priority");
+  assert.equal(shown.get("easyMail.guideShown.100"), true, "the local vsix install uses its directory birth time");
+  assert.equal(shown.get("easyMail.guideShown.200"), true, "a reinstall with a different directory birth time opens the guide");
+  assert.equal(shown.get("easyMail.guideShown.0.3.0"), true, "a stat failure falls back to package version");
+  assert.deepEqual(statPaths, ["vsix-a", "vsix-a", "vsix-b", "broken-install", "broken-install"], "metadata must avoid an unnecessary filesystem fallback");
+  assert.equal(opened, 4, "each installation signature opens the guide only once");
 });
 
 test("getDashboardHtml forwards the meeting store attached by loadState", async () => {
