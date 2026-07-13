@@ -424,10 +424,12 @@
     - Known issues：真实安装目录创建时间行为需用户在本地 VS Code 复验。
     - Commit：`077a939`。
 
-### [ ] F4.7 Marketplace Details 与 README 解耦、去外链（§7#16 用户诉求，P2）
+### [x] F4.7 Marketplace Details 与 README 解耦、去外链（§7#16 用户诉求，P2） — `9b2b434`
 
 - **做法**：新建 `docs/marketplace-details.md`（自包含无外链版：删除 releases/user guide/setup/AGENTS 等链接与外部跳转，保留纯文案 + 截图占位）；打包改用 `vsce package --readme-path docs/marketplace-details.md`（先验证当前 vsce 版本支持该参数；不支持则打包脚本临时替换 README 再还原，Notes 写明取舍）。GitHub 的 README.md/README_zh.md 保持现状。
 - **验收**：重新打包后扩展详情页 Details 来自新文件且无外链；`npm test` 全绿。
+
+  - Completion Notes（2026-07-13）：`docs/marketplace-details.md` 作为独立无链接 Details；打包使用 `--readme-path`，并移除 package repository 以消除 VSIX manifest 自动生成的外链，重新打包 `releases/easymail-0.3.0.vsix`。`README.md`/`README_zh.md` 未改。验收：解包确认 Details 逐字一致且 manifest 无 Links；定向 1/1、完整 `npm test` 416/416、独立 review、`git diff --check` 均通过。Manual validation：安装本地 vsix，确认 Details 仅为本地内容且无外部跳转。Known issues：Marketplace 不再显示源码/支持链接，这是去外链要求的有意取舍。Commit：`9b2b434`。
 
 ### [ ] F4.8 分析进度按 chunk 更新 + 预估耗时 + picker 提前提示（新反馈#1 + §7#6 建议，P2）
 
@@ -501,6 +503,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F4.4 已完成，代码提交 `d43062b`：可取消任务在取消瞬间提供独立 toast，Sidebar cancelling 更新保留；真实 VS Code 时序验证待用户执行。下一步按序 claim F4.5。
 - 2026-07-13 · F4.5 已完成，代码提交 `8f3e9d6`：Workbench active reader、detail card 与单封原文容器统一占满可用宽度；active reader 时 placeholder 由 CSS 强制 `display: none`。真实 VS Code 布局验证待用户执行。下一步按序 claim F4.6。
 - 2026-07-13 · F4.6 已完成，代码提交 `077a939`：Guide key 在本地 vsix 无 metadata 时改用扩展目录创建时间，同安装稳定、重装变更；stat 失败才回落 version。真实卸载重装验证待用户执行。下一步按序 claim F4.7。
+- 2026-07-13 · F4.7 已完成，代码提交 `9b2b434`：Marketplace Details 已与 GitHub README 解耦，重新打包的 VSIX Details 与 manifest 均无外链。下一步按序 claim F4.8。
 
 ---
 
@@ -599,6 +602,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.6 pre-work checkpoint）**：恢复现场：F4.5 代码与记录已提交（`8f3e9d6`、`91bb521`），工作树干净；HEAD `91bb521`。已重新定位：`maybeOpenGuide` 当前仅用 `packageJSON.__metadata.installedTimestamp || version` 构成 globalState key（`src/extension.ts:177-184`）；本地 vsix 没有该 metadata，故同版本重装复用旧 key。现有单测也只覆盖 metadata/version 回落（`src/test/extension-cancellation.test.ts:160-188`）。边界：仅 Guide 安装签名三级回落与单测；不改 Guide 内容、其他 globalState、打包流程或 F4.7。
 
 - **2026-07-13 · Codex（F4.6 completion）**：完成 `077a939`。Guide 安装签名按非空 metadata → 扩展目录 `birthtimeMs` → version 回落；测试覆盖 metadata 不触发 stat、相同 birthtime 仅一次、不同 birthtime 视为重装、stat 失败回落，mock 由 finally 复原。独立 review 无 P0/P1/P2。验收：`npm run compile` 零错误、定向 12/12、全量 `npm test` 415/415、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，卸载重装同版本 vsix 后 Guide 再弹，同安装重启不重复。Next：claim F4.7。
+
+- **2026-07-13 · Codex（F4.7 pre-work checkpoint）**：恢复现场：F4.6 代码与记录已提交（`077a939`、`049094c`、`e2b1cbb`），工作树干净；HEAD `e2b1cbb`。已重新定位：`package.json` 当前打包脚本直接执行 `vsce package --out releases/easymail-0.3.0.vsix`，仓库根 README 与中英文 README、user guide、setup、AGENTS 一并列入 package files；`npx vsce package --help` 已核对当前版本可调用。边界：仅新增无外链 Marketplace Details 并令打包使用它；GitHub README 保持现状，不改功能代码或 F4.8。
+
+- **2026-07-13 · Codex（F4.7 completion）**：完成 `9b2b434`。复审发现 repository 元数据会在 VSIX manifest 生成五个 GitHub Links，已在本 step 边界内移除并使用 `--allow-missing-repository`；解包产物确认 Details 指向新文件、正文及 manifest 均无外链。验收：`npm test` 416/416、定向 1/1、`git diff --check`、独立复审均通过。Manual：**needs user validation on real VS Code**，安装新 vsix 后确认 Details 无跳转。Next：claim F4.8。
 
 ---
 
