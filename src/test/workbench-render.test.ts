@@ -342,6 +342,7 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes("Thread Subject"));
     assert.ok(html.includes('data-id="t1"'));
+    assert.ok(html.includes('data-action="analyzeThread" data-thread-id="t1">Analyze Full Thread</button>'));
     assert.ok(html.includes("Participants:</strong> Alice</div>"));
     assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'));
   });
@@ -401,6 +402,7 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
 
     assert.ok(html.includes("Thread Spotlight"));
+    assert.ok(html.includes('data-action="analyzeThread" data-thread-id="t1">Re-analyze</button>'));
     assert.ok(html.includes("Approval is not confirmed."));
     assert.ok(html.includes("Move release to Thursday."));
     assert.ok(!html.includes("Open Questions"));

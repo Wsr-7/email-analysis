@@ -177,7 +177,7 @@ function renderThreadDetail(
       <div class="wb-field"><strong>${escapeHtml(labels.threads.security)}:</strong> ${escapeHtml(formatThreadSecurity(thread.security))}</div>
     </div>
     <div class="wb-actions">
-      <button class="wb-btn${busyKind === "analyzeThread" ? " is-busy" : ""}" data-action="analyzeThread" data-thread-id="${escapeAttr(thread.threadId)}"${busyKind ? " disabled" : ""}>${escapeHtml(labels.threads.analyzeThread)}${renderButtonSpinner(busyKind === "analyzeThread")}</button>
+      <button class="wb-btn${busyKind === "analyzeThread" ? " is-busy" : ""}" data-action="analyzeThread" data-thread-id="${escapeAttr(thread.threadId)}"${busyKind ? " disabled" : ""}>${escapeHtml(analysis ? labels.card.reanalyze : labels.threads.analyzeThread)}${renderButtonSpinner(busyKind === "analyzeThread")}</button>
       ${ignoredIds && thread.sourceMailIds.length > 0 && thread.sourceMailIds.every((id) => ignoredIds.has(id))
         ? `<button class="wb-btn ghost" data-action="unignoreThread" data-thread-id="${escapeAttr(thread.threadId)}">${escapeHtml(labels.card.restore)}</button>`
         : `<button class="wb-btn ghost" data-action="ignoreThread" data-thread-id="${escapeAttr(thread.threadId)}">${escapeHtml(labels.card.ignore)}</button>`}
