@@ -535,6 +535,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F5.4 已完成，代码提交 `e08be3e`：每个分析 chunk 写盘后立即 sidebar-only 更新，workbench 仍只在任务结束时刷新，避免中途打断阅读与草稿。真实 VS Code 验证待用户执行。F5 全部完成。
 - 2026-07-14 · F6.4 已完成，代码提交 `d02bb1d`：批量分析在总量提示后立即报告 `Analyzing chunk 1/N…`，后续 chunk 继续显示剩余时间预估。下一步 claim F6.5。
 - 2026-07-14 · F6.5 已完成，代码提交 `d08a8c4`：默认 hard block 词表扩至 18 个中英文关键词，中文“密码”命中回归已覆盖。下一步记录并 claim 用户新增的单项分析文案优化。
+- 2026-07-14 · F6.6 已完成，代码提交 `3a39356`：Workbench 单封与线程分析通知分别使用 `Analyzing 1 email`、`Analyzing 1 thread`，单封不再被 batch chunk 消息覆盖；Sidebar 批量进度保持原样。F6 全部完成，下一步重新打包 VSIX 并推送。
 
 - 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
 
@@ -681,6 +682,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-14 · Codex（F6.5 pre-work checkpoint）**：恢复现场：F6.4 代码与记录已提交（`d02bb1d`、`1a59d53`），工作树干净；HEAD `1a59d53`。已重新定位：`buildSecuritySettings` 的 hard block 默认值仍仅有四个英文词；`decideMail` 对 `mailText` 调用 `matchKeywords`，后者已按 lower-case 字面子串匹配。边界：仅按计划替换默认硬阻断词表并增加中文“密码”命中回归；不改匹配算法、手动确认词、配置化、store/schema 或 R3。
 
 - **2026-07-14 · Codex（F6.5 completion）**：完成 `d08a8c4`。默认 hard block 词表现含计划规定的 18 个词，继续由既有大小写不敏感子串匹配消费；新增中文“密码”从默认设置进入 `buildMailGateDecision` 后 hard block 的回归。验收：定向 security gate 10/10、`npm run compile` 零错误、完整 `npm test` 427/427、`git diff --check` 均通过。Manual：**needs user validation on real Outlook/VS Code**，确认含“密码”的邮件被 hard block。Known issues：语义/变体覆盖仍属 R3。Next：记录并 claim 用户新增单项分析文案优化。
+
+- **2026-07-14 · Codex（F6.6 pre-work checkpoint）**：恢复现场：F6.5 代码与记录已提交（`d08a8c4`、`e821423`），工作树干净；HEAD `e821423`。按用户新增需求重新定位：`analyzeSelected` 以单个 mailId 调用共用的 `runAnalysisWithBusy`，该方法无条件传入通用 detail 与 `reportProgress`，故 F6.4 chunk 消息会覆盖单封提示；`analyzeThread` 独立调用 `runWithBusy`，同样给了通用 detail。边界：只按入口区分单封和单线程的 notification detail，并阻止单封转发 batch chunk progress；Sidebar 批量入口、chunk 逻辑、locale/schema/config 均不改。
+
+- **2026-07-14 · Codex（F6.6 completion）**：完成 `3a39356`。单个 mailId 选择的初始通知为 `Analyzing 1 email`，且不再转发 chunk progress；线程入口为 `Analyzing 1 thread`。Sidebar 批量入口仍保留总量和 F6.4 chunk 序列。验收：定向 extension cancellation 17/17、`npm run compile` 零错误、完整 `npm test` 429/429、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，分别验证 Workbench 单封、线程与 Sidebar 多封三条路径。Known issues：无新增。Next：F6 全部完成，重新打包 VSIX 并推送。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -870,6 +875,20 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - Manual validation：**needs user validation on real Outlook/VS Code**。拉取或以 sample 构造正文含“密码”的邮件后执行单封 Analyze，确认被 hard block，且不会出现普通 Analyze/Confirm Analyze 流程。
   - Known issues：此层仍是字面子串快速止损，不覆盖同义改写或语义变体；可配置化与正则仍属于 R3。
   - Commit：`d08a8c4`。
+
+### [x] F6.6 单项分析进度文案（用户新增，P2）（commit `3a39356`）
+
+- **现状（已核实）**：`analyzeSelected` 与 Sidebar 批量入口共用 `runAnalysisWithBusy`，初始通知均为通用 `Analyzing…`，且单封也会被 batch chunk 进度覆盖；`analyzeThread` 同样使用通用 detail。用户需要单封与线程的即时提示更准确，而 Sidebar 的批量 `N emails`/chunk 序列保持不变。
+- **做法**：单封邮件 Analyze 使用 `Analyzing 1 email`，且不把 batch chunk 进度转给该单项通知；线程 Analyze 使用 `Analyzing 1 thread`。Sidebar Analyze/Analyze All 继续保留既有总量与 chunk progress（含 F6.4 的 `1/N` 序列）。不新增 locale/schema/config。
+- **验收**：单测分别锁定单封、线程 detail 与单封不接收 chunk progress；`npm test` 全绿。**needs user validation**：在 Workbench 点击单封 Analyze 与线程 Analyze，右下角通知分别显示上述单项文案；从 Sidebar 分析多封仍显示总量/chunk 文案。
+
+- **Completion Notes**：
+  - 改动文件：`src/extension.ts`、`src/test/extension-cancellation.test.ts`。
+  - 实现边界：单个 mailId 选择才使用 `Analyzing 1 email`，并不再把 batch chunk progress 转交给通知；线程入口使用 `Analyzing 1 thread`。Sidebar 的 Analyze/Analyze All 仍使用原有总量及 chunk progress。未改 locale/schema/config、分析逻辑或 sidebar 刷新。
+  - 验收结果：两条新增文案回归先 RED 后 GREEN；定向 extension cancellation 17/17 通过；`npm run compile` 零错误；完整 `npm test` 429/429 通过；`git diff --check` 通过。
+  - Manual validation：**needs user validation on real VS Code**。在 Workbench 分别点击单封邮件 Analyze 和线程 Analyze，确认右下角通知为 `Analyzing 1 email` 与 `Analyzing 1 thread`；从 Sidebar 分析多封，确认仍显示总量/chunk 文案。
+  - Known issues：无新增。
+  - Commit：`3a39356`。
 
 ### 第四轮验证问答核实记录（2026-07-13）
 
