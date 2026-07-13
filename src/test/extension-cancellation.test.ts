@@ -25,7 +25,10 @@ const vscodeMock = {
 const internalModule = Module as unknown as { _load: (request: string, parent: unknown, isMain: boolean) => unknown };
 const originalLoad = internalModule._load;
 internalModule._load = (request, parent, isMain) => request === "vscode" ? vscodeMock : originalLoad(request, parent, isMain);
-const { EasyMailApp } = require("../extension") as { EasyMailApp: new (context: unknown) => object };
+const { EasyMailApp, buildSidebarRenderInput } = require("../extension") as {
+  EasyMailApp: new (context: unknown) => object;
+  buildSidebarRenderInput: (state: any, availableModels: unknown[], nextActionsStore: unknown, busyKind: string, isBusy: boolean) => any;
+};
 const { CopilotProvider } = require("../lib/copilot-provider") as { CopilotProvider: new () => { listModels: () => Promise<unknown[]>; sendPrompt: (prompt: string, options: unknown) => Promise<{ rawText: string }> } };
 internalModule._load = originalLoad;
 
@@ -170,6 +173,37 @@ test("getDashboardHtml forwards the meeting store attached by loadState", async 
   const html = await (app as any).getDashboardHtml();
 
   assert.ok(html.includes("F4.1 Meeting"));
+});
+
+test("buildSidebarRenderInput forwards every render field attached by loadState", () => {
+  const store = { marker: "store" };
+  const index = { marker: "index" };
+  const queue = { marker: "queue" };
+  const classifications = { marker: "classifications" };
+  const securityDecisions = new Map([["mail-1", { marker: "security" }]]);
+  const promptConfig = { marker: "prompt" };
+  const threadStore = { marker: "threads" };
+  const threadAnalysis = { marker: "thread-analysis" };
+  const meetingStore = { marker: "meetings" };
+  const ignoredIds = new Set(["mail-1"]);
+  const state = {
+    config: {}, digestMetadata: {}, overview: {}, categories: [],
+    store, index, queue, classifications, securityDecisions, promptConfig,
+    threadStore, threadAnalysis, meetingStore, ignoredIds
+  };
+
+  const input = buildSidebarRenderInput(state, [], { items: [] }, "", false);
+
+  assert.equal(input.store, store);
+  assert.equal(input.index, index);
+  assert.equal(input.queue, queue);
+  assert.equal(input.classifications, classifications);
+  assert.equal(input.securityDecisions, securityDecisions);
+  assert.equal(input.promptConfig, promptConfig);
+  assert.equal(input.threadStore, threadStore);
+  assert.equal(input.threadAnalysis, threadAnalysis);
+  assert.equal(input.meetingStore, meetingStore);
+  assert.equal(input.ignoredIds, ignoredIds);
 });
 
 test("flushWorkbenchDrafts times out a missing webview response and permits the next flush", async () => {

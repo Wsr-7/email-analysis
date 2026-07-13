@@ -41,6 +41,46 @@ type BusyState = {
 
 type SecurityDecisionMap = Map<string, SecurityGateDecisionResult>;
 
+type LoadedDashboardState = DashboardState & {
+  modelInfo?: Record<string, unknown>;
+  store?: MailStore;
+  index?: MailIndex;
+  queue?: ReturnType<typeof buildQueueState>;
+  classifications?: ClassificationCache;
+  securityDecisions?: SecurityDecisionMap;
+  promptConfig?: PromptConfig;
+  threadStore?: ThreadStore;
+  threadAnalysis?: ThreadAnalysisResult;
+  meetingStore?: MeetingStore;
+  ignoredIds?: Set<string>;
+};
+
+export function buildSidebarRenderInput(
+  state: LoadedDashboardState,
+  availableModels: AvailableModel[],
+  nextActionsStore: NextActionsStore,
+  busyKind: string,
+  isBusy: boolean
+): Parameters<typeof renderSidebarHtml>[0] {
+  return {
+    state,
+    store: state.store || emptyMailStore(),
+    index: state.index || emptyMailIndex(),
+    queue: state.queue || { pending: [], blocked: [], analysed: [], allowed: [] },
+    classifications: state.classifications || normalizeClassificationCache({}),
+    securityDecisions: state.securityDecisions || new Map(),
+    promptConfig: state.promptConfig || normalizePromptConfig({}),
+    threadStore: state.threadStore || emptyThreadStore(),
+    threadAnalysis: state.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    meetingStore: state.meetingStore || emptyMeetingStore(),
+    ignoredIds: state.ignoredIds,
+    nextActionsStore,
+    availableModels,
+    busyKind,
+    isBusy
+  };
+}
+
 function configuredOutputLanguage(settings: vscode.WorkspaceConfiguration): Locale {
   const inspected = settings.inspect<string>("outputLanguage");
   const explicit = inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
@@ -1217,19 +1257,7 @@ export class EasyMailApp {
       config.autoAnalyzeMaxClassificationLevel,
       config.ignoredSenders
     );
-    const state = buildDashboardState(config, digest, analysis, ignoredIds, allowedCategoryIds(promptConfig), securedThreadStore) as DashboardState & {
-      modelInfo?: Record<string, unknown>;
-      store?: MailStore;
-      index?: MailIndex;
-      queue?: ReturnType<typeof buildQueueState>;
-      classifications?: ClassificationCache;
-      securityDecisions?: SecurityDecisionMap;
-      promptConfig?: PromptConfig;
-      threadStore?: ThreadStore;
-      threadAnalysis?: ThreadAnalysisResult;
-      meetingStore?: MeetingStore;
-      ignoredIds?: Set<string>;
-    };
+    const state = buildDashboardState(config, digest, analysis, ignoredIds, allowedCategoryIds(promptConfig), securedThreadStore) as LoadedDashboardState;
     state.modelInfo = await this.data.readModelInfo();
     state.store = store;
     state.index = index;
@@ -1301,37 +1329,10 @@ export class EasyMailApp {
 
   private async getDashboardHtml(): Promise<string> {
     const state = await this.loadState();
-    const extendedState = state as DashboardState & {
-      store?: MailStore;
-      index?: MailIndex;
-      queue?: ReturnType<typeof buildQueueState>;
-      classifications?: ClassificationCache;
-      securityDecisions?: SecurityDecisionMap;
-      promptConfig?: PromptConfig;
-      threadStore?: ThreadStore;
-      threadAnalysis?: ThreadAnalysisResult;
-      meetingStore?: MeetingStore;
-      ignoredIds?: Set<string>;
-    };
+    const extendedState = state as LoadedDashboardState;
     const availableModels = await this.data.readCachedAvailableModels(this.availableModelsCache, (event, d) => this.log(event, d));
     const nextActionsStore = await this.data.readNextActions();
-    return renderSidebarHtml({
-      state,
-      store: extendedState.store || emptyMailStore(),
-      index: extendedState.index || emptyMailIndex(),
-      queue: extendedState.queue || { pending: [], blocked: [], analysed: [], allowed: [] },
-      classifications: extendedState.classifications || normalizeClassificationCache({}),
-      securityDecisions: extendedState.securityDecisions || new Map(),
-      promptConfig: extendedState.promptConfig || normalizePromptConfig({}),
-      threadStore: extendedState.threadStore || emptyThreadStore(),
-      threadAnalysis: extendedState.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
-      meetingStore: extendedState.meetingStore || emptyMeetingStore(),
-      ignoredIds: extendedState.ignoredIds,
-      nextActionsStore,
-      availableModels,
-      busyKind: this.busy?.kind || "",
-      isBusy: !!this.busy
-    });
+    return renderSidebarHtml(buildSidebarRenderInput(extendedState, availableModels, nextActionsStore, this.busy?.kind || "", !!this.busy));
   }
 }
 
