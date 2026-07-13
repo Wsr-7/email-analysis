@@ -536,7 +536,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
 
-- 2026-07-14 · F6.3 已完成，代码提交 `a0fbca0`：会议的 Open in Outlook 已移至 metadata 下方、正文之前的统一按钮区。下一步按序 claim F6.4。
+- 2026-07-14 · F6.3 已完成，代码提交 `bd5cba7`：会议的 Open in Outlook 已移至 metadata 下方、正文之前的统一按钮区。下一步按序 claim F6.4。
 
 ## 6. Handover Log
 
@@ -670,7 +670,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - **2026-07-14 · Codex（F6.3 pre-work checkpoint）**：恢复现场：F6.1/F6.2 代码与记录已提交（`0a44b9b`、`8e6d851`），工作树干净；HEAD `8e6d851`。已重新定位 `renderMeetingDetail`：`wb-meta-grid` 后先渲染正文、再渲染 `openMeetingInOutlook` actions，故按钮在底部；F6.2 已使 actions 自带前后单线，移动到 metadata 后即可与邮件一致。边界：仅重排既有会议详情模板与回归断言；不改 EntryID/VBS、meeting store/schema 或 F6.4/F6.5。
 
-- **2026-07-14 · Codex（F6.3 completion）**：完成 `a0fbca0`。会议模板只将既有 `wb-actions` 从正文后移至 metadata 后，继续使用同一 `openMeetingInOutlook` EntryID 按钮和 F6.2 统一样式；正文内容与数据路径不变。验收：`npm run compile` 零错误、Workbench 定向 40/40、完整 `npm test` 426/426、`git diff --check` 通过。Manual：**needs user validation on real VS Code/Outlook**，打开会议详情确认按钮在 metadata 下方，并确认原 EntryID 项仍能打开。Known issues：真实 Outlook 打开行为仍依赖既有 F5.2 真机验证。Next：claim F6.4。
+- **2026-07-14 · Codex（F6.3 completion）**：完成 `bd5cba7`。会议模板只将既有 `wb-actions` 从正文后移至 metadata 后，继续使用同一 `openMeetingInOutlook` EntryID 按钮和 F6.2 统一样式；正文内容与数据路径不变。验收：`npm run compile` 零错误、Workbench 定向 40/40、完整 `npm test` 426/426、`git diff --check` 通过。Manual：**needs user validation on real VS Code/Outlook**，打开会议详情确认按钮在 metadata 下方，并确认原 EntryID 项仍能打开。Known issues：真实 Outlook 打开行为仍依赖既有 F5.2 真机验证。Next：claim F6.4。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -832,7 +832,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - 验收结果：`npm run compile` 零错误、Workbench 定向 40/40、完整 `npm test` 426/426、`git diff --check` 通过。
   - Manual validation：**needs user validation on real VS Code/Outlook**：确认会议按钮位置及原日历项打开。
   - Known issues：真实 Outlook 打开行为仍待既有真机验证。
-  - Commit：`a0fbca0`。
+  - Commit：`bd5cba7`。
 
 ### [ ] F6.4 chunk 进度序列补首块（用户反馈#3，P2）
 
