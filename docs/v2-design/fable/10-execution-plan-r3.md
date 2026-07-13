@@ -63,7 +63,7 @@
 - **验收**：单测——自定义词表生效、空数组关闭、非法值回落、**词表变更触发缓存全量重算**；`npm test` 全绿。**needs user validation**：Settings 改词表后，已拉取邮件的分级与 hard block 行为都随之变化（无需重新 Fetch）。
 - **边界**：不做正则模式、不做 MIP（二期已搁置）；分级级别名与数量（0-3 四级）不动。
 
-### [~] G4 dueDate 结构化（D4，S-M 级）
+### [x] G4 dueDate 结构化（D4，S-M 级）— `b6a6ead`
 
 - **现状锚点**：`analysis-schema.ts` `AnalysisItem`/normalize；`prompts/output-schema.md` 字段清单；**分类内条目顺序来自 `dashboard-state.ts`（`compareItems` 全局排序后分桶），不是 sidebar-render**；行渲染在 `sidebar-render.ts` `renderCompactAnalysisRow`；workbench 详情 `renderAnalysisDetail`。
 - **做法**：
@@ -122,6 +122,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G1 已完成（`f3dd065`）：单封分析 chunk 以并发度 2 补位执行，合并落盘串行化；新增 `draftGeneration=auto|onDemand`，全量测试 437 pass。Next: claim G2。
 - 2026-07-14 · G2 已完成（`96723b8`）：会议队列更名为会议邀请，未响应邀请平铺，未来已接受/暂定/组织者日程默认折叠，徽标仅计未响应。全量测试 438 pass。Next: claim G3。
 - 2026-07-14 · G3 已完成（`789799b`）：hard-block/manual-confirm 与 3/2 级分类词表均可在 Settings 编辑，空数组关闭，非法值回落，分级词表 hash 变化触发全量重算。全量测试 443 pass。Next: claim G4。
+- 2026-07-14 · G4 已完成（`b6a6ead`）：分析输出新增合法 `YYYY-MM-DD` dueDate，两个行动桶按期限优先排序，Sidebar/Workbench 显示期限且过期或今日到期标红，翻译保持日期不变。全量测试 447 pass。Next: claim G5。
 
 ---
 
@@ -168,3 +169,13 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Commit：`789799b`（本地，未 push）。
 
 - **2026-07-14 · Codex（G4 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `18cff8d`；重新定位确认 `src/lib/analysis-schema.ts:54-70/123-176` 为 AnalysisItem 与 normalize，`src/lib/app-analysis.ts:184` 为 omitted fallback，`src/lib/dashboard-state.ts` 的 `compareItems` 后分桶决定分类内顺序，Sidebar/Workbench 渲染锚点分别仍在 `src/lib/sidebar-render.ts:105` 与 `src/lib/workbench-render.ts:63`，翻译入口在 `src/lib/analysis-translation.ts`。边界：仅新增可选 dueDate、合法日期 normalize、两个目标桶内排序、期限标识/详情与翻译保护；不改 digest、不做提醒或新计数。Action: claim G4。
+
+- **2026-07-14 · Codex（G4 completion）**：Action: 完成 dueDate schema/prompt、真实日历日期 normalize、两个行动桶期限优先排序、Sidebar 期限徽标与本地日期紧急态、Workbench metadata 及翻译保护。Validated: `npm run compile` 通过；`node --test out/test/app-analysis.test.js` 31 pass；`npm test` 447 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——分析一封正文明确写出期限的真实邮件，核对期限徽标、两个行动桶排序、今日/过期红色样式与 Workbench 期限字段。Next: G5。
+
+  **Completion Notes**
+  - 改动文件：`prompts/analysis-prompt.md`、`prompts/output-schema.md`、`src/lib/analysis-schema.ts`、`src/lib/app-analysis.ts`、`src/lib/dashboard-state.ts`、`src/lib/dashboard-labels.ts`、`src/lib/sidebar-render.ts`、`src/lib/workbench-render.ts`、`src/lib/analysis-translation.ts`、对应测试、本计划。
+  - 实现边界：只结构化单封分析期限、目标桶排序与可见标识；未改 digest 格式、overview 计数，也未实现提醒/通知。
+  - 验收结果：合法日期（含闰年）、非法日期清空、目标桶排序、其他桶稳定、紧急态与翻译保护均有自动化覆盖；全量 447 pass。
+  - Manual validation：**needs user validation**，真实 Copilot 是否只为明确期限输出日期，以及真实 webview 的排序与红色状态仍需确认。
+  - Known issues：模型输出质量依赖 prompt 遵从；不确定期限按设计为空，不会推断或提醒。
+  - Commit：`b6a6ead`（本地，未 push）。
