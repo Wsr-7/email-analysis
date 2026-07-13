@@ -540,6 +540,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-14 · F7.2 已完成，代码提交 `1adf263`：同线程 Next Action 行以唯一 action id 高亮，点击仍按 sourceId 路由至 Workbench。真实 VS Code 验证待用户执行。下一步 claim F7.3。
 - 2026-07-14 · F7.3 已完成，代码提交 `e857db4`：hard block 决策已参与队列分流，低密级命中词的邮件显示在既有“需手动确认”队列，详情保留安全阻断原因且无分析入口。真实 VS Code 验证待用户执行。F7 全部完成。
 - 2026-07-14 · F7.4 已完成，代码提交 `edcc2f3`：VS Code Settings 的 Folders、Important Senders、Ignore Senders 现相邻排序，未重排其他配置。真实 VS Code 验证待用户执行。下一步 claim F7.5。
+- 2026-07-14 · F7.5 已完成，代码提交 `14e9c80`：线程已有 Spotlight 时仅按钮文案切换为 `Re-analyze`，action 与分析行为不变。真实 VS Code 验证待用户执行。F 系列全部完成，下一步重新打包 VSIX 并推送。
 
 - 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
 
@@ -706,6 +707,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-14 · Codex（F7.4 pre-work checkpoint）**：恢复现场：F7 代码、文档与 VSIX 已提交推送（HEAD `7251b74`），工作树干净，branch `v3...origin/v3`。已重新定位 VS Code configuration manifest：Folders 的 order 为 4、Important Senders 为 10、Ignore Senders 为 17，导致三项分散。按用户确认顺序仅调整为 Folders → Important Senders → Ignore Senders，并以小数 order 避免重排其他设置。边界：仅 manifest order 与回归断言；不改字段、默认值、description、Sidebar 设置或其他配置。
 
 - **2026-07-14 · Codex（F7.4 completion）**：完成 `edcc2f3`。仅将 Important Senders、Ignore Senders 的 configuration order 改为 4.1、4.2，紧随 Folders 的 4；字段、默认值、description、Sidebar 设置和其他 setting order 均未改动。验收：新增 manifest order 断言先 RED 后 GREEN；定向 sidebar render 43/43、`npm run compile` 零错误、完整 `npm test` 432/432、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，在 EasyMail Settings 确认 Folders → Important Senders → Ignore Senders 三项相邻且顺序正确。Known issues：无新增。Next：claim F7.5。
+
+- **2026-07-14 · Codex（F7.5 pre-work checkpoint）**：恢复现场：F7.4 的代码与记录已提交（`edcc2f3`、`9da9ba3`），工作树仅有本 step 的 `[~]` claim，branch `v3...origin/v3 [ahead 2]`；HEAD `9da9ba3`。已重新定位：`renderWorkbenchHtml` 已按 threadId 将既有 `threadAnalysis` 项传给 `renderThreadDetail`，但其 Analyze Thread 按钮无条件用 `labels.threads.analyzeThread`；同一 labels 已有 `labels.card.reanalyze` 的中英文文本。边界：仅按现有 analysis 是否存在切换此按钮标签；不改 action、message handler、分析调用、busy 状态、schema 或 labels 内容。
+
+- **2026-07-14 · Codex（F7.5 completion）**：完成 `14e9c80`。`renderThreadDetail` 仅在已有 thread analysis 时复用既有 `labels.card.reanalyze`，否则继续使用 `labels.threads.analyzeThread`；`analyzeThread` action、thread id、busy/disabled 状态、message handler、模型调用和 labels 内容均未改动。验收：未分析/已分析线程标签断言先 RED 后 GREEN；定向 workbench render 40/40、`npm run compile` 零错误、完整 `npm test` 432/432、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，分析一个线程后确认按钮变为 Re-analyze，点击后仍重新分析同一线程。Known issues：无新增。Next：F 系列全部完成，重新打包 VSIX 并推送。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -970,11 +975,19 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - Known issues：无新增。
   - Commit：`edcc2f3`。
 
-### [ ] F7.5 已分析线程按钮文案（P2）
+### [x] F7.5 已分析线程按钮文案（P2）（commit `14e9c80`）
 
 - **现状（已核实）**：线程已有 Spotlight 后，`renderThreadDetail` 仍无条件使用 `Analyze Full Thread`，而单封已分析邮件使用 `Re-analyze`。
 - **做法**：仅依据现有线程 analysis 是否存在切换按钮标签为 `Re-analyze`；保持 action、线程分析调用、busy 状态与其他文案不变。
 - **验收**：渲染回归锁定未分析线程为 `Analyze Full Thread`、已分析线程为 `Re-analyze`；`npm test` 全绿。**needs user validation**：线程分析完成后按钮显示 `Re-analyze`，点击仍重新分析该线程。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/workbench-render.ts`、`src/test/workbench-render.test.ts`。
+  - 实现边界：仅依据既有 thread analysis 是否存在，切换 `analyzeThread` 按钮为已有的 `Re-analyze` 标签；action、thread id、busy/disabled 状态、message handler、分析调用、schema 与 labels 内容均未改动。
+  - 验收结果：未分析/已分析线程标签断言先 RED 后 GREEN；定向 workbench render 40/40 通过；`npm run compile` 零错误；完整 `npm test` 432/432 通过；`git diff --check` 通过。
+  - Manual validation：**needs user validation on real VS Code**。分析一个线程并等待 Spotlight 出现，确认按钮显示 `Re-analyze`；点击它，确认仍重新分析同一线程。
+  - Known issues：无新增。
+  - Commit：`14e9c80`。
 
 ### 第四轮验证问答核实记录（2026-07-13）
 
