@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildMailGateDecision, buildThreadGateDecision } from "../lib/security-gate";
+import { buildSecuritySettings } from "../lib/config-utils";
 import type { MailClassification } from "../lib/classification";
 import type { StoredMail } from "../lib/mail-store";
 import type { ThreadRecord } from "../lib/thread-schema";
@@ -76,6 +77,17 @@ test("buildMailGateDecision blocks hard block keyword regardless of classificati
 
   assert.equal(decision.decision, "block");
   assert.deepEqual(decision.matchedHardBlockKeywords, ["password"]);
+});
+
+test("buildMailGateDecision blocks Chinese hard block keywords from default settings", () => {
+  const decision = buildMailGateDecision(
+    mail({ mailId: "mail-chinese-password", bodyExcerpt: "请通过安全渠道发送密码。" }),
+    classification("mail-chinese-password", 1),
+    buildSecuritySettings({})
+  );
+
+  assert.equal(decision.decision, "block");
+  assert.deepEqual(decision.matchedHardBlockKeywords, ["密码"]);
 });
 
 test("buildMailGateDecision requires manual confirmation for configured keywords", () => {

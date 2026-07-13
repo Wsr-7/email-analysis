@@ -170,7 +170,10 @@ export function buildSecuritySettings(config: Record<string, unknown>): Security
     autoAnalyzeEnabled: true,
     maxAutoClassificationLevel: parseClassificationLevel(config.autoAnalyzeMaxClassificationLevel, 2),
     maxManualClassificationLevel: 3,
-    hardBlockKeywords: ["password", "api_key", "access_token", "auth_token"],
+    hardBlockKeywords: [
+      "password", "passwd", "pwd", "api_key", "apikey", "access_token", "auth_token",
+      "secret_key", "private_key", "credential", "credentials", "密码", "口令", "密钥", "私钥", "凭证", "令牌"
+    ],
     manualConfirmKeywords: []
   };
 }
