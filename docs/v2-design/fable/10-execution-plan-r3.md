@@ -1,0 +1,101 @@
+# 10 · R3 执行计划（G 批次，2026-07-14）
+
+> 来源：`09-r3-design-decisions.md` §7 用户拍板结果（M0 + D1-D6 + G7）。本文件是 worker 的唯一执行依据。
+> **协议**：完全沿用 `07-execution-plan-remediation.md` §1 的全部规则（claim 单个 step、pre-work checkpoint、Completion Notes、Handover Log 写回本文件 §3、本地提交不 push、`npm run compile` 零错误 + `npm test` 全绿；涉及 VBS 的加 `--help`/`--sample` 检查）。文中行号锚点可能漂移，动手前 grep 重新定位。
+> **通用边界**：不改 digest 文件格式（G4 的 schema 变更仅限分析输出 JSON）；不引入新 npm 依赖；不做 09 §4 C 组已否决的任何项。
+
+状态标记：`[ ]` 未开始 · `[~]` 进行中（已 claim）· `[x]` 完成（含 commit hash）· `[!]` 阻塞/需用户决策
+
+---
+
+## 1. Milestone G — R3 批次（按建议顺序排列，互相独立可并行 claim；G1 最大，建议单独一人做）
+
+### [ ] G1 分析提速：chunk 并行度 2 + draftGeneration 开关（D1，M 级，最高优先）
+
+- **现状锚点**：`app-analysis.ts` `analyzeBatchCore` 的 chunk for 循环串行 await（~L300-410）；每 chunk `mergeAndPersist` 独立落盘 + F1.2 对账 + F5.4 chunk 完成后 sidebar 刷新回调；取消检查在循环头；进度回调 `ctx.progress`。
+- **做法**：
+  1. **并行度 2 的受控并发**：实现简单的并发池（同时最多 2 个 chunk 在飞，完成一个补位一个——不是分批 barrier）。`mergeAndPersist` 与 `merged` 累积变量存在共享写：用一个串行化点（如 async 队列/互斥 promise 链）保证合并与写盘按完成顺序逐个执行，不并发写文件。对账、omitted 兜底、orphan 丢弃逻辑不变（本就按 chunk 独立）。
+  2. **取消语义**：取消后不再启动新 chunk，已在飞的等它们返回（沿用 F1.7 的 cancelling 反馈）；退避重试沿用现有 `isRetryableLlmError` 路径，不做全局限流器。
+  3. **进度文案适配并发**：改为"已完成 x/N chunk（约剩 X 分钟）"（完成计数制，替代"正在分析第 i 个"的串行叙事）；预估 = 平均耗时 × 剩余 / 并行度。
+  4. **并行度常量** `ANALYSIS_CHUNK_CONCURRENCY = 2`（常量即可，不做设置项——用户只拍板了 2）。
+  5. **draftGeneration 设置**：注册 `easyMail.draftGeneration`（enum `"auto"|"onDemand"`，默认 `"auto"`，description 说明 onDemand 显著提速但草稿需手动点 Generate）。`onDemand` 时：分析 prompt 中的 reply-draft 指令替换为"所有 draftReply 输出空串、省略 draftReplyParts"（改 prompt 组装层，不改 output schema），workbench 对空草稿已有 Generate Draft 按钮路径无需改动。
+- **验收**：单测——并发池按序合并（模拟乱序完成）、取消不启新 chunk、onDemand 时 prompt 含空草稿指令且 auto 不含；`npm test` 全绿。**needs user validation**：20 封分析耗时明显下降（预期约减半）；onDemand 模式再快且 Generate Draft 可用；进度文案正常。
+- **边界**：不改 chunk 划分逻辑与 token 预算；不做并行度设置项；不动线程分析（单请求无并发需求）。
+
+### [ ] G2 会议队列重定位为"会议邀请"（D2，S-M 级）
+
+- **现状锚点**：`sidebar-render.ts` meetings 队列（未响应排前 + 倒序，F5.2/F6.3 已修好详情与按钮）；labels 在 `dashboard-labels.ts`（`meetings.title` 等）。
+- **做法**：
+  1. 队列改名：`会议邀请 / Meeting Invites`（labels 中英文，queue id `meetings` 不改）。
+  2. 两级展示：`notResponded` 邀请为主体直接平铺（现排序规则保留）；其余（accepted/tentative/organizer 的未来会议）收进一个可折叠次级分组（组头如 `已接受的日程 (N) / Accepted schedule (N)`，默认收起，展开状态存 webview state——复用 F3.4 pending 分组的实现模式）。
+  3. 队列计数徽标只计未响应数（次级分组数量在组头体现），避免"看着有 5 条其实只有 1 条要处理"的误导。
+  4. **不做**插件内 Accept/Decline（09 §7 已定：违背"绝不自动发送"红线），响应动作保持 Open in Outlook。
+- **验收**：渲染单测（两级分组、计数、折叠态）；`npm test` 全绿。**needs user validation**：邀请置顶平铺、已接受折叠、徽标计数只含未响应。
+- **边界**：采集脚本与 meeting store 不动；详情/按钮不动。
+
+### [ ] G3 安全词表配置化一期（D3，S-M 级）
+
+- **现状锚点**：`config-utils.ts` `buildSecuritySettings`（~L167-176）硬编码 `hardBlockKeywords`（F6.5 已扩为中英文 17 词）与 `manualConfirmKeywords: []`；`classification.ts` `ensureClassifications` 的分级关键词硬编码（~L62-68：3 级词表与 2 级词表）。
+- **做法**：
+  1. 注册三个 settings（默认值 = 当前硬编码值，语义不变：子串匹配、大小写不敏感）：
+     - `easyMail.hardBlockKeywords`（string array，默认 = F6.5 的 17 词）；
+     - `easyMail.manualConfirmKeywords`（string array，默认 `[]`）；
+     - `easyMail.classificationKeywords`（object：`{"3": [...], "2": [...]}` 或两个平级 array 设置——worker 取 VS Code Settings UI 可编辑性更好的形态，Notes 说明取舍），默认 = 现 3 级/2 级词表。
+  2. `buildSecuritySettings` 与 `ensureClassifications` 改从 config 读取，缺失/非法回落默认值；空数组 = 用户显式关闭该层（允许，description 写明后果）。
+  3. Settings description 写清匹配语义与默认值含义；`package.json` order 放入安全组。
+- **验收**：单测——自定义词表生效、空数组关闭、非法值回落；`npm test` 全绿。**needs user validation**：Settings 改词表后 hard block/分级行为随之变化。
+- **边界**：不做正则模式、不做 MIP（二期已搁置）；分级级别名与数量（0-3 四级）不动。
+
+### [ ] G4 dueDate 结构化（D4，S-M 级）
+
+- **现状锚点**：`analysis-schema.ts` `AnalysisItem`/normalize；`prompts/output-schema.md` 字段清单；sidebar 分类内排序在 `sidebar-render.ts`（现按时间）；workbench 详情 `renderAnalysisDetail`。
+- **做法**：
+  1. output schema 增加可选 `dueDate`（格式 `YYYY-MM-DD` 或空串；prompt 指示：仅当邮件明确含期限时输出，不确定就留空）。
+  2. normalize：校验 `^\d{4}-\d{2}-\d{2}$` 且为合法日期，否则置空串；merge/prune 路径自然透传。
+  3. sidebar：`mustHandleToday` 与 `waitingForMe` 分类内排序改为 dueDate 升序优先（有期限的在前、按期限近远排；无期限的按原时间倒序垫后）；行尾显示期限徽标，过期或今天到期标红（本地日期判定）。
+  4. workbench 详情 metadata 区显示 `期限/Due:` 字段（无则不显示）。
+  5. 翻译路径（analysis-translation）把 dueDate 列入"不翻译"字段。
+- **验收**：单测——normalize 校验、排序规则、过期标红判定、翻译不动 dueDate；`npm test` 全绿。**needs user validation**：含明确期限的邮件分析后有期限徽标且排序靠前。
+- **边界**：不做提醒/通知；overview 计数不加新维度；digest 格式不动。
+
+### [ ] G5 Webview CSP 加固（D5，S-M 级）
+
+- **现状锚点**：`sidebar-render.ts` / `workbench-render.ts` / `guide-webview.ts` 三个 HTML 模板均无 CSP meta，脚本为裸 inline `<script>`。
+- **做法**：按 VS Code 官方 webview 指南——每次渲染生成随机 nonce（调用方传入或模板内生成均可，注意 render 是纯函数、nonce 由调用方传入更可测）；HTML head 加 `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-...'; img-src data:;">`（按各页面实际资源微调，能收紧就收紧）；所有 `<script>` 挂 nonce。确认三个页面无外部资源依赖（现状即无）。
+- **验收**：单测断言三个页面输出含 CSP meta 且 script 带 nonce、两次渲染 nonce 不同；`npm test` 全绿。**needs user validation**：三个页面功能无回归（按钮/输入/折叠都正常）——CSP 配错的典型症状是页面脚本全哑。
+- **边界**：不引入外部资源；不改页面功能。
+
+### [ ] G6 Sidebar 上下方向键导航（D6 裁剪版，S 级）
+
+- **做法**：sidebar 列表获得焦点时，↑/↓ 在**当前可见队列**的条目间移动选中（跳过折叠分组内隐藏项与组头），选中行高亮 + 滚动入视野 + 触发与点击相同的 `openItem`（workbench 自动跟随——现有行为，点击即打开）。仅此一个动作，不做 Enter/其他快捷键。注意与 F3.4 pending 折叠分组、G2 会议折叠分组的可见性判定兼容。
+- **验收**：webview 脚本单测（断言键盘 handler 与可见性过滤逻辑存在于输出 HTML）；`npm test` 全绿。**needs user validation**：↑/↓ 切换流畅、workbench 跟随、折叠组内隐藏项被跳过。
+- **边界**：不做 workbench 侧键盘导航；不做其他快捷键。
+
+### [ ] G7 附件可见性（09 §7 C 组核实产出，S 级）
+
+- **现状锚点（已核实）**：attachmentCount/attachmentNames 已采集入 store（`mail-store.ts:196-197`）；但 ① sidebar 邮件行不显示；② workbench 单封详情（pending 与 analyzed 两个模板）不显示；③ **单封批量分析 prompt 不含附件字段**（`mail-store.ts` `buildBatchDigestMarkdown` ~L283-299 无 Attachment 行；线程 prompt 已含，`thread-prompt-builder.ts:60-61`）。
+- **做法**：
+  1. sidebar 邮件行：有附件时行尾加 `📎`（tooltip 显示数量与文件名）。
+  2. workbench 单封详情（pending + analyzed 两处模板）metadata 区显示 `附件/Attachments: N（文件名列表）`，无附件不显示。
+  3. `buildBatchDigestMarkdown` 每封邮件补 `AttachmentCount:` 与 `AttachmentNames:` 行——模型分析单封时可核对"正文提及附件"与附件实际存在性（如"称有附件但实际没有"可提示风险）。附件名经现有 redaction 路径处理后入 prompt。
+  4. analysis prompt 指南补一句：附件仅有元数据（数量与文件名），无法读取内容。
+- **验收**：单测——渲染含 📎 与 metadata 行、batch digest 含附件行、无附件邮件不出现空字段；`npm test` 全绿。**needs user validation**：带附件的真实邮件在列表与详情可见附件标识；分析结果能正确反映附件存在。
+- **边界**：不做附件下载/预览/内容读取；digest 文件格式不动（附件字段本就存在）。
+
+---
+
+## 2. 建议执行顺序与完成后流程
+
+G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立可并行。全部完成后：规划者全量复审 → 重打 vsix → 用户按规划者汇总的验证清单做 R3 验证轮。R4 候选池（09 §4 延后项）待 R3 落地后按需重启。
+
+---
+
+## 3. Current Snapshot
+
+- 2026-07-14 · 计划创建（依据 09 §7 拍板）。G1-G7 全部 `[ ]` 待 claim。
+
+---
+
+## 4. Handover Log
+
+- **2026-07-14 · Claude Fable 5（规划者）**：依据 09 拍板展开 R3 执行计划。要点：G1 并发池注意 mergeAndPersist 串行化（共享 merged 状态不可并发写）；G2 复用 F3.4 折叠分组模式；G3 默认值必须等于现硬编码值（行为零变化起步）；G4 只做字段+排序+标注不做提醒；G5 nonce 由调用方传入保持 render 纯函数；G6 只做上下键一个动作；G7 的 batch prompt 附件行是模型感知附件的关键补齐。无 dirty state。Next: worker claim G1（或并行从 G2-G7 任选）。
