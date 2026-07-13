@@ -192,6 +192,7 @@ function omittedAnalysisItems(mails: StoredMail[]): AnalysisItem[] {
     reason: "",
     suggestedAction: "",
     draftReply: "",
+    dueDate: "",
     confidence: 0,
     needsOriginalMailCheck: false
   }));

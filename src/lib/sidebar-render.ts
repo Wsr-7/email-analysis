@@ -107,9 +107,14 @@ function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: 
   const sender = item.sender || "";
   const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
   const title = [sender, time].filter(Boolean).join(" · ");
+  const today = new Date();
+  const todayText = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const dueBadge = item.dueDate
+    ? `<span class="sb-due-badge${item.dueDate <= todayText ? " sb-due-urgent" : ""}">${escapeHtml(item.dueDate)}</span>`
+    : "";
   return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${dueBadge}${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
   </div>`;
 }
 
@@ -416,6 +421,8 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   .sb-line2-meta { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: 0.55; }
   .sb-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; white-space: nowrap; flex-shrink: 0; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); }
   .sb-cls-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; opacity: 0.8; border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.35)); color: var(--vscode-foreground, #ccc); }
+  .sb-due-badge { font-size: 10px; white-space: nowrap; flex-shrink: 0; color: var(--vscode-descriptionForeground, #aaa); }
+  .sb-due-urgent { color: var(--vscode-errorForeground, #f48771); font-weight: 600; }
 
   .sb-row-dim { opacity: 0.45; }
   .sb-action-status { cursor: pointer; font-size: 10px; padding: 1px 6px; border-radius: 8px; border: none; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); }

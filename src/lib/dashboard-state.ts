@@ -51,12 +51,17 @@ export function buildDashboardState(
   ).values()];
 
   const dynamicCategories = unique([...categoryOrder, ...items.map((item) => item.category), "ignored"]);
-  const categories = dynamicCategories.map((category) => ({
-    id: category,
-    items: category === "ignored"
+  const categories = dynamicCategories.map((category) => {
+    const categoryItems = category === "ignored"
       ? ignoredItems
-      : items.filter((item) => item.category === category)
-  }));
+      : items.filter((item) => item.category === category);
+    return {
+      id: category,
+      items: category === "mustHandleToday" || category === "waitingForMe"
+        ? [...categoryItems].sort(compareDueDates)
+        : categoryItems
+    };
+  });
 
   return {
     config,
@@ -77,6 +82,13 @@ function compareItems(a: AnalysisResult["items"][number], b: AnalysisResult["ite
     return byPriority;
   }
   return String(b.receivedTime || "").localeCompare(String(a.receivedTime || ""));
+}
+
+function compareDueDates(a: AnalysisResult["items"][number], b: AnalysisResult["items"][number]): number {
+  if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+  if (a.dueDate) return -1;
+  if (b.dueDate) return 1;
+  return 0;
 }
 
 function buildOverview(items: AnalysisResult["items"]): AnalysisResult["overview"] {

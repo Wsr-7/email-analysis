@@ -62,6 +62,7 @@ export interface AnalysisItem {
   reason: string;
   suggestedAction: string;
   draftReply: string;
+  dueDate?: string;
   draftReplyParts?: DraftReplyParts;
   confidence: number;
   needsOriginalMailCheck: boolean;
@@ -154,6 +155,7 @@ function normalizeItem(item: unknown, index: number, allowedCategories: Set<stri
     reason: String((base as Record<string, unknown>).reason || ""),
     suggestedAction: String((base as Record<string, unknown>).suggestedAction || ""),
     draftReply: String((base as Record<string, unknown>).draftReply || ""),
+    dueDate: normalizeDueDate((base as Record<string, unknown>).dueDate),
     confidence,
     needsOriginalMailCheck
   };
@@ -174,6 +176,18 @@ function normalizeItem(item: unknown, index: number, allowedCategories: Set<stri
   }
 
   return normalized;
+}
+
+function normalizeDueDate(value: unknown): string {
+  const text = String(value || "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return "";
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1]! ? text : "";
 }
 
 function clampPriorityForCategory(category: Category, priority: Priority): Priority {

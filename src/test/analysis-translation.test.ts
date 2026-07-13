@@ -20,6 +20,7 @@ const mail: AnalysisResult = {
       reason: "The mail asks for confirmation.",
       suggestedAction: "Reply today.",
       draftReply: "Hi Alice,\n\nConfirmed.\n\nThanks,",
+      dueDate: "2026-06-20",
       confidence: 0.9,
       needsOriginalMailCheck: false
     }
@@ -60,6 +61,7 @@ test("buildAnalysisTranslationPrompt excludes draft reply translation instructio
   const prompt = buildAnalysisTranslationPrompt({ mail, threads, targetLanguage: "zh-CN" });
   assert.match(prompt, /Simplified Chinese/);
   assert.match(prompt, /Do not translate original mail content/);
+  assert.match(prompt, /dueDate/);
   assert.doesNotMatch(prompt, /Hi Alice,\\n\\nConfirmed/);
 });
 
@@ -87,7 +89,8 @@ test("applyAnalysisTranslation updates display fields and preserves draft replie
           mailId: "mail-1",
           summary: "Alice 需要确认。",
           reason: "邮件要求确认。",
-          suggestedAction: "今天回复。"
+          suggestedAction: "今天回复。",
+          dueDate: "2026-12-31"
         }
       ],
       threads: [
@@ -108,6 +111,7 @@ test("applyAnalysisTranslation updates display fields and preserves draft replie
   assert.equal(result.mail.language, "zh-CN");
   assert.equal(result.mail.items[0].summary, "Alice 需要确认。");
   assert.equal(result.mail.items[0].draftReply, mail.items[0].draftReply);
+  assert.equal(result.mail.items[0].dueDate, "2026-06-20");
   assert.equal(result.threads.language, "zh-CN");
   assert.equal(result.threads.items[0].actionItems[0].task, "确认负责人");
   assert.equal(result.threads.items[0].risks[0].description, "存在延迟风险。");

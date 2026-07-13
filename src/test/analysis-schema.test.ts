@@ -184,3 +184,26 @@ test("parseAnalysisJson recomputes overview from normalized items", () => {
   assert.equal(analysis.overview.mustHandleToday, 0);
   assert.equal(analysis.overview.notices, 1);
 });
+
+test("parseAnalysisJson keeps only real YYYY-MM-DD due dates", () => {
+  const item = (mailId: string, dueDate: string) => ({
+    mailId,
+    category: "notice",
+    priority: "P3",
+    subject: "Notice",
+    sender: "System",
+    receivedTime: "2026-06-16 09:12:00",
+    summary: "Routine notice.",
+    reason: "No action required.",
+    suggestedAction: "No action.",
+    draftReply: "",
+    dueDate,
+    confidence: 0.9,
+    needsOriginalMailCheck: false
+  });
+  const analysis = parseAnalysisJson(JSON.stringify({
+    items: [item("valid", "2028-02-29"), item("invalid-day", "2026-02-30"), item("invalid-shape", "02/28/2026")]
+  }));
+
+  assert.deepEqual(analysis.items.map((entry) => entry.dueDate), ["2028-02-29", "", ""]);
+});

@@ -68,6 +68,7 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
   const clsHtml = classification ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>` : "";
   const toHtml = originalMail?.to ? `<div class="wb-field" title="${escapeAttr(originalMail.to)}"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.to))}</div>` : "";
   const ccHtml = originalMail?.cc ? `<div class="wb-field" title="${escapeAttr(originalMail.cc)}"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.cc))}</div>` : "";
+  const dueHtml = item.dueDate ? `<div class="wb-field"><strong>${escapeHtml(labels.card.due)}:</strong> ${escapeHtml(item.dueDate)}</div>` : "";
   const bodyText = originalMail?.bodyExcerpt || "";
   const bodyHtml = bodyText ? `<div class="wb-section wb-original-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(bodyText)}</div></div>` : "";
   return `<div class="wb-detail-card wb-with-body wb-mail-with-body">
@@ -80,6 +81,7 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
       ${toHtml}
       ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
+      ${dueHtml}
       ${clsHtml}
     </div>
     <div class="wb-actions">

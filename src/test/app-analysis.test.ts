@@ -393,6 +393,7 @@ describe("analyzeBatchCore", () => {
         reason: "",
         suggestedAction: "",
         draftReply: "",
+        dueDate: "",
         confidence: 0,
         needsOriginalMailCheck: false
       });

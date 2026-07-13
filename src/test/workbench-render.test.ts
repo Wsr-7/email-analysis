@@ -173,6 +173,18 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("Urgent task"));
   });
 
+  it("renders a due date in analyzed metadata only when present", () => {
+    const withDue = renderWorkbenchHtml(stubInput({
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem({ dueDate: "2026-07-20" })] }])
+    }));
+    const withoutDue = renderWorkbenchHtml(stubInput({
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem()] }])
+    }));
+
+    assert.ok(withDue.includes("Due:</strong> 2026-07-20"));
+    assert.ok(!withoutDue.includes("Due:</strong>"));
+  });
+
   it("does not show a thread internal id in an analyzed mail reader", () => {
     const input = stubInput({
       state: stubState({}, [

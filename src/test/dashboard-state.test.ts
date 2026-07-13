@@ -124,3 +124,33 @@ test("buildDashboardState can carry thread store without changing mail categorie
   assert.equal(state.threadStore?.items.length, 1);
   assert.ok(state.categories.find((entry) => entry.id === "mustHandleToday"));
 });
+
+test("buildDashboardState sorts due dates only inside actionable buckets", () => {
+  const item = (mailId: string, category: string, dueDate: string, receivedTime: string) => ({
+    mailId, category, priority: "P1" as const, subject: mailId, sender: "", receivedTime,
+    summary: "", reason: "", suggestedAction: "", draftReply: "", dueDate,
+    confidence: 0.9, needsOriginalMailCheck: false
+  });
+  const state = buildDashboardState(
+    {},
+    { metadata: { generatedAt: "", rangeMode: "", recentHours: 24, maxItems: 50, folders: [] }, items: [] },
+    {
+      generatedAt: "",
+      overview: { totalMails: 7, mustHandleToday: 3, risks: 0, waitingForMe: 2, notices: 2 },
+      items: [
+        item("must-none", "mustHandleToday", "", "2026-07-03"),
+        item("must-later", "mustHandleToday", "2026-07-20", "2026-07-02"),
+        item("must-sooner", "mustHandleToday", "2026-07-15", "2026-07-01"),
+        item("wait-none", "waitingForMe", "", "2026-07-03"),
+        item("wait-due", "waitingForMe", "2026-07-16", "2026-07-01"),
+        item("notice-new", "notice", "2026-07-30", "2026-07-03"),
+        item("notice-old", "notice", "2026-07-10", "2026-07-01")
+      ]
+    },
+    []
+  );
+
+  assert.deepEqual(state.categories.find((entry) => entry.id === "mustHandleToday")?.items.map((entry) => entry.mailId), ["must-sooner", "must-later", "must-none"]);
+  assert.deepEqual(state.categories.find((entry) => entry.id === "waitingForMe")?.items.map((entry) => entry.mailId), ["wait-due", "wait-none"]);
+  assert.deepEqual(state.categories.find((entry) => entry.id === "notice")?.items.map((entry) => entry.mailId), ["notice-new", "notice-old"]);
+});

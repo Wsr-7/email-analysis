@@ -530,6 +530,21 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("INTERNAL"), "badge should show classification level name");
   });
 
+  it("renders due-date badges and marks overdue or today as urgent", () => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const html = renderSidebarHtml(stubInput({
+      state: stubState({}, [{ id: "mustHandleToday", items: [
+        stubAnalysisItem({ mailId: "past", dueDate: "2000-01-01" }),
+        stubAnalysisItem({ mailId: "today", dueDate: today }),
+        stubAnalysisItem({ mailId: "future", dueDate: "2099-01-01" })
+      ] }])
+    }));
+
+    assert.equal((html.match(/sb-due-badge sb-due-urgent/g) || []).length, 2);
+    assert.match(html, /sb-due-badge">2099-01-01<\/span>/);
+  });
+
   it("uses the renamed important senders label in both locales", () => {
     const categories = [{ id: "importantSender", items: [stubAnalysisItem()] }];
     const oldPromptLabel = normalizePromptConfig({

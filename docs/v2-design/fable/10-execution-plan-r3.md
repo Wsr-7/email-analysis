@@ -63,7 +63,7 @@
 - **验收**：单测——自定义词表生效、空数组关闭、非法值回落、**词表变更触发缓存全量重算**；`npm test` 全绿。**needs user validation**：Settings 改词表后，已拉取邮件的分级与 hard block 行为都随之变化（无需重新 Fetch）。
 - **边界**：不做正则模式、不做 MIP（二期已搁置）；分级级别名与数量（0-3 四级）不动。
 
-### [ ] G4 dueDate 结构化（D4，S-M 级）
+### [~] G4 dueDate 结构化（D4，S-M 级）
 
 - **现状锚点**：`analysis-schema.ts` `AnalysisItem`/normalize；`prompts/output-schema.md` 字段清单；**分类内条目顺序来自 `dashboard-state.ts`（`compareItems` 全局排序后分桶），不是 sidebar-render**；行渲染在 `sidebar-render.ts` `renderCompactAnalysisRow`；workbench 详情 `renderAnalysisDetail`。
 - **做法**：
@@ -166,3 +166,5 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Manual validation：**needs user validation**，真实 Settings 修改后的 Sidebar 分级与 hard block 实时变化需在扩展宿主确认。
   - Known issues：空 `hardBlockKeywords` 会显式关闭该安全层，风险已在 setting description 说明；未实现正则或 MIP。
   - Commit：`789799b`（本地，未 push）。
+
+- **2026-07-14 · Codex（G4 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `18cff8d`；重新定位确认 `src/lib/analysis-schema.ts:54-70/123-176` 为 AnalysisItem 与 normalize，`src/lib/app-analysis.ts:184` 为 omitted fallback，`src/lib/dashboard-state.ts` 的 `compareItems` 后分桶决定分类内顺序，Sidebar/Workbench 渲染锚点分别仍在 `src/lib/sidebar-render.ts:105` 与 `src/lib/workbench-render.ts:63`，翻译入口在 `src/lib/analysis-translation.ts`。边界：仅新增可选 dueDate、合法日期 normalize、两个目标桶内排序、期限标识/详情与翻译保护；不改 digest、不做提醒或新计数。Action: claim G4。

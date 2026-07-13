@@ -36,7 +36,7 @@ export type DashboardLabels = {
   meta: Record<"range" | "folders" | "generated" | "requestedModel" | "lastUsedModel" | "lastPull" | "lastImport", string>;
   stats: Record<"pulled" | "pending" | "analysed" | "blocked" | "mustHandle" | "risk" | "waiting" | "notice" | "threads", string>;
   categories: Record<string, string>;
-  card: Record<"from" | "to" | "cc" | "body" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "analyze" | "reanalyze" | "openInOutlook" | "noItems" | "thread", string>;
+  card: Record<"from" | "to" | "cc" | "body" | "received" | "due" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "analyze" | "reanalyze" | "openInOutlook" | "noItems" | "thread", string>;
   pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select" | "confirmAnalyze", string>;
   threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "contentTruncated" | "attachments" | "mailIds", string>;
   meetings: Record<"title" | "acceptedSchedule" | "organizer" | "time" | "location" | "attendees" | "requiredAttendees" | "optionalAttendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
@@ -132,6 +132,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       cc: "抄送",
       body: "原文",
       received: "收到时间",
+      due: "期限",
       summary: "摘要",
       reason: "判断原因",
       suggestedAction: "建议动作",
@@ -324,6 +325,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       cc: "Cc",
       body: "Body",
       received: "Received",
+      due: "Due",
       summary: "Summary",
       reason: "Reason",
       suggestedAction: "Suggested Action",
