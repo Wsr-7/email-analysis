@@ -431,11 +431,19 @@
 
   - Completion Notes（2026-07-13）：`docs/marketplace-details.md` 作为独立无链接 Details；打包使用 `--readme-path`，并移除 package repository 以消除 VSIX manifest 自动生成的外链，重新打包 `releases/easymail-0.3.0.vsix`。`README.md`/`README_zh.md` 未改。验收：解包确认 Details 逐字一致且 manifest 无 Links；定向 1/1、完整 `npm test` 416/416、独立 review、`git diff --check` 均通过。Manual validation：安装本地 vsix，确认 Details 仅为本地内容且无外部跳转。Known issues：Marketplace 不再显示源码/支持链接，这是去外链要求的有意取舍。Commit：`9b2b434`。
 
-### [ ] F4.8 分析进度按 chunk 更新 + 预估耗时 + picker 提前提示（新反馈#1 + §7#6 建议，P2）
+### [x] F4.8 分析进度按 chunk 更新 + 预估耗时 + picker 提前提示（新反馈#1 + §7#6 建议，P2） — `f27ce88`
 
 - **现状（已核实日志）**：20 封 = 2 chunk 串行，各 45-76s，耗时几乎全在模型生成（输出 1 万 + 7 千字符）。`withProgress` 目前是固定文案。
 - **做法**：① analyze 的 progress 按 chunk 更新：`正在分析 chunk i/N（约剩 X 分钟）`——预估 = 已完成 chunk 的平均耗时 × 剩余数，首 chunk 前显示总 chunk 数；② Select Outlook Folders 的 progress 文案开头即提示"先启动 Outlook 可显著加快加载"（不等失败才说）。真正提速的两个方向（chunk 并行、draftReply 按需生成砍输出）涉及产品权衡，已列入 §3 R3 决策输入，不在本 step 做。
 - **验收**：`npm test` 全绿。**needs user validation**：分析多 chunk 时能看到进度与预估；picker 一开始就有 Outlook 提示。
+
+  - Completion Notes（2026-07-13）：
+    - 改动文件：`src/lib/app-analysis.ts`、`src/extension.ts`、`src/test/app-analysis.test.ts`、`src/test/extension-cancellation.test.ts`。
+    - 实现边界：复用 `AnalysisContext` 可选 progress 回调；首 chunk 前显示总数，第二个 chunk 起用已完成 chunk 平均耗时估算剩余分钟；Folder picker 首条提示先启动 Outlook。未改变串行 chunk、草稿生成、store/schema 或 R3 决策。
+    - 验收结果：进度与 picker 测试先 RED 后 GREEN；review 发现首 chunk 误显示 0 分钟，已修正并复审通过。`npm run compile` 零错误、定向 40/40、完整 `npm test` 417/417、`git diff --check` 均通过。
+    - Manual validation：**needs user validation on real VS Code**：分析多 chunk 时先显示 chunk 总数，第二个 chunk 起显示预估；打开 Select Outlook Folders 时一开始就显示先启动 Outlook 的提示。
+    - Known issues：预估基于本次运行已完成 chunk 的平均耗时，模型响应波动大时仅作近似参考。
+    - Commit：`f27ce88`。
 
 ### [ ] F4.9 模型分类为 ignored 的邮件掉进渲染黑洞（§7#3 消失之谜的真正根因，P0，已确证）
 
@@ -504,6 +512,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F4.5 已完成，代码提交 `8f3e9d6`：Workbench active reader、detail card 与单封原文容器统一占满可用宽度；active reader 时 placeholder 由 CSS 强制 `display: none`。真实 VS Code 布局验证待用户执行。下一步按序 claim F4.6。
 - 2026-07-13 · F4.6 已完成，代码提交 `077a939`：Guide key 在本地 vsix 无 metadata 时改用扩展目录创建时间，同安装稳定、重装变更；stat 失败才回落 version。真实卸载重装验证待用户执行。下一步按序 claim F4.7。
 - 2026-07-13 · F4.7 已完成，代码提交 `9b2b434`：Marketplace Details 已与 GitHub README 解耦，重新打包的 VSIX Details 与 manifest 均无外链。下一步按序 claim F4.8。
+- 2026-07-13 · F4.8 已完成，代码提交 `f27ce88`：分析按 chunk 报告总数与基于已完成 chunk 的剩余预估，Folder picker 立即提示先启动 Outlook。F4.1-F4.8 均已完成，等待用户真机验证。
 
 ---
 
@@ -606,6 +615,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.7 pre-work checkpoint）**：恢复现场：F4.6 代码与记录已提交（`077a939`、`049094c`、`e2b1cbb`），工作树干净；HEAD `e2b1cbb`。已重新定位：`package.json` 当前打包脚本直接执行 `vsce package --out releases/easymail-0.3.0.vsix`，仓库根 README 与中英文 README、user guide、setup、AGENTS 一并列入 package files；`npx vsce package --help` 已核对当前版本可调用。边界：仅新增无外链 Marketplace Details 并令打包使用它；GitHub README 保持现状，不改功能代码或 F4.8。
 
 - **2026-07-13 · Codex（F4.7 completion）**：完成 `9b2b434`。复审发现 repository 元数据会在 VSIX manifest 生成五个 GitHub Links，已在本 step 边界内移除并使用 `--allow-missing-repository`；解包产物确认 Details 指向新文件、正文及 manifest 均无外链。验收：`npm test` 416/416、定向 1/1、`git diff --check`、独立复审均通过。Manual：**needs user validation on real VS Code**，安装新 vsix 后确认 Details 无跳转。Next：claim F4.8。
+
+- **2026-07-13 · Codex（F4.8 pre-work checkpoint）**：恢复现场：F4.7 代码与记录已提交（`9b2b434`、`a0363ca`），工作树干净；HEAD `a0363ca`。已重新定位：`analyzeBatchCore` 已在 chunk loop 写 `analyze:chunkStart/chunkDone` 日志（`src/lib/app-analysis.ts:312-395`），但 `runWithBusy` 的 progress 只在开始显示固定 `labels.progress.detail`（`src/extension.ts:641-663`、`741-744`），两层之间没有 progress 回调；`selectFolders` 当前首条文案为“Starting Outlook and reading mail folders…”（`894-910`），需按计划提前明确启动 Outlook 会显著加快加载。边界：仅复用现有分析上下文增加 progress 回调与文案/测试，不改 chunk 串行模型、草稿生成、store/schema 或 R3 提速决策。
+
+- **2026-07-13 · Codex（F4.8 completion）**：完成 `f27ce88`。批分析首 chunk 前显示总数；从第二个 chunk 起按已完成 chunk 平均耗时×剩余数报告预估，保留串行、取消和失败语义。review 发现首 chunk 的 0 分钟误导性提示，已在 `index > 0` 后才估时并复审通过；Folder picker 首条文案已提示先启动 Outlook。验收：`npm run compile` 零错误、定向 40/40、全量 `npm test` 417/417、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，观察多 chunk 进度与首条 picker 提示。F4 批全部完成。
 
 ---
 
