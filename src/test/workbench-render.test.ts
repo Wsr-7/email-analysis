@@ -593,6 +593,7 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("openMeetingInOutlook"));
     assert.ok(html.includes('data-meeting-id="e-mtg-1"'));
     assert.ok(html.includes("wb-mtg-notResponded"));
+    assert.ok(html.indexOf('data-action="openMeetingInOutlook"') < html.indexOf("Agenda details"), "meeting action should follow metadata before body content");
   });
 
   it("orders meetings with unanswered invitations first, then newest start time", () => {

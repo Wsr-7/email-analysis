@@ -216,10 +216,10 @@ function renderMeetingDetail(item: StoredMeeting, labels: DashboardLabels): stri
       ${item.optionalAttendees ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.optionalAttendees)}:</strong> ${escapeHtml(item.optionalAttendees)}</div>` : ""}
       ${flags.length ? `<div class="wb-field">${escapeHtml(flags.join(", "))}</div>` : ""}
     </div>
-    ${item.bodyExcerpt ? `<div class="wb-body">${escapeHtml(item.bodyExcerpt)}</div>` : ""}
     <div class="wb-actions">
       <button class="wb-btn" data-action="openMeetingInOutlook" data-meeting-id="${escapeAttr(item.entryId)}">${escapeHtml(labels.meetings.openInOutlook)}</button>
     </div>
+    ${item.bodyExcerpt ? `<div class="wb-body">${escapeHtml(item.bodyExcerpt)}</div>` : ""}
   </div>`;
 }
 
