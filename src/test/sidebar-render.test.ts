@@ -11,6 +11,7 @@ import { emptyMeetingStore, type StoredMeeting as StoredMeetingItem } from "../l
 import type { DashboardRenderInput } from "../lib/dashboard-render";
 import type { DashboardState } from "../lib/dashboard-state";
 import type { AnalysisItem } from "../lib/analysis-schema";
+import { buildDashboardState } from "../lib/dashboard-state";
 
 function stubMail(overrides?: Partial<StoredMail>): StoredMail {
   return {
@@ -322,6 +323,23 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('data-queue="ignored"'));
     assert.ok(html.includes("Old mail"));
     assert.ok(!html.includes('data-action="unignore"'), "compact sidebar should not have action buttons");
+  });
+
+  it("shows model-ignored analysis in the ignored queue and count", () => {
+    const state = buildDashboardState(
+      {},
+      { metadata: { generatedAt: "", rangeMode: "", recentHours: 24, maxItems: 50, folders: ["Inbox"] }, items: [] },
+      {
+        generatedAt: "2026-07-13T10:00:00+08:00",
+        overview: { totalMails: 1, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 },
+        items: [stubAnalysisItem({ mailId: "model-ignored", category: "ignored", subject: "Model ignored mail" })]
+      },
+      []
+    );
+
+    const html = renderSidebarHtml(stubInput({ state }));
+    assert.match(html, /data-queue-id="ignored"[\s\S]*?<span class="sb-queue-count">1<\/span>/);
+    assert.ok(html.includes('data-queue="ignored" data-mail-id="model-ignored"'));
   });
 
   it("can focus the ignored queue from extension messages", () => {

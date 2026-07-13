@@ -54,6 +54,38 @@ test("buildDashboardState filters ignored ids and groups categories", () => {
   assert.equal(state.overview.notices, 0);
 });
 
+test("buildDashboardState puts model and manually ignored mail into the ignored category once", () => {
+  const state = buildDashboardState(
+    {},
+    { metadata: { generatedAt: "", rangeMode: "", recentHours: 24, maxItems: 50, folders: ["Inbox"] }, items: [] },
+    {
+      generatedAt: "2026-07-13T10:00:00+08:00",
+      overview: { totalMails: 3, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 },
+      items: [
+        {
+          mailId: "model-ignored", category: "ignored", priority: "P3", subject: "Model ignored", sender: "",
+          receivedTime: "2026-07-13 09:00:00", summary: "", reason: "", suggestedAction: "", draftReply: "", confidence: 0,
+          needsOriginalMailCheck: false
+        },
+        {
+          mailId: "manual-ignored", category: "notice", priority: "P3", subject: "Manual ignored", sender: "",
+          receivedTime: "2026-07-13 08:00:00", summary: "", reason: "", suggestedAction: "", draftReply: "", confidence: 0,
+          needsOriginalMailCheck: false
+        },
+        {
+          mailId: "both-ignored", category: "ignored", priority: "P3", subject: "Both ignored", sender: "",
+          receivedTime: "2026-07-13 07:00:00", summary: "", reason: "", suggestedAction: "", draftReply: "", confidence: 0,
+          needsOriginalMailCheck: false
+        }
+      ]
+    },
+    ["manual-ignored", "both-ignored"]
+  );
+
+  const ignored = state.categories.find((entry) => entry.id === "ignored");
+  assert.deepEqual(ignored?.items.map((item) => item.mailId), ["model-ignored", "manual-ignored", "both-ignored"]);
+});
+
 test("buildDashboardState can carry thread store without changing mail categories", () => {
   const state = buildDashboardState(
     {},

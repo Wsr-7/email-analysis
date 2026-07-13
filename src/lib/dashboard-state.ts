@@ -44,7 +44,11 @@ export function buildDashboardState(
   const ignored = new Set(ignoredIds || []);
   const allItems = (analysis?.items || []).sort(compareItems);
   const items = allItems.filter((item) => !ignored.has(item.mailId));
-  const ignoredItems = allItems.filter((item) => ignored.has(item.mailId));
+  const ignoredItems = [...new Map(
+    allItems
+      .filter((item) => ignored.has(item.mailId) || item.category === "ignored")
+      .map((item) => [item.mailId, item])
+  ).values()];
 
   const dynamicCategories = unique([...categoryOrder, ...items.map((item) => item.category), "ignored"]);
   const categories = dynamicCategories.map((category) => ({
