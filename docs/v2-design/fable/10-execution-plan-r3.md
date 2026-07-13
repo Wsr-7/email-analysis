@@ -1,10 +1,24 @@
 # 10 · R3 执行计划（G 批次，2026-07-14）
 
-> 来源：`09-r3-design-decisions.md` §7 用户拍板结果（M0 + D1-D6 + G7）。本文件是 worker 的唯一执行依据。
-> **协议**：完全沿用 `07-execution-plan-remediation.md` §1 的全部规则（claim 单个 step、pre-work checkpoint、Completion Notes、Handover Log 写回本文件 §3、本地提交不 push、`npm run compile` 零错误 + `npm test` 全绿；涉及 VBS 的加 `--help`/`--sample` 检查）。文中行号锚点可能漂移，动手前 grep 重新定位。
-> **通用边界**：不改 digest 文件格式（G4 的 schema 变更仅限分析输出 JSON）；不引入新 npm 依赖；不做 09 §4 C 组已否决的任何项。
+> 来源：`09-r3-design-decisions.md` §7 用户拍板结果（M0 + D1-D6 + G7）。**本文件自包含，是 worker 的唯一执行依据，无需阅读 07/08/09 等历史文档。**
 
 状态标记：`[ ]` 未开始 · `[~]` 进行中（已 claim）· `[x]` 完成（含 commit hash）· `[!]` 阻塞/需用户决策
+
+## 0. Worker 协议（自包含，完整规则）
+
+1. **一次只 claim 一个 step**（S 级小项允许多个合并 claim，但 Completion Notes 必须分项写）。claim 时把该 step 标记为 `[~]` 并在 §4 Handover Log 写 pre-work checkpoint。
+2. **Pre-work checkpoint 内容**：`git status --short --branch` 必须干净并记录 HEAD；用 grep 重新定位 step 中的文件/行号锚点（可能已漂移）并确认"现状锚点"描述仍成立；写明本 step 边界（做什么、不做什么、不进入哪些 step）。
+3. **实现纪律**：严格按 step 的"做法"执行，不越界顺手修别的问题——发现新问题写进 Handover 的风险上报，由规划者决定；不改 digest 文件格式（G4 的 schema 变更仅限分析输出 JSON）；不引入新 npm 依赖；不做 09 §4 C 组已否决项；R4 保持锁定。
+4. **验收硬门槛**：`npm run compile` 零错误；`npm test` 全绿；涉及 VBS 时 `cscript //nologo scripts/<file>.vbs --help` 与 `--sample` 不回归；`git diff --check` 通过。UI/真机行为无法本地验证的，在 Completion Notes 标注 **needs user validation** 并写清用户操作步骤。
+5. **完成记录**：step 改 `[x]`（附 commit hash）；Completion Notes 按固定结构写：改动文件 / 实现边界 / 验收结果 / Manual validation / Known issues / Commit；更新 §3 Current Snapshot 一行摘要；在 §4 Handover Log 追加完成条目（Action / Validated / Manual / Next）。
+6. **Git 纪律**：本地 commit 不 push（push 由规划者统一执行）；commit message 末尾加 `Generated with AI`；不用 `--no-verify`；结束前工作树必须干净、文档与代码状态一致。
+7. **语言**：文档记录与对话用中文（代码/技术术语除外）。
+
+## 0.1 通用背景速查（避免翻历史文档）
+
+- 构建与测试：`npm run compile`（清 out/ 后 tsc）、`npm test`（compile + node --test 全量）、单文件 `node --test out/test/<module>.test.js`。
+- 关键既有机制：分析按 chunk 切分且每 chunk 独立合并落盘（含漏返/孤儿对账兜底）；chunk 完成后有 sidebar 刷新回调；取消走 CancellationToken + cancelling 状态反馈；草稿状态由扩展侧 `workingDrafts` Map 持久化（空文本仅在已有条目时写入）；sidebar Pending 队列已有按 folder 折叠分组的实现可参考（`sidebar-render.ts` 的 `renderPendingFolderGroups` + webview state 记忆展开态）。
+- 打包：`npm run package:vsix`（Details 用 `docs/marketplace-details.md`，与 README 解耦）。
 
 ---
 
@@ -77,8 +91,13 @@
 - **做法**：
   1. sidebar 邮件行：有附件时行尾加 `📎`（tooltip 显示数量与文件名）。
   2. workbench 单封详情（pending + analyzed 两处模板）metadata 区显示 `附件/Attachments: N（文件名列表）`，无附件不显示。
-  3. `buildBatchDigestMarkdown` 每封邮件补 `AttachmentCount:` 与 `AttachmentNames:` 行——模型分析单封时可核对"正文提及附件"与附件实际存在性（如"称有附件但实际没有"可提示风险）。附件名经现有 redaction 路径处理后入 prompt。
-  4. analysis prompt 指南补一句：附件仅有元数据（数量与文件名），无法读取内容。
+  3. `buildBatchDigestMarkdown` 每封邮件补两行（即"附件元数据行"，格式与 digest 文件中已有字段一致）：
+     ```text
+     AttachmentCount: 2
+     AttachmentNames: contract.pdf; budget.xlsx
+     ```
+     作用：模型分析单封时可核对"正文提及附件"与附件实际存在性（正文写"详见附件"但 `AttachmentCount: 0` → 可在 summary/risk 中提示发件人漏附；反之附件存在时结论可引用文件名）。附件名经现有 redaction 路径处理后入 prompt。
+  4. analysis prompt 指南补一句（防模型幻觉）：`Attachment fields provide only the count and file names; attachment contents are not available — never claim to have read an attachment.`（即只告诉模型"有几个附件、叫什么名字"，并明确禁止它假装读过附件内容。）
 - **验收**：单测——渲染含 📎 与 metadata 行、batch digest 含附件行、无附件邮件不出现空字段；`npm test` 全绿。**needs user validation**：带附件的真实邮件在列表与详情可见附件标识；分析结果能正确反映附件存在。
 - **边界**：不做附件下载/预览/内容读取；digest 文件格式不动（附件字段本就存在）。
 
