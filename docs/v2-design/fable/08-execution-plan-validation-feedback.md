@@ -532,6 +532,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-13 · F5.3 已完成，代码提交 `722ecb3`：folder picker 保留原有 title，进度 message 按界面语言只显示一句简洁的 Outlook 启动提示；中英文均有回归覆盖。真实 VS Code 验证待用户执行。下一步按序 claim F5.4。
 
+- 2026-07-13 · F5.4 已完成，代码提交 `e08be3e`：每个分析 chunk 写盘后立即 sidebar-only 更新，workbench 仍只在任务结束时刷新，避免中途打断阅读与草稿。真实 VS Code 验证待用户执行。F5 全部完成。
+
 ## 6. Handover Log
 
 - **2026-07-11 · Claude Fable 5（规划者）**：创建本计划。核实过程要点：① `FormatRestrictDate` 在 `collect-outlook-mails.vbs:529` 与 `collect-outlook-meetings.vbs:444` 均以 `\` 拼日期（mail 版还带秒），Outlook Restrict 静默返回 0 → recentHours 空result；meetings 循环无下界守卫 + `pruneMeetingStore`（`meeting-store.ts:71`）剪掉过期已响应会议 → 队列空但 store 有数据。② `FolderScanSummary` 在 `src/` 零引用，采集诊断从未到达 UI。③ 草稿保留依赖 webview `getState` 客户端回填，真机失效，F1.3 改扩展侧持久化。④ `importantSenders` 为 prompt 级模型匹配，无代码匹配——Exchange DN 直接拉低命中，F1.6 从采集源 SMTP 化。⑤ `classification.ts:88` 语义下模型漏返邮件应留 Pending，用户实测消失——F1.2 要求真机复现 + 对账兜底双管齐下。无 dirty state。Next: worker 从 F1.1 开始 claim。
@@ -654,6 +656,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - **2026-07-13 · Codex（F5.3 completion）**：完成 `722ecb3`。`selectFolders` 的 Notification title 保持 `Loading Outlook folders…`；message 改为 en-US `Tip: starting Outlook first makes this faster.` 或 zh-CN `提示：先启动 Outlook 可加快加载。`，不再重复 Loading。回归测试分别锁定两种语言各仅一条提示。验收：`npm run compile` 零错误、定向 15/15、完整 `npm test` 424/424、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，运行 folder picker，确认通知为 title 加单句本地化提示。Known issues：无新增；真实通知排版待真机确认。Next：claim F5.4。
 
+- **2026-07-13 · Codex（F5.4 pre-work checkpoint）**：恢复现场：F5.3 代码与记录已提交（`722ecb3`、`1e5951e`，文档提交引用校正为 `a898959`），工作树干净；HEAD `a898959`。已重新定位：`analyzeBatchCore` 的唯一 `mergeAndPersist` 会先写 `analysis-result.json` 与 summary，成功与跳过 chunk 都经由它；扩展侧只在 `runWithBusy` 的 finally 调 `refresh()`，而既有 `refreshCancellationSidebar` 已只调用 `dashboardProvider.update()` 且不 rebuild workbench。边界：通过 `AnalysisContext` 可选异步回调，在每次落盘后 await sidebar-only 更新；不改 merge/store/schema、chunk 语义、workbench 或 F5.3。
+
+- **2026-07-13 · Codex（F5.4 completion）**：完成 `e08be3e`。`AnalysisContext` 新增可选 `onChunkPersisted`，唯一 `mergeAndPersist` 在 analysis 与 summary 都写盘后 await 它；`runAnalysisWithBusy` 注入既有 `refreshCancellationSidebar`，因此每个成功或 fallback chunk 均只执行 `dashboardProvider.update()`，不触及 workbench rebuild。回归测试用两个 chunk 在回调中读取分析文件，确认回调逐 chunk 触发且可观察到已落盘结果。验收：`npm run compile` 零错误、定向 42/42、完整 `npm test` 424/424、`git diff --check` 均通过；代码审查未发现 P0/P1/P2。Manual：**needs user validation on real VS Code**，分析 20+ 封邮件，首个 chunk 完成后确认 sidebar 分类已出现部分结果，且 workbench 阅读/草稿未被打断。Known issues：真实 VS Code 刷新时序待用户确认。Next：F5 全部完成，等待下一轮计划或验证反馈。
+
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
 > 前置：安装重新打包后的 `releases/easymail-0.3.0.vsix`（含全部 F 批改动）。结果列填 ✅ / ❌ / ⏭️，❌ 请附现象与相关日志行（日志：globalStorage 下 `logs/easy-mail.log`）。
@@ -745,11 +751,19 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - Known issues：真实 VS Code Notification 的视觉换行尚待用户确认。
   - Commit：`722ecb3`。
 
-### [ ] F5.4 分析结果按 chunk 增量进入分类（用户新确认#2，P2 体验）
+### [x] F5.4 分析结果按 chunk 增量进入分类（用户新确认#2，P2 体验）
 
 - **前提事实（已核实）**：chunk 之间**没有关联**——`app-analysis.ts:404` 每个 chunk 完成即 `mergeAndPersist`（合并+写盘），analysis-result.json 在分析过程中就是逐 chunk 更新的；缺的只是 UI 刷新（sidebar/workbench 只在 busy 结束的 `finally { refresh() }` 里刷一次）。
 - **做法**：每个 chunk `mergeAndPersist` 后触发一次 **sidebar-only** 更新（复用 `refreshCancellationSidebar` 的模式，走 `dashboardProvider.update()`）；**不要**在分析中途 rebuild workbench（避免打断用户阅读/草稿编辑与 flush 往返）。通过 ctx 回调注入，保持 app-analysis 纯函数性。
 - **验收**：单测（chunk 完成回调触发）；`npm test` 全绿。**needs user validation**：分析 20+ 封时，第一个 chunk 完成后 sidebar 分类里即出现部分结果。
+
+- Completion Notes（2026-07-13）：
+  - 改动文件：`src/lib/app-analysis.ts`、`src/extension.ts`、`src/test/app-analysis.test.ts`。
+  - 实现边界：通过可选回调在每次 `mergeAndPersist` 写完 analysis 与 summary 后刷新 sidebar；成功与 fallback chunk 均覆盖。未改 store/schema、合并语义、chunk 切分或 workbench 刷新路径。
+  - 验收结果：`npm run compile` 零错误、定向 42/42、完整 `npm test` 424/424、`git diff --check` 均通过；代码审查无 P0/P1/P2。
+  - Manual validation：**needs user validation on real VS Code**：对 20+ 封邮件运行分析；第一个 chunk 完成后检查 sidebar 分类已有部分结果，并确认 workbench 阅读和草稿不会中途重建。
+  - Known issues：真实 VS Code 的 sidebar 刷新时序仍待用户验证。
+  - Commit：`e08be3e`。
 
 ### 第三轮验证问答核实记录（2026-07-13）
 
