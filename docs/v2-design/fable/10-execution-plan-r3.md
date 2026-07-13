@@ -38,7 +38,7 @@
 - **验收**：单测——并发池按序合并（模拟乱序完成）、单 chunk 失败不影响其他 chunk、取消不启新 chunk、onDemand 时 prompt 含空草稿指令且 auto 不含、空 parts 模板 no-op；`npm test` 全绿。**needs user validation**：20 封分析耗时明显下降（预期约减半）；onDemand 模式再快且 Generate Draft 可用；进度文案正常。
 - **边界**：不改 chunk 划分逻辑与 token 预算；不做并行度设置项；不动线程分析（单请求无并发需求）。
 
-### [~] G2 会议队列重定位为"会议邀请"（D2，S-M 级）
+### [x] G2 会议队列重定位为"会议邀请"（D2，S-M 级）— `96723b8`
 
 - **现状锚点**：`sidebar-render.ts` meetings 队列（未响应排前 + 倒序，F5.2/F6.3 已修好详情与按钮）；labels 在 `dashboard-labels.ts`（`meetings.title` 等）。
 - **做法**：
@@ -120,6 +120,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - 2026-07-14 · 计划创建（依据 09 §7 拍板）。G1-G7 全部 `[ ]` 待 claim。
 - 2026-07-14 · G1 已完成（`f3dd065`）：单封分析 chunk 以并发度 2 补位执行，合并落盘串行化；新增 `draftGeneration=auto|onDemand`，全量测试 437 pass。Next: claim G2。
+- 2026-07-14 · G2 已完成（`96723b8`）：会议队列更名为会议邀请，未响应邀请平铺，未来已接受/暂定/组织者日程默认折叠，徽标仅计未响应。全量测试 438 pass。Next: claim G3。
 
 ---
 
@@ -142,3 +143,13 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Commit：`f3dd065`（本地，未 push）。
 
 - **2026-07-14 · Codex（G2 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `1172c11`；重新定位确认 `src/lib/sidebar-render.ts:189-234` 仍将全部会议统一排序/计数/平铺，`renderPendingFolderGroups` 与 `restorePendingFolders`/`togglePendingFolder` 仍提供可复用折叠状态模式，`src/lib/dashboard-labels.ts:195/386` 的 `meetings.title` 仍为“会议/Meetings”，对应渲染测试在 `src/test/sidebar-render.test.ts:447-485`。边界：只改 meetings 队列名称、未响应主体、未来已接受/暂定/组织者次级折叠组及未响应徽标计数；不改 queue id、采集/store、详情按钮或 Outlook 响应动作。Action: claim G2。
+
+- **2026-07-14 · Codex（G2 completion）**：Action: 完成 Meeting Invites 命名、两级会议展示、未响应专用徽标计数与折叠状态持久化；保留 `meetings` queue id 与 Open in Outlook 动作。Validated: `npm run compile` 通过；`node --test out/test/sidebar-render.test.js out/test/dashboard-labels.test.js` 49 pass；`npm test` 438 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——在 Sidebar 打开会议邀请，核对未响应邀请平铺置顶、已接受日程默认收起且展开态在刷新后保留、导航徽标只显示未响应数。Next: G3。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/lib/dashboard-labels.ts`、`src/test/sidebar-render.test.ts`、`src/test/dashboard-labels.test.ts`、本计划。
+  - 实现边界：仅改变 Sidebar 会议队列的信息架构；未改 meeting store、采集脚本、Workbench 详情或 Outlook 响应能力。
+  - 验收结果：两级分组、未来日程过滤、组内倒序、未响应计数及折叠状态脚本均有自动化覆盖；全量 438 pass。
+  - Manual validation：**needs user validation**，真实会议邀请/已接受日程的视觉分层与展开态需在 VS Code webview 确认。
+  - Known issues：插件内仍不提供 Accept/Decline，按计划继续只在 Outlook 响应。
+  - Commit：`96723b8`（本地，未 push）。
