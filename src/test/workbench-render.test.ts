@@ -190,13 +190,24 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(!html.includes("<strong>Thread:</strong> conversation:private-id"));
   });
 
-  it("uses the remaining reader height for original mail content", () => {
+  it("fills the active reader width for short content", () => {
     const html = renderWorkbenchHtml(stubInput());
 
-    assert.ok(html.includes(".wb-reader.active { display: flex; height: 100%; }"));
+    assert.ok(html.includes(".wb-reader.active { display: flex; width: 100%; height: 100%; }"));
+  });
+
+  it("hides the selection placeholder with display none while a reader is active", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes(".wb-reader.active ~ .wb-placeholder { display: none; }"));
+  });
+
+  it("uses the remaining reader area for full-width original mail content", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
     assert.ok(html.includes(".wb-reader.active .wb-with-body { display: flex; flex-direction: column; height: 100%; min-height: 100%; width: 100%; }"));
-    assert.ok(html.includes(".wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }"));
-    assert.ok(html.includes(".wb-body { flex: 1 1 auto; min-height: 0;"));
+    assert.ok(html.includes(".wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; width: 100%; }"));
+    assert.ok(html.includes(".wb-body { flex: 1 1 auto; min-height: 0; width: 100%;"));
     assert.ok(!html.includes("max-height: 400px"));
   });
 
