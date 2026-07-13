@@ -528,6 +528,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-13 · F5.1 已完成，代码提交 `a293b95`：已分析单封原文的 flex 高度链仅作用于邮件卡片，正文可占用剩余空间并内部滚动；sample 全部改为三行正文。真实 VS Code 验证待用户执行。下一步按序 claim F5.2。
 
+- 2026-07-13 · F5.2 已完成，代码提交 `708e4c4`：Workbench 接收 meetingStore，点击会议可按 EntryID 聚焦详情；补参会人字段，未响应优先、余项按开始时间倒序。真实 VS Code/Outlook 验证待用户执行。下一步按序 claim F5.3。
+
 ## 6. Handover Log
 
 - **2026-07-11 · Claude Fable 5（规划者）**：创建本计划。核实过程要点：① `FormatRestrictDate` 在 `collect-outlook-mails.vbs:529` 与 `collect-outlook-meetings.vbs:444` 均以 `\` 拼日期（mail 版还带秒），Outlook Restrict 静默返回 0 → recentHours 空result；meetings 循环无下界守卫 + `pruneMeetingStore`（`meeting-store.ts:71`）剪掉过期已响应会议 → 队列空但 store 有数据。② `FolderScanSummary` 在 `src/` 零引用，采集诊断从未到达 UI。③ 草稿保留依赖 webview `getState` 客户端回填，真机失效，F1.3 改扩展侧持久化。④ `importantSenders` 为 prompt 级模型匹配，无代码匹配——Exchange DN 直接拉低命中，F1.6 从采集源 SMTP 化。⑤ `classification.ts:88` 语义下模型漏返邮件应留 Pending，用户实测消失——F1.2 要求真机复现 + 对账兜底双管齐下。无 dirty state。Next: worker 从 F1.1 开始 claim。
@@ -642,6 +644,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - **2026-07-13 · Codex（F5.1 completion）**：完成 `a293b95`。邮件卡片新增专用 `wb-mail-with-body`，仅 pending/analyzed 路径获得可收缩的 flex 高度链；分析后的 `.wb-original-section` 隐藏外层溢出，内部 `.wb-body` 继续滚动。会议和线程不命中该新选择器。sample 十封正文均为三行。review 无 P0/P1，并补 analyzed 原文路径的精确模板断言。验收：`npm run compile` 零错误、定向 40/40、全量 `npm test` 420/420、`git diff --check`、mail VBS `--help`/`--sample` 均通过。Manual：**needs user validation on real VS Code**，验证 analyzed 单封正文可读/可滚动。Next：claim F5.2。
 
+- **2026-07-13 · Codex（F5.2 pre-work checkpoint）**：恢复现场：F5.1 代码与记录已提交（`a293b95`、`d644661`），工作树干净；HEAD `d644661`。已重新定位：sidebar 会议行用 entryId 调 `openInWorkbench`（`sidebar-render.ts:153-158`），workbench renderer 也为 entryId 构建 meeting reader 与 Outlook 按钮（`workbench-render.ts:201-222`、`276-277`），但须核对 `getWorkbenchHtml` 是否把 `meetingStore` 传到 renderer，及 `openWorkbench` focus 路径是否保留该 store。当前 sidebar/workbench 都将未响应置前、余项 start 升序（`sidebar-render.ts:189-192`、`workbench-render.ts:239-244`），计划要求余项改为倒序。边界：只补会议详情数据转发/路由并统一排序；复用现有 EntryID Outlook 打开路径，不改采集、digest/store/schema 或 F5.3/F5.4。
+
+- **2026-07-13 · Codex（F5.2 completion）**：完成 `708e4c4`。根因是 `getWorkbenchHtml` 漏传 meetingStore；sidebar 既有 entryId focus 能命中 reader 后即展示详情。详情补齐必选/可选参会人，Open in Outlook 仍走既有 EntryID 路径；sidebar/workbench 同时改为未响应优先、同状态 start 倒序。独立 review 无 P0/P1/P2。验收：`npm run compile` 零错误、定向 135/135、全量 `npm test` 423/423、`git diff --check` 均通过。Manual：**needs user validation on real VS Code/Outlook**，点击会议并打开对应 Outlook 项。Next：claim F5.3。
+
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
 > 前置：安装重新打包后的 `releases/easymail-0.3.0.vsix`（含全部 F 批改动）。结果列填 ✅ / ❌ / ⏭️，❌ 请附现象与相关日志行（日志：globalStorage 下 `logs/easy-mail.log`）。
@@ -704,12 +710,20 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
     - Known issues：未在真实 VS Code webview 中观察布局。
     - Commit：`a293b95`。
 
-### [ ] F5.2 Meetings 点击无详情 + 排序统一（§8#1，P2 交互补全）
+### [x] F5.2 Meetings 点击无详情 + 排序统一（§8#1，P2 交互补全） — `708e4c4`
 
 - **现象**：会议在 sidebar 正常展示，但点击后 workbench 无任何内容——无法看会议详情、无法跳回 Outlook 看邀请邮件。用户评价"只有 sidebar 展示的话功能太尴尬"。
 - **定位线索**：`workbench-render.ts` 已存在 `wb-mtg-*` 样式（暗示会议详情渲染曾规划或部分存在）；sidebar 会议行 `openItem(entryId)` 走 `openInWorkbench`——排查 workbench 是否为会议构建 reader、id 用的是 meetingId 还是 entryId、路由是否匹配。
 - **做法**：① 点击会议 → workbench 显示会议详情（主题/起止时间/地点/组织者/必选与可选参会人/响应状态/正文摘要）；② 详情带 **Open in Outlook** 按钮——复用现有按 EntryID 打开条目的 VBS（`GetItemFromID` 对 AppointmentItem 同样有效，真机验证）；③ 排序：未响应仍排最前，其余按开始时间**倒序**（用户要求与邮件列表统一；注：升序=最近的会议在前是日历惯例，若用后觉得不顺手可一行改回，Notes 里注明）。
 - **验收**：渲染/路由单测；`npm test` 全绿。**needs user validation**：点击会议出详情；Open in Outlook 能打开对应日历项/邀请；排序符合预期。
+
+  - Completion Notes（2026-07-13）：
+    - 改动文件：`src/extension.ts`、`src/lib/dashboard-labels.ts`、`src/lib/sidebar-render.ts`、`src/lib/workbench-render.ts`、相关渲染/路由测试。
+    - 实现边界：补 Workbench 的 meetingStore 转发，复用既有 EntryID Outlook 打开；会议详情补必选/可选参会人，排序统一为未响应优先、余项 start 倒序。未改采集、digest/store/schema 或打包。
+    - 验收结果：`npm run compile` 零错误、定向 135/135、完整 `npm test` 423/423、`git diff --check` 均通过；独立 review 通过。
+    - Manual validation：**needs user validation on real VS Code/Outlook**：点击会议显示详情；Open in Outlook 打开对应日历项或邀请；确认排序。
+    - Known issues：真实 Outlook AppointmentItem 的 `GetItemFromID` 打开行为尚待用户验证。
+    - Commit：`708e4c4`。
 
 ### [ ] F5.3 folder picker 进度文案去重（§8#9，P2 文案）
 
