@@ -792,8 +792,7 @@ describe("analyzeBatchCore", () => {
       assert.equal(result.batchSize, 2);
       assert.equal(provider.prompts.length, 2);
       assert.deepEqual(progressMessages, [
-        "Analyzing 2 chunks…",
-        "Analyzing chunk 1/2…",
+        "Analyzing 2 emails in 2 chunks. Starting chunk 1/2…",
         "Analyzing chunk 2/2 (about 1 minute remaining)"
       ]);
       assert.equal(persistedResults.length, 2, "each completed chunk notifies after its merged result is written");

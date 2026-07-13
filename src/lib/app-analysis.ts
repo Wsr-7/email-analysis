@@ -313,7 +313,6 @@ export async function analyzeBatchCore(
     await mergeAndPersist(fallback);
   };
 
-  ctx.progress?.(`Analyzing ${chunks.length} chunk${chunks.length === 1 ? "" : "s"}…`);
   for (let index = 0; index < chunks.length; index += 1) {
     if (ctx.cancellationToken?.isCancellationRequested) {
       cancelled = true;
@@ -326,7 +325,7 @@ export async function analyzeBatchCore(
       const remainingMinutes = Math.ceil((averageChunkMs * (chunks.length - index)) / 60000);
       ctx.progress?.(`Analyzing chunk ${index + 1}/${chunks.length} (about ${remainingMinutes} ${remainingMinutes === 1 ? "minute" : "minutes"} remaining)`);
     } else {
-      ctx.progress?.(`Analyzing chunk 1/${chunks.length}…`);
+      ctx.progress?.(`Analyzing ${batch.length} email${batch.length === 1 ? "" : "s"} in ${chunks.length} chunk${chunks.length === 1 ? "" : "s"}. Starting chunk 1/${chunks.length}…`);
     }
     const chunkStartedAtMs = Date.now();
     const redacted = redactStoredMails(chunk, buildDefaultRedactionPolicy());
