@@ -355,11 +355,19 @@
   - Known issues：无。
   - Commits：`f2159e9`、`eaa5bf7`。
 
-### [~] F4.2 草稿自动创建回归：flush 空 textarea 遮蔽模型 draftReply（新反馈#2，P0，根因已确证）
+### [x] F4.2 草稿自动创建回归：flush 空 textarea 遮蔽模型 draftReply（新反馈#2，P0，commit `897fcbd`）
 
 - **根因（已核实）**：模型一直在生成 `draftReply`（output-schema 未变），渲染 fallback 链 `workingDrafts.get(id) ?? item.draftReply` 也正确。但 F1.3 的 flush 协议把**所有** `.draft-box-editable` 的 textarea 值无条件上报（`workbench-render.ts:465-470`，含空值），`workingDraftsFlushed` 处理器把空串写进 Map——此后 `get(id)` 返回 `""` 而非 `undefined`，`??` 不触发，模型草稿被永久遮蔽。典型触发序列：邮件在 workbench 打开过 → 分析 → busy finally 触发 refresh → flush 把旧 HTML 里的空草稿框写成 `""` → 新渲染丢弃刚生成的 draftReply。
 - **做法**：区分"用户清空"与"从未编辑"——`updateWorkingDraft`（含 flush 批量路径与 input debounce 路径）收到**空文本**时仅当 Map 已存在该 id 条目才写入（清空要尊重），否则跳过（不得用空串占位）。单测：① flush 上报空 textarea 不遮蔽 `draftReply`；② 用户输入后清空 → 刷新后仍为空；③ Generate/Polish 写入后正常显示。
 - **验收**：`npm test` 全绿。**needs user validation**：分析一批含需回复邮件 → 详情草稿框自动带模型草稿；Notice 类模型留空 → 显示 Generate Draft。
+
+- **Completion Notes**：
+  - 改动文件：`src/extension.ts`、`src/test/extension-cancellation.test.ts`。
+  - 实现边界：扩展侧 `updateWorkingDraft` 对首次空文本不创建 Map 条目；已有条目仍允许写入空串，故用户主动清空继续生效。Generate/Polish/Refine 的既有直接写入不变；未改 webview flush 协议、digest/store/schema。
+  - 验收结果：首次空 flush 在修复前实际建立空条目（RED），修复后不再遮蔽模型 `draftReply`；回归测试覆盖 flush→渲染 fallback、输入后清空→刷新为空、Generate→Polish→刷新显示最终草稿。独立 review 首轮提出渲染断言缺口，已补齐并复审通过。`npm run compile` 零错误，定向 11/11 与全量 `npm test` 410/410 通过，`git diff --check` 通过。
+  - Manual validation：**needs user validation on real Outlook/VS Code Workbench**。分析一批含需回复邮件后打开详情，确认模型草稿自动出现；对 Notice 类确认显示 Generate Draft；手写后清空并 Fetch/刷新，确认仍为空。
+  - Known issues：无。
+  - Commit：`897fcbd`。
 
 ### [ ] F4.3 IsSentFolder 的 VBScript If-条件错误陷阱 → 全部文件夹误判 SentOn（§7#1 残留，P1）
 
@@ -456,6 +464,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · **规划者复审 F3 批通过**（diff `f7490fc..08f6b33`，独立复核 `npm test` 405/405 全绿、VBS `--help` 通过、`run-sample-validation.ps1` 端到端通过）：F3.1 超时降级 + requestId 防串号正确（两条竞态测试齐备）；F3.2 核实 enum 在 F2.1 注册时就已不存在（用户笔记引用的是旧版安装包 manifest），worker 只补 description 属诚实的最小处理；F3.3 双 README 结构完整（Overview/Features/Quick Start/Usage/Configuration/FAQ/Known Limitations/Author，5 个中文截图占位）；F3.4 分组渲染含 0 计数与历史目录兜底、展开态存 webview state；F3.5 `matchesIgnoredSender` 大小写不敏感子串匹配、`ignoredPending` 双来源合并、线程 prompt 过滤含全忽略保护。vsix 已重新打包含 F3 全部改动。§7 验证表已追加 F3 行（14-16）。**08 计划全部 19 个 step 完成，等待用户第二轮人工验证。**
 - 2026-07-13 · **用户完成第二轮验证（结果回填 §7）+ 两条新反馈，规划者核实后产出 F4 批（§2.10，8 个 step）**。两个 P0 根因已本地确证：**F4.1** Meetings 队列空 = `getDashboardHtml` 漏传 `meetingStore`（数据链 6/6 存活、显式传入即渲染，调用点丢字段）；**F4.2** 草稿不自动创建 = F1.3 flush 把空 textarea 写进 Map 遮蔽模型 `draftReply`。其余：F4.3 IsSentFolder 的 VBScript If-条件错误陷阱（全文件夹误判 SentOn）、F4.4 取消态真实环境不可见、F4.5 workbench 布局三处、F4.6 本地 vsix 无 `__metadata` 致 Guide 不弹、F4.7 Details 去外链解耦、F4.8 chunk 进度+预估。§7#3（注入邮件）核实为旧构建测试（日志键 `skippedChunkedMails` ≠ 当前代码），需新 vsix 复测。会议队列产品定位（邀请 vs 日程）与分析提速（并行/草稿按需）入 R3 决策清单。通过项：#4/#5/#6/#7/#9/#10/#14/#15/#16 主体。
 - 2026-07-13 · F4.1 已完成，代码提交 `f2159e9`、`eaa5bf7`：`getDashboardHtml` 不再丢弃 `loadState` 的 `meetingStore`，Sidebar 直接收到该 store；集中 Sidebar 入参构造并用逐字段与端到端回归测试锁定转发链。真实 Outlook/VS Code 验证待用户执行。下一步按序 claim F4.2。
+- 2026-07-13 · F4.2 已完成，代码提交 `897fcbd`：首次空 flush 不再写入草稿 Map，模型 `draftReply` 能正常作为初值显示；用户主动清空仍保持为空。真实 Workbench 验证待用户执行。下一步按序 claim F4.3。
 
 ---
 
@@ -536,6 +545,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.1 completion）**：完成 `f2159e9`、`eaa5bf7`。`getDashboardHtml` 的扩展状态与 Sidebar render 入参均补齐 `meetingStore`，无数据时保持空 store 回退；集中入参构造后以逐字段断言锁住所有 Sidebar 扩展字段，端到端测试仍断言唯一会议标题进入最终 HTML，两个新增测试均在相应实现前实际 RED。独立复审通过，无 P0/P1/P2。验收：`npm run compile` 零错误、定向 8/8 与全量 `npm test` 407/407 通过、`git diff --check` 通过；meetings VBS `--help` 通过，`--sample` digest 验证 6 条会议。Manual：**needs user validation on real Outlook/VS Code Sidebar**，Fetch 后确认 Meetings 中显示今天/未来实例和未响应邀请。Next：按用户顺序 claim F4.2；不改会议产品语义、不进入 F4.3/R3/R4。
 
 - **2026-07-13 · Codex（F4.2 pre-work checkpoint）**：恢复现场：F4.1 代码与记录已提交（`f2159e9`、`eaa5bf7`、`4192abf`），工作树干净；HEAD `4192abf`。已重新定位根因：webview flush 无条件枚举所有 `.draft-box-editable` 并上报空 `draftText`（`workbench-render.ts:462-470`），message handler 再无条件调用 `updateWorkingDraft`（`message-handler.ts:81-94`）；extension context 当前直接 `Map.set`（`extension.ts:1314`），所以空框会建立空值条目并遮蔽 `workingDrafts.get(id) ?? item.draftReply` fallback。Generate/Polish/Refine 已直接写 Map。边界：仅让扩展侧草稿更新区分首次空值与用户主动清空，并补三组回归测试；不改 webview flush 协议、digest/store/schema 或 F4.3。
+
+- **2026-07-13 · Codex（F4.2 completion）**：完成 `897fcbd`。扩展侧草稿更新仅在文本非空或已有条目时写入 Map，故 flush/input 的首次空值不占位、已输入后清空仍保留空值；Generate/Polish/Refine 不受影响。测试以真实 handler 与 Workbench render 验证首次空 flush 显示模型草稿、主动清空刷新仍空、Generate→Polish 刷新显示最终文本。首轮 review 发现后两项只断言 Map 未验证渲染，已补 HTML 断言并复审通过。验收：`npm run compile` 零错误、定向 11/11、全量 `npm test` 410/410、`git diff --check` 通过。Manual：**needs user validation on real Outlook/VS Code Workbench**，确认自动草稿、Notice Generate Draft 与清空后刷新三种情形。Next：按用户顺序 claim F4.3；不进入 F4.4/R3/R4。
 
 ---
 
