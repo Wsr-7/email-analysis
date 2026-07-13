@@ -25,7 +25,7 @@
 
 ## 1. Milestone G — R3 批次（按建议顺序排列，互相独立可并行 claim；G1 最大，建议单独一人做）
 
-### [ ] G1 分析提速：chunk 并行度 2 + draftGeneration 开关（D1，M 级，最高优先）
+### [~] G1 分析提速：chunk 并行度 2 + draftGeneration 开关（D1，M 级，最高优先）
 
 - **现状锚点**：`app-analysis.ts` `analyzeBatchCore` 的 chunk for 循环串行 await（~L300-410）；每 chunk `mergeAndPersist` 独立落盘 + F1.2 对账 + F5.4 chunk 完成后 sidebar 刷新回调；取消检查在循环头；进度回调 `ctx.progress`。
 - **做法**：
@@ -127,3 +127,5 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **2026-07-14 · Claude Fable 5（规划者）**：依据 09 拍板展开 R3 执行计划。要点：G1 并发池注意 mergeAndPersist 串行化（共享 merged 状态不可并发写）；G2 复用 F3.4 折叠分组模式；G3 默认值必须等于现硬编码值（行为零变化起步）；G4 只做字段+排序+标注不做提醒；G5 nonce 由调用方传入保持 render 纯函数；G6 只做上下键一个动作；G7 的 batch prompt 附件行是模型感知附件的关键补齐。无 dirty state。Next: worker claim G1（或并行从 G2-G7 任选）。
 
 - **2026-07-14 · Claude Fable 5（规划者开工前自审，修订 5 处）**：① **G5 补最大的坑**——三个模板存在大量 `onclick=` 内联事件属性，nonce 型 CSP 不放行内联 handler，必须先迁移事件委托再加 CSP（两步顺序不可颠倒，级别 S-M 上调为 M）；② **G3 补分类缓存失效机制**——classification cache 持久化导致词表变更后已分类邮件不重算，需词表 hash 变更触发全量重算，否则验收必失败；③ **G4 修正排序锚点**——分类内顺序来自 `dashboard-state.ts` 分桶（非 sidebar-render），改法明确为分桶后仅对两个目标桶做桶内重排；④ G1 补单 chunk 失败隔离与 `applyReplyTemplateToAnalysis` 空 parts no-op 确认项、G7 补 `redactStoredMails` 是否覆盖附件名的确认项；⑤ §0.1 补"新增设置三件套模式"、G6 补与 G2 的顺序约束。自审后判定：任务/做法/验收/边界达到可开工标准。
+
+- **2026-07-14 · Codex（G1 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `fc062db`；重新定位确认 `src/lib/app-analysis.ts:213-408` 仍是串行 chunk 循环，`mergeAndPersist`/`persistSkippedChunk`/取消检查/进度回调锚点均成立，`src/lib/prompt-config.ts:118` 为单封 prompt 组装入口，`src/lib/reply-template.ts:36` 为模板应用入口，设置三件套仍落在 `package.json`、`default-config.json`、`src/extension.ts readConfig`。边界：仅实现并发度 2、串行合并落盘、失败/取消/进度语义与 `draftGeneration`；不改 chunk 划分/token 预算，不做并发度设置，不动线程分析。基线 `npm test`：432 pass / 0 fail。Action: claim G1。

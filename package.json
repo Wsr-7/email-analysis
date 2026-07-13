@@ -132,6 +132,20 @@
           "default": "auto",
           "description": "Draft reply language. Auto follows the source mail or thread language."
         },
+        "easyMail.draftGeneration": {
+          "type": "string",
+          "order": 12.5,
+          "enum": [
+            "auto",
+            "onDemand"
+          ],
+          "enumItemLabels": [
+            "Automatic",
+            "On demand"
+          ],
+          "default": "auto",
+          "description": "Draft generation mode. On demand significantly speeds up analysis; use Generate Draft in the workbench when a reply is needed."
+        },
         "easyMail.autoAnalyzeMaxClassificationLevel": {
           "type": "number",
           "order": 13,

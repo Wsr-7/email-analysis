@@ -1120,6 +1120,7 @@ export class EasyMailApp {
       modelFamily,
       outputLanguage: configuredOutputLanguage(settings),
       draftLanguage: normalizeDraftLanguage(settings.get("draftLanguage", defaults.draftLanguage || "auto")),
+      draftGeneration: settings.get("draftGeneration", defaults.draftGeneration || "auto"),
       autoAnalyzeMaxClassificationLevel: settings.get("autoAnalyzeMaxClassificationLevel", defaults.autoAnalyzeMaxClassificationLevel),
       mailStoreRetentionDays: settings.get("mailStoreRetentionDays", defaults.mailStoreRetentionDays),
       mailIndexRetentionDays: settings.get("mailIndexRetentionDays", defaults.mailIndexRetentionDays),

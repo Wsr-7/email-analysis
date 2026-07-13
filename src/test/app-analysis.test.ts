@@ -51,6 +51,26 @@ function analysisResponse(mailId: string): string {
   });
 }
 
+async function createChunkedAnalysisData(count: number): Promise<{ data: AppDataStore; globalStoragePath: string }> {
+  const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+  const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+  await data.ensureConfig();
+  await fs.mkdir(data.getDataDir(), { recursive: true });
+  await data.writeMailStore({
+    generatedAt: "2026-07-02T00:00:00.000Z",
+    lastPullAt: "2026-07-02T00:00:00.000Z",
+    items: Array.from({ length: count }, (_, index) => ({ ...mail(index + 1), bodyExcerpt: "x".repeat(2400) }))
+  });
+  await data.writeMailIndex(emptyMailIndex());
+  await data.writeIgnoredIds([]);
+  await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }]);
+  return { data, globalStoragePath };
+}
+
+function nextTurn(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 function threadMessage(mailId: string, from: string, body: string): ThreadMessage {
   return {
     mailId,
@@ -111,6 +131,145 @@ describe("analyzeBatchCore", () => {
     assert.equal(hugeChunks[0].length, 1);
     assert.equal(hugeChunks[0][0].mailId, "mail-099");
     assert.equal(hugeChunks[1][0].mailId, "mail-100");
+  });
+
+  it("runs at most two chunks concurrently and serializes merges by completion order", async () => {
+    const { data, globalStoragePath } = await createChunkedAnalysisData(3);
+    let releaseFirst = () => {};
+    let releaseSecond = () => {};
+    const gates = new Map([
+      ["mail-001", new Promise<void>((resolve) => { releaseFirst = resolve; })],
+      ["mail-002", new Promise<void>((resolve) => { releaseSecond = resolve; })]
+    ]);
+    const requested: string[] = [];
+    const completed: number[] = [];
+    let active = 0;
+    let maxActive = 0;
+    try {
+      const run = analyzeBatchCore({
+        data,
+        llmProvider: {
+          listModels: async () => [],
+          sendPrompt: async (prompt) => {
+            const mailId = /## Mail: (mail-\d+)/.exec(prompt)?.[1] || "";
+            requested.push(mailId);
+            active += 1;
+            maxActive = Math.max(maxActive, active);
+            await gates.get(mailId);
+            active -= 1;
+            return {
+              rawText: analysisResponse(mailId),
+              model: { vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" },
+              usedFallback: false
+            };
+          }
+        },
+        extensionPath: process.cwd(),
+        readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+        log: async (event, details) => {
+          if (event === "analyze:chunkDone") completed.push(Number(details.chunk));
+        },
+        availableModelsCache: null
+      }, "allAllowed");
+
+      for (let index = 0; index < 100 && requested.length < 1; index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+      await nextTurn();
+      const initiallyStarted = requested.length;
+      releaseSecond();
+      for (let index = 0; index < 100 && !completed.includes(3); index += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+      releaseFirst();
+      await run;
+
+      assert.equal(initiallyStarted, 2);
+      assert.equal(maxActive, 2);
+      assert.deepEqual(completed, [2, 3, 1]);
+    } finally {
+      releaseFirst();
+      releaseSecond();
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps other concurrent chunks when one transport fails", async () => {
+    const { data, globalStoragePath } = await createChunkedAnalysisData(3);
+    let active = 0;
+    let maxActive = 0;
+    let calls = 0;
+    let releaseFirstPair = () => {};
+    const firstPair = new Promise<void>((resolve) => { releaseFirstPair = resolve; });
+    try {
+      const result = await analyzeBatchCore({
+        data,
+        llmProvider: {
+          listModels: async () => [],
+          sendPrompt: async (prompt) => {
+            const mailId = /## Mail: (mail-\d+)/.exec(prompt)?.[1] || "";
+            calls += 1;
+            active += 1;
+            maxActive = Math.max(maxActive, active);
+            if (calls === 2) releaseFirstPair();
+            if (calls <= 2) await firstPair;
+            active -= 1;
+            if (mailId === "mail-001") throw new Error("transport failed");
+            return {
+              rawText: analysisResponse(mailId),
+              model: { vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" },
+              usedFallback: false
+            };
+          }
+        },
+        extensionPath: process.cwd(),
+        readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+        log: async () => {},
+        availableModelsCache: null,
+        retryDelaysMs: []
+      }, "allAllowed");
+
+      const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
+      assert.equal(maxActive, 2);
+      assert.equal(result.batchSize, 2);
+      assert.equal(result.skippedChunks, 1);
+      assert.deepEqual(analysis.items.map((item) => item.mailId).sort(), ["mail-001", "mail-002", "mail-003"]);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
+  it("does not start another chunk after cancellation while two chunks are in flight", async () => {
+    const { data, globalStoragePath } = await createChunkedAnalysisData(4);
+    const token = { isCancellationRequested: false };
+    let calls = 0;
+    try {
+      await assert.rejects(() => analyzeBatchCore({
+        data,
+        llmProvider: {
+          listModels: async () => [],
+          sendPrompt: async (prompt) => {
+            calls += 1;
+            if (calls === 2) token.isCancellationRequested = true;
+            const mailId = /## Mail: (mail-\d+)/.exec(prompt)?.[1] || "";
+            return {
+              rawText: analysisResponse(mailId),
+              model: { vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" },
+              usedFallback: false
+            };
+          }
+        },
+        extensionPath: process.cwd(),
+        readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+        log: async () => {},
+        availableModelsCache: null,
+        cancellationToken: token
+      }, "allAllowed"), /cancelled/i);
+
+      assert.equal(calls, 2);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
   });
 
   it("does not analyze an explicitly selected ignored sender", async () => {
@@ -591,7 +750,7 @@ describe("analyzeBatchCore", () => {
     }
   });
 
-  it("rejects cancellation between chunks and preserves completed results", async () => {
+  it("rejects cancellation between chunks and preserves completed in-flight results", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
       const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
@@ -631,8 +790,8 @@ describe("analyzeBatchCore", () => {
       );
 
       const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
-      assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001"]);
-      assert.equal(provider.prompts.length, 1);
+      assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001", "mail-002"]);
+      assert.equal(provider.prompts.length, 2);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }
@@ -822,8 +981,9 @@ describe("analyzeBatchCore", () => {
       assert.equal(result.batchSize, 2);
       assert.equal(provider.prompts.length, 2);
       assert.deepEqual(progressMessages, [
-        "Analyzing 2 emails in 2 chunks. Starting chunk 1/2…",
-        "Analyzing chunk 2/2 (about 1 minute remaining)"
+        "Completed 0/2 chunks.",
+        "Completed 1/2 chunks (about 1 minute remaining)",
+        "Completed 2/2 chunks (about 0 minutes remaining)"
       ]);
       assert.equal(persistedResults.length, 2, "each completed chunk notifies after its merged result is written");
       assert.ok(persistedResults.every((result) => result.includes('"items"')), "the notification observes a persisted analysis result");

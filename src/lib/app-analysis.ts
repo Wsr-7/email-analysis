@@ -19,6 +19,7 @@ import type { AppDataStore } from "./app-data";
 
 const ANALYSIS_CHUNK_TOKEN_BUDGET = 12000;
 const ANALYSIS_OUTPUT_RESERVE_PER_MAIL = 400;
+const ANALYSIS_CHUNK_CONCURRENCY = 2;
 const DEFAULT_RETRY_DELAYS_MS = [2000, 8000];
 
 export interface AnalysisContext {
@@ -265,6 +266,7 @@ export async function analyzeBatchCore(
   const replyDraftPrompt = await fs.promises.readFile(path.join(ctx.extensionPath, "prompts", "reply-draft-prompt.md"), "utf8");
   const replyTemplate = await ctx.data.readReplyTemplate((event, d) => ctx.log(event, d));
   const configuredModel = typeof config.modelFamily === "string" ? config.modelFamily.trim() : "gpt-5.4";
+  const draftGeneration = config.draftGeneration === "onDemand" ? "onDemand" : "auto";
   const modelInputTokenBudget = await analysisTokenBudget(ctx, configuredModel);
   const promptOverheadTokens = estimateTextTokens(composeAnalysisPrompt({
     basePrompt,
@@ -274,6 +276,7 @@ export async function analyzeBatchCore(
     digestText: buildBatchDigestMarkdown([]),
     outputLanguage: String(config.outputLanguage || "en-US"),
     draftLanguage: normalizeDraftLanguage(config.draftLanguage),
+    draftGeneration,
     promptConfig
   }));
   const chunkInputTokenBudget = Math.max(1, modelInputTokenBudget - promptOverheadTokens);
@@ -294,7 +297,11 @@ export async function analyzeBatchCore(
   let omittedMails = 0;
   let totalReplacements = 0;
   let cancelled = false;
+  let cancellationError: unknown;
+  let nextChunkIndex = 0;
+  let completedChunks = 0;
   let completedChunkElapsedMs = 0;
+  let mergeTail = Promise.resolve();
   const summaryLabels = buildCategoryLabels(getLabels(getLocaleFromConfig(config)), promptConfig, getLocaleFromConfig(config));
   const mergeAndPersist = async (incoming: ReturnType<typeof normalizeAnalysis>): Promise<void> => {
     merged = pruneAnalysisResult(
@@ -311,23 +318,24 @@ export async function analyzeBatchCore(
     await ctx.log("analyze:omittedItems", { chunk: chunkIndex, chunks: chunks.length, mailIds: chunk.map((mail) => mail.mailId), reason: "chunkSkipped" });
     const fallback = normalizeAnalysis({ generatedAt: "", overview: {}, items: omittedAnalysisItems(chunk) }, allowedCategoryIds(promptConfig));
     fallback.language = getLocaleFromConfig(config);
-    await mergeAndPersist(fallback);
+    await serializeMerge(() => mergeAndPersist(fallback));
   };
+  function serializeMerge(work: () => Promise<void>): Promise<void> {
+    const result = mergeTail.then(work);
+    mergeTail = result;
+    return result;
+  }
+  const completeChunk = (startedAtMs: number): void => {
+    completedChunkElapsedMs += Date.now() - startedAtMs;
+    completedChunks += 1;
+    const averageChunkMs = completedChunkElapsedMs / completedChunks;
+    const remainingMinutes = Math.ceil((averageChunkMs * (chunks.length - completedChunks)) / ANALYSIS_CHUNK_CONCURRENCY / 60000);
+    ctx.progress?.(`Completed ${completedChunks}/${chunks.length} chunks (about ${remainingMinutes} ${remainingMinutes === 1 ? "minute" : "minutes"} remaining)`);
+  };
+  ctx.progress?.(`Completed 0/${chunks.length} chunks.`);
 
-  for (let index = 0; index < chunks.length; index += 1) {
-    if (ctx.cancellationToken?.isCancellationRequested) {
-      cancelled = true;
-      await ctx.log("analyze:cancelled", { analyzedCount, chunks: chunks.length, nextChunk: index + 1 });
-      break;
-    }
+  const runChunk = async (index: number): Promise<void> => {
     const chunk = chunks[index];
-    if (index) {
-      const averageChunkMs = completedChunkElapsedMs / index;
-      const remainingMinutes = Math.ceil((averageChunkMs * (chunks.length - index)) / 60000);
-      ctx.progress?.(`Analyzing chunk ${index + 1}/${chunks.length} (about ${remainingMinutes} ${remainingMinutes === 1 ? "minute" : "minutes"} remaining)`);
-    } else {
-      ctx.progress?.(`Analyzing ${batch.length} email${batch.length === 1 ? "" : "s"} in ${chunks.length} chunk${chunks.length === 1 ? "" : "s"}. Starting chunk 1/${chunks.length}…`);
-    }
     const chunkStartedAtMs = Date.now();
     const redacted = redactStoredMails(chunk, buildDefaultRedactionPolicy());
     totalReplacements += redacted.totalReplacements;
@@ -340,6 +348,7 @@ export async function analyzeBatchCore(
       digestText,
       outputLanguage: String(config.outputLanguage || "en-US"),
       draftLanguage: normalizeDraftLanguage(config.draftLanguage),
+      draftGeneration,
       promptConfig
     });
     await ctx.log("analyze:chunkStart", { chunk: index + 1, chunks: chunks.length, mails: chunk.length });
@@ -348,7 +357,9 @@ export async function analyzeBatchCore(
       raw = (await sendPromptToModel(ctx, prompt, configuredModel, "analyze")).raw;
     } catch (error) {
       if (ctx.cancellationToken?.isCancellationRequested || isCancellationError(error)) {
-        throw error;
+        cancelled = true;
+        cancellationError = cancellationError || error;
+        return;
       }
       skippedChunks += 1;
       await ctx.log("analyze:chunkSkipped", {
@@ -357,8 +368,8 @@ export async function analyzeBatchCore(
         error: error instanceof Error ? error.message : String(error)
       });
       await persistSkippedChunk(chunk, index + 1);
-      completedChunkElapsedMs += Date.now() - chunkStartedAtMs;
-      continue;
+      completeChunk(chunkStartedAtMs);
+      return;
     }
     await ctx.log("analyze:response", { chunk: index + 1, chunks: chunks.length, rawLength: raw.length });
     let analysis: ReturnType<typeof parseAnalysisJson>;
@@ -369,8 +380,10 @@ export async function analyzeBatchCore(
         const repaired = await repairAnalysisJson(ctx, raw, error, configuredModel);
         analysis = parseAnalysisJson(repaired, allowedCategoryIds(promptConfig));
       } catch (repairError) {
-        if (ctx.cancellationToken?.isCancellationRequested) {
-          throw repairError;
+        if (ctx.cancellationToken?.isCancellationRequested || isCancellationError(repairError)) {
+          cancelled = true;
+          cancellationError = cancellationError || repairError;
+          return;
         }
         skippedChunks += 1;
         await ctx.log("analyze:chunkSkipped", {
@@ -379,8 +392,8 @@ export async function analyzeBatchCore(
           error: repairError instanceof Error ? repairError.message : String(repairError)
         });
         await persistSkippedChunk(chunk, index + 1);
-        completedChunkElapsedMs += Date.now() - chunkStartedAtMs;
-        continue;
+        completeChunk(chunkStartedAtMs);
+        return;
       }
     }
 
@@ -405,18 +418,26 @@ export async function analyzeBatchCore(
       ...returnedItems,
       ...omittedAnalysisItems(omitted)
     ];
-    await mergeAndPersist(normalized);
+    await serializeMerge(() => mergeAndPersist(normalized));
     analyzedCount += chunk.length;
     await ctx.log("analyze:chunkDone", { chunk: index + 1, chunks: chunks.length, mergedItems: merged.items.length });
-    completedChunkElapsedMs += Date.now() - chunkStartedAtMs;
-  }
+    completeChunk(chunkStartedAtMs);
+  };
+
+  const worker = async (): Promise<void> => {
+    while (!cancelled && !ctx.cancellationToken?.isCancellationRequested) {
+      const index = nextChunkIndex;
+      nextChunkIndex += 1;
+      if (index >= chunks.length) return;
+      await runChunk(index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(ANALYSIS_CHUNK_CONCURRENCY, chunks.length) }, () => worker()));
 
   if (cancelled || ctx.cancellationToken?.isCancellationRequested) {
-    if (!cancelled) {
-      await ctx.log("analyze:cancelled", { analyzedCount, chunks: chunks.length, nextChunk: analyzedCount + 1 });
-    }
+    await ctx.log("analyze:cancelled", { analyzedCount, chunks: chunks.length, nextChunk: Math.min(nextChunkIndex + 1, chunks.length) });
     throwIfCancelled(ctx.cancellationToken);
-    throw cancelledError();
+    throw cancellationError || cancelledError();
   }
 
   if (!analyzedCount) {
