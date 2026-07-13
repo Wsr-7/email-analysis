@@ -537,6 +537,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-14 · F6.5 已完成，代码提交 `d08a8c4`：默认 hard block 词表扩至 18 个中英文关键词，中文“密码”命中回归已覆盖。下一步记录并 claim 用户新增的单项分析文案优化。
 - 2026-07-14 · F6.6 已完成，代码提交 `3a39356`：Workbench 单封与线程分析通知分别使用 `Analyzing 1 email`、`Analyzing 1 thread`，单封不再被 batch chunk 消息覆盖；Sidebar 批量进度保持原样。F6 全部完成，下一步重新打包 VSIX 并推送。
 - 2026-07-14 · F7.1 已完成，代码提交 `eb07267`：Sidebar 批量分析首条进度合并实际邮件数、chunk 数和开始首块，避免同步通知覆盖；不增加等待。下一步 claim F7.2。
+- 2026-07-14 · F7.2 已完成，代码提交 `1adf263`：同线程 Next Action 行以唯一 action id 高亮，点击仍按 sourceId 路由至 Workbench。真实 VS Code 验证待用户执行。下一步 claim F7.3。
 
 - 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
 
@@ -691,6 +692,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-14 · Codex（F7.1 pre-work checkpoint）**：恢复现场：F6 的 VSIX 已提交并推送（`1f39095`），工作树干净；HEAD `1f39095`。已重新定位 `analyzeBatchCore`：总量和首块消息在无 await 的连续调用中发出，故 Notification 只能看到后者。边界：只把首块消息改为包含实际邮件数、chunk 数与开始状态的单条文案；不加人为等待，不改 chunk 切分、进度机制或 F7.2/F7.3。
 
 - **2026-07-14 · Codex（F7.1 completion）**：完成 `eb07267`。首条 batch progress 现为实际邮件数、chunk 数与 `Starting chunk 1/N` 的单条文本，后续 chunk 的预估保持不变，未以 sleep 影响模型请求。验收：定向 app-analysis 27/27、`npm run compile` 零错误、完整 `npm test` 429/429、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，确认 Sidebar 的首条内容可见且准确。Known issues：无新增。Next：claim F7.2。
+
+- **2026-07-14 · Codex（F7.2 pre-work checkpoint）**：恢复现场：F7.1 的代码与记录已提交（`eb07267`、`31d40c3`），工作树仅有本 step 的 `[~]` claim，branch `v3...origin/v3 [ahead 2]`；HEAD `31d40c3`。已重新定位：`renderCompactNextActionRow` 以共享的 `sourceId` 写入 `data-thread-id`，点击也把该 id 交给 `openItem`；`setActiveRow` 据 `data-thread-id` 匹配，故同一线程的多个 Next Action 同时 active。边界：仅给 Next Action 行添加唯一 action id 作为选中键，Workbench 路由继续使用 sourceId；不改邮件、线程、会议的选择逻辑、Next Actions store/schema 或 F7.3 安全门禁。
+
+- **2026-07-14 · Codex（F7.2 completion）**：完成 `1adf263`。每条 Next Action 行保留 `data-thread-id` 供 Workbench 路由，并添加唯一的 `data-next-action-id` 供选中态；`openItem` 以 sourceId 打开详情、以 action id 设置 active，邮件/线程/会议原有单参数调用不变。验收：回归先 RED（43 项中新增断言失败）后 GREEN；定向 sidebar render 43/43、`npm run compile` 零错误、完整 `npm test` 430/430、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，同一线程有两条 Next Actions 时依次点击，始终仅当前项高亮且详情仍正确打开。Known issues：无新增。Next：claim F7.3。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -913,11 +918,19 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - Known issues：无新增。
   - Commit：`eb07267`。
 
-### [ ] F7.2 Next Actions 单项高亮（P2）
+### [x] F7.2 Next Actions 单项高亮（P2）（commit `1adf263`）
 
 - **现状**：用户点击两个 Next Actions 中任一项时，两个行同时高亮。
 - **做法**：重新定位 Sidebar 行的 DOM 选择器与 action id，令高亮键使用唯一的 Next Action id；不得影响邮件、线程、会议行的既有选中态。
 - **验收**：渲染/客户端选择回归测试锁定两个不同 Next Action 只高亮被点击项；`npm test` 全绿。**needs user validation**：有两个 Next Actions 时依次点击，始终仅当前项高亮。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/test/sidebar-render.test.ts`。
+  - 实现边界：Next Action 行新增唯一 `data-next-action-id`，点击时继续以 `sourceId` 打开 Workbench、以 action id 设置选中态；邮件、线程、会议的选择键、Next Actions store/schema 和安全门禁均未改动。
+  - 验收结果：新增同一线程两条 action 的断言先 RED 后 GREEN；定向 sidebar render 43/43 通过；`npm run compile` 零错误；完整 `npm test` 430/430 通过；`git diff --check` 通过。
+  - Manual validation：**needs user validation on real VS Code**。在同一线程有两条 Next Actions 时依次点击，确认始终仅当前项高亮，且详情仍打开该线程。
+  - Known issues：无新增。
+  - Commit：`1adf263`。
 
 ### [ ] F7.3 hard block 邮件可见性与提示（P1）
 
