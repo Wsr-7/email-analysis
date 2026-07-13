@@ -212,7 +212,8 @@ function renderMeetingDetail(item: StoredMeeting, labels: DashboardLabels): stri
       <div class="wb-field"><strong>${escapeHtml(labels.meetings.organizer)}:</strong> ${escapeHtml(item.organizer || "-")}</div>
       <div class="wb-field"><strong>${escapeHtml(labels.meetings.time)}:</strong> ${escapeHtml(timeRange)}</div>
       ${item.location ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.location)}:</strong> ${escapeHtml(item.location)}</div>` : ""}
-      ${item.requiredAttendees ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.attendees)}:</strong> ${escapeHtml(item.requiredAttendees)}</div>` : ""}
+      ${item.requiredAttendees ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.requiredAttendees)}:</strong> ${escapeHtml(item.requiredAttendees)}</div>` : ""}
+      ${item.optionalAttendees ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.optionalAttendees)}:</strong> ${escapeHtml(item.optionalAttendees)}</div>` : ""}
       ${flags.length ? `<div class="wb-field">${escapeHtml(flags.join(", "))}</div>` : ""}
     </div>
     ${item.bodyExcerpt ? `<div class="wb-body">${escapeHtml(item.bodyExcerpt)}</div>` : ""}
@@ -240,7 +241,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   const sortedMeetings = [...meetingStore.items].sort((a, b) => {
     if (a.responseStatus === "notResponded" && b.responseStatus !== "notResponded") return -1;
     if (a.responseStatus !== "notResponded" && b.responseStatus === "notResponded") return 1;
-    return (a.start || "").localeCompare(b.start || "");
+    return (b.start || "").localeCompare(a.start || "");
   });
 
   const detailData: string[] = [];

@@ -390,17 +390,7 @@ export class EasyMailApp {
 
   private async getWorkbenchHtml(): Promise<string> {
     const state = await this.loadState();
-    const extendedState = state as DashboardState & {
-      store?: MailStore;
-      index?: MailIndex;
-      queue?: ReturnType<typeof buildQueueState>;
-      classifications?: ClassificationCache;
-      securityDecisions?: SecurityDecisionMap;
-      promptConfig?: PromptConfig;
-      threadStore?: ThreadStore;
-      threadAnalysis?: ThreadAnalysisResult;
-      ignoredIds?: Set<string>;
-    };
+    const extendedState = state as LoadedDashboardState;
     const availableModels = await this.data.readCachedAvailableModels(this.availableModelsCache, (event, d) => this.log(event, d));
     return renderWorkbenchHtml({
       state,
@@ -412,6 +402,7 @@ export class EasyMailApp {
       promptConfig: extendedState.promptConfig || normalizePromptConfig({}),
       threadStore: extendedState.threadStore || emptyThreadStore(),
       threadAnalysis: extendedState.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+      meetingStore: extendedState.meetingStore || emptyMeetingStore(),
       ignoredIds: extendedState.ignoredIds,
       workingDrafts: this.workingDrafts,
       availableModels,

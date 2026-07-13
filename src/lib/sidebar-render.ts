@@ -187,9 +187,11 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     queueCounts[cat.id] = cat.items.length;
   }
   const meetingStore = input.meetingStore || emptyMeetingStore();
-  const unrespondedMeetings = meetingStore.items.filter((m) => m.responseStatus === "notResponded");
-  const upcomingMeetings = meetingStore.items.filter((m) => m.responseStatus !== "notResponded");
-  const sortedMeetings = [...unrespondedMeetings, ...upcomingMeetings].sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  const sortedMeetings = [...meetingStore.items].sort((a, b) => {
+    if (a.responseStatus === "notResponded" && b.responseStatus !== "notResponded") return -1;
+    if (a.responseStatus !== "notResponded" && b.responseStatus === "notResponded") return 1;
+    return (b.start || "").localeCompare(a.start || "");
+  });
 
   const nextActionsItems = (input.nextActionsStore?.items || []).filter((a) => a.status === "open");
   queueCounts["meetings"] = meetingStore.items.length;

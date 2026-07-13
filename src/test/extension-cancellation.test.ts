@@ -265,6 +265,31 @@ test("getDashboardHtml forwards the meeting store attached by loadState", async 
   assert.ok(html.includes("F4.1 Meeting"));
 });
 
+test("getWorkbenchHtml forwards meetings so a sidebar EntryID can focus its reader", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  (app as any).loadState = async () => ({
+    config: { outputLanguage: "en-US" },
+    digestMetadata: { generatedAt: "", rangeMode: "", recentHours: 0, maxItems: 0, folders: [] },
+    overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 },
+    categories: [],
+    meetingStore: {
+      generatedAt: "", lastPullAt: "", items: [{
+        meetingId: "meeting-1", entryId: "meeting-entry-id", subject: "Workbench Meeting",
+        organizer: "Alice", start: "2026-07-13 09:00", end: "2026-07-13 09:30",
+        location: "Room A", isAllDay: false, isRecurring: false, requiredAttendees: "Bob",
+        optionalAttendees: "Carol", responseStatus: "notResponded", meetingSource: "calendar",
+        importance: "Normal", bodyExcerpt: "Agenda", pulledAt: "2026-07-13"
+      }]
+    }
+  });
+  ((app as any).data as any).readCachedAvailableModels = async () => [];
+
+  const html = await (app as any).getWorkbenchHtml();
+
+  assert.ok(html.includes('data-id="meeting-entry-id" data-queue="meetings"'));
+  assert.ok(html.includes("Workbench Meeting"));
+});
+
 test("buildSidebarRenderInput forwards every render field attached by loadState", () => {
   const store = { marker: "store" };
   const index = { marker: "index" };

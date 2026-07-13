@@ -39,7 +39,7 @@ export type DashboardLabels = {
   card: Record<"from" | "to" | "cc" | "body" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "analyze" | "reanalyze" | "openInOutlook" | "noItems" | "thread", string>;
   pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select" | "confirmAnalyze", string>;
   threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "contentTruncated" | "attachments" | "mailIds", string>;
-  meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
+  meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "requiredAttendees" | "optionalAttendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
   nextActions: Record<"title" | "owner" | "task" | "deadline" | "source" | "markDone" | "markIgnored" | "reopen" | "noActions", string>;
   progress: Record<"pullMail" | "loadMore" | "sampleDigest" | "analyze" | "reports" | "loadModels" | "translate" | "cancelling", string> & { detail: string };
   model: Record<"fallback" | "preferred", string>;
@@ -198,6 +198,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       time: "时间",
       location: "地点",
       attendees: "参会人",
+      requiredAttendees: "必选参会人",
+      optionalAttendees: "可选参会人",
       status: "出席状态",
       allDay: "全天",
       recurring: "周期性",
@@ -387,6 +389,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       time: "Time",
       location: "Location",
       attendees: "Attendees",
+      requiredAttendees: "Required attendees",
+      optionalAttendees: "Optional attendees",
       status: "Status",
       allDay: "All Day",
       recurring: "Recurring",

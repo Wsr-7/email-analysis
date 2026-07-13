@@ -558,15 +558,37 @@ describe("renderWorkbenchHtml", () => {
       meetingId: "mtg-1", entryId: "e-mtg-1", subject: "Standup", organizer: "Alice",
       start: "2026-07-01 09:00", end: "2026-07-01 09:30", location: "Room A",
       isAllDay: false, isRecurring: false, requiredAttendees: "bob@test.com",
-      optionalAttendees: "", responseStatus: "notResponded", meetingSource: "calendar",
-      importance: "Normal", bodyExcerpt: "", pulledAt: "2026-07-01"
+      optionalAttendees: "dave@test.com", responseStatus: "notResponded", meetingSource: "calendar",
+      importance: "Normal", bodyExcerpt: "Agenda details", pulledAt: "2026-07-01"
     };
     const input = stubInput({ meetingStore: { generatedAt: "", lastPullAt: "", items: [mtg] } });
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes("Standup"));
     assert.ok(html.includes("Alice"));
+    assert.ok(html.includes("bob@test.com"));
+    assert.ok(html.includes("dave@test.com"));
+    assert.ok(html.includes("Agenda details"));
     assert.ok(html.includes("openMeetingInOutlook"));
+    assert.ok(html.includes('data-meeting-id="e-mtg-1"'));
     assert.ok(html.includes("wb-mtg-notResponded"));
+  });
+
+  it("orders meetings with unanswered invitations first, then newest start time", () => {
+    const meeting = (entryId: string, start: string, responseStatus: StoredMeetingItem["responseStatus"]): StoredMeetingItem => ({
+      meetingId: entryId, entryId, subject: entryId, organizer: "Alice", start, end: start,
+      location: "", isAllDay: false, isRecurring: false, requiredAttendees: "", optionalAttendees: "",
+      responseStatus, meetingSource: "calendar", importance: "Normal", bodyExcerpt: "", pulledAt: "2026-07-01"
+    });
+    const html = renderWorkbenchHtml(stubInput({ meetingStore: {
+      generatedAt: "", lastPullAt: "", items: [
+        meeting("accepted-old", "2026-07-01 09:00", "accepted"),
+        meeting("unanswered", "2026-07-02 09:00", "notResponded"),
+        meeting("accepted-new", "2026-07-03 09:00", "accepted")
+      ]
+    } }));
+
+    assert.ok(html.indexOf('data-id="unanswered"') < html.indexOf('data-id="accepted-new"'));
+    assert.ok(html.indexOf('data-id="accepted-new"') < html.indexOf('data-id="accepted-old"'));
   });
 
   it("renders ignore button on thread detail", () => {

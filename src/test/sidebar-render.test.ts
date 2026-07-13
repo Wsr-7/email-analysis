@@ -439,6 +439,24 @@ describe("renderSidebarHtml", () => {
     assert.ok(!html.includes("sb-detail"), "compact row should not have detail section");
   });
 
+  it("orders meetings with unanswered invitations first, then newest start time", () => {
+    const meeting = (entryId: string, start: string, responseStatus: StoredMeetingItem["responseStatus"]): StoredMeetingItem => ({
+      meetingId: entryId, entryId, subject: entryId, organizer: "Alice", start, end: start,
+      location: "", isAllDay: false, isRecurring: false, requiredAttendees: "", optionalAttendees: "",
+      responseStatus, meetingSource: "calendar", importance: "Normal", bodyExcerpt: "", pulledAt: "2026-07-01"
+    });
+    const html = renderSidebarHtml(stubInput({ meetingStore: {
+      generatedAt: "", lastPullAt: "", items: [
+        meeting("accepted-old", "2026-07-01 09:00", "accepted"),
+        meeting("unanswered", "2026-07-02 09:00", "notResponded"),
+        meeting("accepted-new", "2026-07-03 09:00", "accepted")
+      ]
+    } }));
+
+    assert.ok(html.indexOf('data-meeting-id="unanswered"') < html.indexOf('data-meeting-id="accepted-new"'));
+    assert.ok(html.indexOf('data-meeting-id="accepted-new"') < html.indexOf('data-meeting-id="accepted-old"'));
+  });
+
   it("shows meetings queue in nav even when empty", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes('data-queue-id="meetings"'));
