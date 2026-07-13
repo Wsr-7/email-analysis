@@ -654,7 +654,7 @@ export class EasyMailApp {
         labels.progress.analyze,
         labels.progress.detail,
         kind,
-        async (token) => await this.analyzeBatchCore(selection, token),
+        async (token, reportProgress) => await this.analyzeBatchCore(selection, token, reportProgress),
         (analysis) => `EasyMail analysis completed for ${analysis.batchSize} mail(s).`,
         true,
         labels.progress.cancelling
@@ -676,7 +676,7 @@ export class EasyMailApp {
     }
   }
 
-  private analysisContext(cancellationToken?: CancellationTokenLike): AnalysisContext {
+  private analysisContext(cancellationToken?: CancellationTokenLike, progress?: (message: string) => void): AnalysisContext {
     return {
       data: this.data,
       llmProvider: this.llmProvider,
@@ -684,12 +684,13 @@ export class EasyMailApp {
       readConfig: () => this.readConfig(),
       log: (event, data) => this.log(event, data),
       availableModelsCache: this.availableModelsCache,
-      cancellationToken
+      cancellationToken,
+      progress
     };
   }
 
-  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike): Promise<AnalysisBatchResult> {
-    return analyzeBatchCoreImpl(this.analysisContext(cancellationToken), selection);
+  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike, progress?: (message: string) => void): Promise<AnalysisBatchResult> {
+    return analyzeBatchCoreImpl(this.analysisContext(cancellationToken, progress), selection);
   }
 
   public async analyzeThread(threadId: string): Promise<void> {
@@ -724,7 +725,7 @@ export class EasyMailApp {
     label: string,
     detail: string,
     kind: string,
-    task: (cancellationToken: CancellationTokenLike) => Promise<T>,
+    task: (cancellationToken: CancellationTokenLike, reportProgress?: (message: string) => void) => Promise<T>,
     completionMessage?: (result: T) => string,
     cancellable = false,
     cancellingDetail = "Cancelling…"
@@ -751,7 +752,7 @@ export class EasyMailApp {
             }
           });
           try {
-            const result = await task(token);
+            const result = await task(token, (message) => progress.report({ message }));
             if (token.isCancellationRequested) {
               throw new Error("EasyMail task cancelled.");
             }
@@ -903,7 +904,7 @@ export class EasyMailApp {
       folderList = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Loading Outlook folders…" },
         async (progress) => {
-          progress.report({ message: "Starting Outlook and reading mail folders…" });
+          progress.report({ message: "Start Outlook first to significantly speed up folder loading. Loading Outlook and reading mail folders…" });
           await runProcess("cscript.exe", ["//nologo", scriptPath, "--list-folders", "--output", outputPath], 90000, (event, data) => {
             void this.log(`listFolders:${event}`, data);
           });

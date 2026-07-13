@@ -754,8 +754,16 @@ describe("analyzeBatchCore", () => {
       const provider = new MockProvider({
         responses: [analysisResponse("mail-001"), analysisResponse("mail-002")]
       });
+      const originalSendPrompt = provider.sendPrompt.bind(provider);
+      let now = 0;
+      provider.sendPrompt = async (prompt, options) => {
+        const response = await originalSendPrompt(prompt, options);
+        now += 60000;
+        return response;
+      };
 
-      const result = await analyzeBatchCore({
+      const progressMessages: string[] = [];
+      const context = {
         data,
         llmProvider: provider,
         extensionPath: process.cwd(),
@@ -765,11 +773,24 @@ describe("analyzeBatchCore", () => {
           outputLanguage: "en-US"
         }),
         log: async () => {},
-        availableModelsCache: null
-      }, "allAllowed");
+        availableModelsCache: null,
+        progress: (message: string) => { progressMessages.push(message); }
+      };
+      const originalDateNow = Date.now;
+      Date.now = () => now;
+      let result;
+      try {
+        result = await analyzeBatchCore(context, "allAllowed");
+      } finally {
+        Date.now = originalDateNow;
+      }
 
       assert.equal(result.batchSize, 2);
       assert.equal(provider.prompts.length, 2);
+      assert.deepEqual(progressMessages, [
+        "Analyzing 2 chunks…",
+        "Analyzing chunk 2/2 (about 1 minute remaining)"
+      ]);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

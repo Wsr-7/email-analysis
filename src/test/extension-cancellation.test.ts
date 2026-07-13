@@ -1,26 +1,32 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import Module from "node:module";
+import * as os from "node:os";
+import * as path from "node:path";
 import test from "node:test";
 
 let cancellationListener: (() => void) | undefined;
 let disposed = 0;
 let cancellationRequested = false;
 const informationMessages: string[] = [];
+const progressMessages: string[] = [];
 const vscodeMock = {
   ProgressLocation: { Notification: 15 },
   LanguageModelChatMessage: { User: (prompt: string) => ({ prompt }) },
   CancellationTokenSource: class { public token = { isCancellationRequested: false }; },
   lm: { selectChatModels: async () => [] as unknown[] },
   window: {
-    withProgress: async <T>(_options: unknown, task: (progress: { report: (value: unknown) => void }, token: unknown) => Promise<T>) => task({ report: () => {} }, {
+    withProgress: async <T>(_options: unknown, task: (progress: { report: (value: unknown) => void }, token: unknown) => Promise<T>) => task({ report: (value) => {
+      if (value && typeof value === "object" && "message" in value && typeof value.message === "string") progressMessages.push(value.message);
+    } }, {
       get isCancellationRequested() { return cancellationRequested; },
       onCancellationRequested: (listener: () => void) => {
         cancellationListener = listener;
         return { dispose: () => { disposed += 1; cancellationListener = undefined; } };
       }
     }),
-    showInformationMessage: (message: string) => { informationMessages.push(message); return undefined; }
+    showInformationMessage: (message: string) => { informationMessages.push(message); return undefined; },
+    showWarningMessage: () => undefined
   }
 };
 
@@ -86,6 +92,25 @@ test("runWithBusy reports cancellation immediately without changing cancellation
   assert.equal(disposed, 1);
   assert.ok(!logs.includes("busy:success"));
   assert.deepEqual(informationMessages, ["EasyMail: Cancelling… Waiting for the current request to finish."], "a cancelled task must not show its completion toast");
+});
+
+test("folder picker tells the user to start Outlook before listing folders", async () => {
+  progressMessages.length = 0;
+  const globalStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), "easy-mail-test-"));
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: globalStoragePath }, extensionPath: "", subscriptions: [] });
+  const processRunner = require("../lib/process-runner") as { runProcess: () => Promise<void> };
+  const originalRunProcess = processRunner.runProcess;
+  (app as any).readConfig = async () => ({ folders: ["Inbox"] });
+  (app as any).findScript = async () => "collector.vbs";
+  (app as any).log = async () => {};
+  processRunner.runProcess = async () => { throw new Error("stop after progress"); };
+  try {
+    await (app as any).selectFolders();
+    assert.deepEqual(progressMessages, ["Start Outlook first to significantly speed up folder loading. Loading Outlook and reading mail folders…"]);
+  } finally {
+    processRunner.runProcess = originalRunProcess;
+    fs.rmSync(globalStoragePath, { recursive: true, force: true });
+  }
 });
 
 test("runWithBusy does not show cancellation feedback for a non-cancellable task", async () => {

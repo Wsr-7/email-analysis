@@ -29,6 +29,7 @@ export interface AnalysisContext {
   log: (event: string, data: Record<string, unknown>) => Promise<void>;
   availableModelsCache: AvailableModel[] | null;
   cancellationToken?: CancellationTokenLike;
+  progress?: (message: string) => void;
   retryDelaysMs?: number[];
 }
 
@@ -291,6 +292,7 @@ export async function analyzeBatchCore(
   let omittedMails = 0;
   let totalReplacements = 0;
   let cancelled = false;
+  let completedChunkElapsedMs = 0;
   const summaryLabels = buildCategoryLabels(getLabels(getLocaleFromConfig(config)), promptConfig, getLocaleFromConfig(config));
   const mergeAndPersist = async (incoming: ReturnType<typeof normalizeAnalysis>): Promise<void> => {
     merged = pruneAnalysisResult(
@@ -309,6 +311,7 @@ export async function analyzeBatchCore(
     await mergeAndPersist(fallback);
   };
 
+  ctx.progress?.(`Analyzing ${chunks.length} chunk${chunks.length === 1 ? "" : "s"}…`);
   for (let index = 0; index < chunks.length; index += 1) {
     if (ctx.cancellationToken?.isCancellationRequested) {
       cancelled = true;
@@ -316,6 +319,12 @@ export async function analyzeBatchCore(
       break;
     }
     const chunk = chunks[index];
+    if (index) {
+      const averageChunkMs = completedChunkElapsedMs / index;
+      const remainingMinutes = Math.ceil((averageChunkMs * (chunks.length - index)) / 60000);
+      ctx.progress?.(`Analyzing chunk ${index + 1}/${chunks.length} (about ${remainingMinutes} ${remainingMinutes === 1 ? "minute" : "minutes"} remaining)`);
+    }
+    const chunkStartedAtMs = Date.now();
     const redacted = redactStoredMails(chunk, buildDefaultRedactionPolicy());
     totalReplacements += redacted.totalReplacements;
     const digestText = buildBatchDigestMarkdown(redacted.items);
@@ -344,6 +353,7 @@ export async function analyzeBatchCore(
         error: error instanceof Error ? error.message : String(error)
       });
       await persistSkippedChunk(chunk, index + 1);
+      completedChunkElapsedMs += Date.now() - chunkStartedAtMs;
       continue;
     }
     await ctx.log("analyze:response", { chunk: index + 1, chunks: chunks.length, rawLength: raw.length });
@@ -365,6 +375,7 @@ export async function analyzeBatchCore(
           error: repairError instanceof Error ? repairError.message : String(repairError)
         });
         await persistSkippedChunk(chunk, index + 1);
+        completedChunkElapsedMs += Date.now() - chunkStartedAtMs;
         continue;
       }
     }
@@ -393,6 +404,7 @@ export async function analyzeBatchCore(
     await mergeAndPersist(normalized);
     analyzedCount += chunk.length;
     await ctx.log("analyze:chunkDone", { chunk: index + 1, chunks: chunks.length, mergedItems: merged.items.length });
+    completedChunkElapsedMs += Date.now() - chunkStartedAtMs;
   }
 
   if (cancelled || ctx.cancellationToken?.isCancellationRequested) {
