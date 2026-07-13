@@ -369,11 +369,19 @@
   - Known issues：无。
   - Commit：`897fcbd`。
 
-### [ ] F4.3 IsSentFolder 的 VBScript If-条件错误陷阱 → 全部文件夹误判 SentOn（§7#1 残留，P1）
+### [x] F4.3 IsSentFolder 的 VBScript If-条件错误陷阱 → 全部文件夹误判 SentOn（§7#1 残留，P1，commit `c75063d`）
 
 - **根因（已定位）**：`IsSentFolder`（`collect-outlook-mails.vbs` ~L456-481）在 `On Error Resume Next` 下执行 `If SafeString(current.EntryID) = sentEntryId Then`。VBScript 语义陷阱：**块 If 的条件表达式出错时，Resume Next 会直接进入 Then 块**。父链上溯到 Namespace/Application 等无 `EntryID` 的对象时条件必然出错 → 进入 Then 块 → `IsSentFolder = True`——因此**每个文件夹**（含 Inbox）最终都被判为 Sent、用 SentOn。F1.1 的空串守护没触及此路径。
 - **做法**：比较前先在守护下取值到变量（`currentEntryId = SafeString(current.EntryID)` + `Err.Number` 检查，出错即 `Err.Clear` 并终止上溯），再做无错比较。顺带排查同文件其他 `On Error Resume Next` 区内"If 条件含 COM 属性读取"的同类写法并一并修正。
 - **验收**：VBS `--help`/`--sample` 通过；`npm test` 全绿。**needs user validation**：Fetch 后日志 Inbox 行 `timeProperty=ReceivedTime`、Sent Items 行仍为 `SentOn`。
+
+- **Completion Notes**：
+  - 改动文件：`scripts/collect-outlook-mails.vbs`、`src/test/collector-scripts.test.ts`、`package.json`。
+  - 实现边界：`IsSentFolder` 先守护读取 `current.EntryID`，出错即清理并结束上溯后再比较；同文件唯一同类 `recipient.Type` 条件读取同步守护。未改采集参数、digest/store/schema。
+  - 验收结果：两处旧条件分别实际 RED；定向静态回归 2/2、`npm run compile` 零错误、`npm test` 412/412 通过、`git diff --check` 通过；VBS `--help`/`--sample` 通过。
+  - Manual validation：**needs user validation on real Outlook**。Fetch 后确认 Inbox `FolderScan` 为 `timeProperty=ReceivedTime`，Sent Items 仍为 `SentOn`。
+  - Known issues：无真实 Outlook COM 环境可直接验证。
+  - Commit：`c75063d`。
 
 ### [ ] F4.4 取消中状态在真实环境不显示（§7#8 复验仍失败，P1）
 
@@ -547,6 +555,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.2 pre-work checkpoint）**：恢复现场：F4.1 代码与记录已提交（`f2159e9`、`eaa5bf7`、`4192abf`），工作树干净；HEAD `4192abf`。已重新定位根因：webview flush 无条件枚举所有 `.draft-box-editable` 并上报空 `draftText`（`workbench-render.ts:462-470`），message handler 再无条件调用 `updateWorkingDraft`（`message-handler.ts:81-94`）；extension context 当前直接 `Map.set`（`extension.ts:1314`），所以空框会建立空值条目并遮蔽 `workingDrafts.get(id) ?? item.draftReply` fallback。Generate/Polish/Refine 已直接写 Map。边界：仅让扩展侧草稿更新区分首次空值与用户主动清空，并补三组回归测试；不改 webview flush 协议、digest/store/schema 或 F4.3。
 
 - **2026-07-13 · Codex（F4.2 completion）**：完成 `897fcbd`。扩展侧草稿更新仅在文本非空或已有条目时写入 Map，故 flush/input 的首次空值不占位、已输入后清空仍保留空值；Generate/Polish/Refine 不受影响。测试以真实 handler 与 Workbench render 验证首次空 flush 显示模型草稿、主动清空刷新仍空、Generate→Polish 刷新显示最终文本。首轮 review 发现后两项只断言 Map 未验证渲染，已补 HTML 断言并复审通过。验收：`npm run compile` 零错误、定向 11/11、全量 `npm test` 410/410、`git diff --check` 通过。Manual：**needs user validation on real Outlook/VS Code Workbench**，确认自动草稿、Notice Generate Draft 与清空后刷新三种情形。Next：按用户顺序 claim F4.3；不进入 F4.4/R3/R4。
+
+- **2026-07-13 · Codex（F4.3 pre-work checkpoint）**：恢复现场：F4.2 代码与记录已提交（`897fcbd`、`a528d0c`），工作树干净；HEAD `a528d0c`。已重新定位 `IsSentFolder`：在 `On Error Resume Next` 区域内，循环直接把 `SafeString(current.EntryID)` 放进块 If 条件（`collect-outlook-mails.vbs:528-531`）；上溯至没有 `EntryID` 的 COM 对象时错误会落入 Then，导致非 Sent folder 误判。`sentEntryId` 空值已有防线，但 current EntryID 仍未分离读取。边界：仅在此 VBS 的 COM 属性读取守护与同类 If 条件审查范围内修复；不动采集参数、digest/store/schema 或 F4.4。
 
 ---
 
