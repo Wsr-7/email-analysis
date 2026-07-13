@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderWorkbenchHtml } from "../lib/workbench-render";
+import { renderWorkbenchHtml as renderWorkbenchHtmlWithNonce } from "../lib/workbench-render";
 import { normalizeClassificationCache } from "../lib/classification";
 import { normalizePromptConfig } from "../lib/prompt-config";
 import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/mail-store";
@@ -58,6 +58,10 @@ function stubInput(overrides?: Partial<DashboardRenderInput>): DashboardRenderIn
   };
 }
 
+function renderWorkbenchHtml(input: DashboardRenderInput): string {
+  return renderWorkbenchHtmlWithNonce(input, "workbench-test-nonce");
+}
+
 describe("renderWorkbenchHtml", () => {
   it("returns valid HTML document", () => {
     const html = renderWorkbenchHtml(stubInput());
@@ -87,6 +91,16 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes('data-id="m1"'));
     assert.ok(html.includes("Hello"));
     assert.ok(html.includes("wb-detail-card wb-with-body wb-mail-with-body"));
+  });
+
+  it("uses a nonce CSP and no inline event handlers", () => {
+    const first = renderWorkbenchHtmlWithNonce(stubInput(), "workbench-nonce-1");
+    const second = renderWorkbenchHtmlWithNonce(stubInput(), "workbench-nonce-2");
+    assert.match(first, /Content-Security-Policy/);
+    assert.match(first, /script-src 'nonce-workbench-nonce-1'/);
+    assert.match(first, /<script nonce="workbench-nonce-1">/);
+    assert.doesNotMatch(first, /\son[a-z]+=/i);
+    assert.notEqual(first, second);
   });
 
   it("renders Analyze before Open in Outlook for an allowed unanalysed mail", () => {

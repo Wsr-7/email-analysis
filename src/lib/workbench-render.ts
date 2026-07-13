@@ -225,7 +225,7 @@ function renderMeetingDetail(item: StoredMeeting, labels: DashboardLabels): stri
   </div>`;
 }
 
-export function renderWorkbenchHtml(input: DashboardRenderInput): string {
+export function renderWorkbenchHtml(input: DashboardRenderInput, nonce: string): string {
   const { state, busyKind } = input;
   const config = state.config as Record<string, unknown>;
   const locale = getLocaleFromConfig(config);
@@ -290,6 +290,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
 <html>
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${escapeAttr(nonce)}'; img-src data:;" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -410,7 +411,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     <div class="wb-placeholder" id="placeholder">${escapeHtml(locale === "zh-CN" ? "从侧栏选择邮件以阅读详情" : "Select an item from sidebar to read")}</div>
   </div>
 
-<script>
+<script nonce="${escapeAttr(nonce)}">
 var vscode = acquireVsCodeApi();
 var prev = vscode.getState() || {};
 var currentId = prev.currentId || '';

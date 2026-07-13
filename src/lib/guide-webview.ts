@@ -23,12 +23,13 @@ type GuideLabels = {
   footer: string;
 };
 
-export function renderEasyMailGuideHtml(options: EasyMailGuideOptions): string {
+export function renderEasyMailGuideHtml(options: EasyMailGuideOptions, nonce: string): string {
   const labels = buildGuideLabels(options);
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${escapeAttr(nonce)}'; img-src data:;" />
   <style>
     :root { color-scheme: light dark; }
     body {
@@ -134,7 +135,7 @@ export function renderEasyMailGuideHtml(options: EasyMailGuideOptions): string {
       <div class="footer">${escapeHtml(labels.footer)}</div>
     </main>
   </div>
-  <script>
+  <script nonce="${escapeAttr(nonce)}">
     const vscode = acquireVsCodeApi();
     document.addEventListener('click', (event) => {
       const button = event.target && event.target.closest ? event.target.closest('button[data-action]') : null;

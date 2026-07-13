@@ -75,7 +75,7 @@
 - **验收**：单测——normalize 校验、排序规则、过期标红判定、翻译不动 dueDate；`npm test` 全绿。**needs user validation**：含明确期限的邮件分析后有期限徽标且排序靠前。
 - **边界**：不做提醒/通知；overview 计数不加新维度；digest 格式不动。
 
-### [ ] G5 Webview CSP 加固（D5，S-M 级）
+### [~] G5 Webview CSP 加固（D5，S-M 级）
 
 - **现状锚点**：`sidebar-render.ts` / `workbench-render.ts` / `guide-webview.ts` 三个 HTML 模板均无 CSP meta，脚本为裸 inline `<script>`；**且模板中存在 `onclick="..."` 等内联事件属性**（如 pending 分组头 `onclick="togglePendingFolder(this)"`、meeting 行 `onclick="openItem(...)"`、dashboard 的 `onclick="post(...)"` 等）。
 - **前置认知（本 step 最大的坑）**：`script-src 'nonce-...'` 的 CSP **不放行内联事件属性**——只加 CSP meta 不迁移 onclick，三个页面的按钮会全部失效。因此本 step 分两步走，顺序不可颠倒：
@@ -179,3 +179,5 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Manual validation：**needs user validation**，真实 Copilot 是否只为明确期限输出日期，以及真实 webview 的排序与红色状态仍需确认。
   - Known issues：模型输出质量依赖 prompt 遵从；不确定期限按设计为空，不会推断或提醒。
   - Commit：`b6a6ead`（本地，未 push）。
+
+- **2026-07-14 · Codex（G5 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `105c0db`；重新定位确认三个模板的 `<script>` 仍无 nonce/CSP，Sidebar 有 23 处 `onclick=`（邮件/线程/会议/Next Action 行、两个折叠组、queue nav、语言/设置/toolbar 按钮），Workbench 与 Guide 已使用 `data-action` document click 委托且无内联 handler；真实 render caller 均在 `src/extension.ts` 的 `getDashboardHtml` / `getWorkbenchHtml` / `getGuideHtml`。边界：先把 Sidebar 全部内联 handler 等价迁到统一委托，再由 extension caller 为三个纯 render 函数传随机 nonce 并添加严格 CSP；不引入资源/依赖，不改功能或视觉，不进入 G6 键盘导航。Action: claim G5。

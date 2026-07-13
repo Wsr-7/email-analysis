@@ -80,7 +80,7 @@ function renderCompactMailRow(item: StoredMail, queue: string, classifications: 
   const sender = item.from || "";
   const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
   const title = [sender, time].filter(Boolean).join(" · ");
-  return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
+  return `<div class="sb-row" data-action="openItem" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
     <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}</div>
   </div>`;
@@ -97,7 +97,7 @@ function renderPendingFolderGroups(items: StoredMail[], folders: string[], class
     groups.get(folder)!.push(item);
   }
   return [...groups].map(([folder, folderItems]) => `<section class="sb-pending-folder" data-queue="pending" data-pending-folder="${escapeAttr(folder)}">
-    <button class="sb-pending-folder-header" type="button" aria-expanded="false" onclick="togglePendingFolder(this)">${escapeHtml(folder)} (${folderItems.length})</button>
+    <button class="sb-pending-folder-header" type="button" aria-expanded="false" data-action="togglePendingFolder">${escapeHtml(folder)} (${folderItems.length})</button>
     <div class="sb-pending-folder-items" hidden>${folderItems.map((item) => renderCompactMailRow(item, "pending", classifications)).join("")}</div>
   </section>`).join("");
 }
@@ -112,7 +112,7 @@ function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: 
   const dueBadge = item.dueDate
     ? `<span class="sb-due-badge${item.dueDate <= todayText ? " sb-due-urgent" : ""}">${escapeHtml(item.dueDate)}</span>`
     : "";
-  return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
+  return `<div class="sb-row" data-action="openItem" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
     <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${dueBadge}${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
   </div>`;
@@ -126,7 +126,7 @@ function renderCompactThreadRow(thread: ThreadStore["items"][number], queue: str
   const time = shortTime(thread.lastTime || "");
   const participants = thread.participants.slice(0, 2);
   const meta = [participants.map(senderDisplayName).join(", "), time].filter(Boolean).join(" · ");
-  return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-thread-id="${escapeAttr(thread.threadId)}" onclick="openItem('${escapeAttr(thread.threadId)}')">
+  return `<div class="sb-row" data-action="openItem" data-queue="${escapeAttr(queue)}" data-thread-id="${escapeAttr(thread.threadId)}">
     <div class="sb-subject" title="${escapeAttr(thread.subject || thread.threadId)}">${escapeHtml(thread.subject || thread.threadId)}</div>
     <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(participants.join(", "))}">${escapeHtml(meta)}</span><span class="sb-badge">${escapeHtml(labels.card.thread)}</span><span class="sb-badge">${escapeHtml(String(thread.messageCount))}</span></div>
   </div>`;
@@ -147,9 +147,9 @@ function meetingStatusBadge(status: string, labels: DashboardLabels): string {
 function renderCompactNextActionRow(item: NextActionItem, labels: DashboardLabels): string {
   const meta = [item.owner || "", item.deadline || ""].filter(Boolean).join(" · ");
   const statusBtn = item.status === "open"
-    ? `<button class="sb-badge sb-action-status" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="done" onclick="event.stopPropagation();post('markNextAction',{actionId:'${escapeAttr(item.id)}',status:'done'})">${escapeHtml(labels.nextActions.markDone)}</button>`
-    : `<button class="sb-badge sb-action-status sb-mtg-dim" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="open" onclick="event.stopPropagation();post('markNextAction',{actionId:'${escapeAttr(item.id)}',status:'open'})">${escapeHtml(labels.nextActions.reopen)}</button>`;
-  return `<div class="sb-row${item.status !== "open" ? " sb-row-dim" : ""}" data-queue="nextActions" data-thread-id="${escapeAttr(item.sourceId)}" data-next-action-id="${escapeAttr(item.id)}" onclick="openItem('${escapeAttr(item.sourceId)}', '${escapeAttr(item.id)}')">
+    ? `<button class="sb-badge sb-action-status" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="done">${escapeHtml(labels.nextActions.markDone)}</button>`
+    : `<button class="sb-badge sb-action-status sb-mtg-dim" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="open">${escapeHtml(labels.nextActions.reopen)}</button>`;
+  return `<div class="sb-row${item.status !== "open" ? " sb-row-dim" : ""}" data-action="openItem" data-queue="nextActions" data-thread-id="${escapeAttr(item.sourceId)}" data-next-action-id="${escapeAttr(item.id)}">
     <div class="sb-subject" title="${escapeAttr(item.task)}">${escapeHtml(item.task)}</div>
     <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${statusBtn}</div>
   </div>`;
@@ -157,13 +157,13 @@ function renderCompactNextActionRow(item: NextActionItem, labels: DashboardLabel
 
 function renderCompactMeetingRow(item: StoredMeeting, labels: DashboardLabels): string {
   const meta = [item.organizer || "", item.start || ""].filter(Boolean).join(" · ");
-  return `<div class="sb-row" data-queue="meetings" data-meeting-id="${escapeAttr(item.entryId)}" onclick="openItem('${escapeAttr(item.entryId)}')">
+  return `<div class="sb-row" data-action="openItem" data-queue="meetings" data-meeting-id="${escapeAttr(item.entryId)}">
     <div class="sb-subject" title="${escapeAttr(item.subject || "-")}">${escapeHtml(item.subject || "-")}</div>
     <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${meetingStatusBadge(item.responseStatus, labels)}</div>
   </div>`;
 }
 
-export function renderSidebarHtml(input: DashboardRenderInput): string {
+export function renderSidebarHtml(input: DashboardRenderInput, nonce: string): string {
   const { state, store, index, availableModels, busyKind, isBusy } = input;
   const config = state.config as Record<string, unknown>;
   const locale = getLocaleFromConfig(config);
@@ -216,7 +216,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     if (count === 0 && !STABLE_QUEUES.has(q)) return "";
     const dimClass = count === 0 ? " sb-queue-dim" : "";
     const separator = q === "mustHandleToday" ? `<div class="sb-queue-separator"></div>` : "";
-    return `${separator}<button class="sb-queue-btn${q === defaultQueue ? " active" : ""}${dimClass}" data-queue-id="${escapeAttr(q)}" onclick="showQueue('${escapeAttr(q)}')">
+    return `${separator}<button class="sb-queue-btn${q === defaultQueue ? " active" : ""}${dimClass}" data-action="showQueue" data-queue-id="${escapeAttr(q)}">
       <span class="sb-queue-icon">${queueIcon(q)}</span>
       <span class="sb-queue-label">${escapeHtml(queueLabel(q, labels, categoryLabels))}</span>
       <span class="sb-queue-count">${count}</span>
@@ -242,7 +242,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     ...meetingInvites.map((meeting) => renderCompactMeetingRow(meeting, labels)),
     acceptedSchedule.length
       ? `<section class="sb-meeting-schedule" data-queue="meetings">
-          <button class="sb-pending-folder-header" type="button" aria-expanded="false" onclick="toggleAcceptedSchedule(this)">${escapeHtml(labels.meetings.acceptedSchedule)} (${acceptedSchedule.length})</button>
+          <button class="sb-pending-folder-header" type="button" aria-expanded="false" data-action="toggleAcceptedSchedule">${escapeHtml(labels.meetings.acceptedSchedule)} (${acceptedSchedule.length})</button>
           <div class="sb-meeting-schedule-items" hidden>${acceptedSchedule.map((meeting) => renderCompactMeetingRow(meeting, labels)).join("")}</div>
         </section>`
       : ""
@@ -260,6 +260,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
 <html>
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${escapeAttr(nonce)}'; img-src data:;" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -516,25 +517,25 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
       <div class="sb-status">${statusText}</div>
       <div class="sb-last-pull">${escapeHtml(lastPull)}</div>
       <div class="sb-header-actions">
-        <button class="sb-icon-btn" onclick="post('openGuide')" title="${escapeAttr(locale === "zh-CN" ? "帮助" : "Help")}">
+        <button class="sb-icon-btn" data-action="post" data-message-type="openGuide" title="${escapeAttr(locale === "zh-CN" ? "帮助" : "Help")}">
           <svg viewBox="0 0 16 16" fill="currentColor"><path d="M7.5 1a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM7.5 0a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15z"/><path d="M5.3 5.7c.2-1.3 1.1-2 2.3-2 1.3 0 2.2.8 2.2 1.9 0 .9-.4 1.3-1.2 1.8-.7.4-1 .8-1 1.5v.4H6.5v-.5c0-.9.4-1.4 1.1-1.8.6-.4.9-.7.9-1.3 0-.6-.5-1-1.2-1-.8 0-1.2.5-1.3 1.1L5.3 5.7zM6.3 11c0-.5.4-.9.9-.9s.9.4.9.9-.4.9-.9.9-.9-.4-.9-.9z"/></svg>
         </button>
         <div class="sb-lang-wrap" id="langToggle">
-          <button class="sb-icon-btn" onclick="toggleLangMenu(event)" title="${escapeAttr(locale === "zh-CN" ? "语言" : "Language")}">
+          <button class="sb-icon-btn" data-action="toggleLangMenu" title="${escapeAttr(locale === "zh-CN" ? "语言" : "Language")}">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="8" cy="8" r="6.5"/><ellipse cx="8" cy="8" rx="2.8" ry="6.5"/><line x1="1.5" y1="5.5" x2="14.5" y2="5.5"/><line x1="1.5" y1="10.5" x2="14.5" y2="10.5"/></svg>
           </button>
           <div class="sb-lang-dropdown" id="langDropdown">
-            <button class="sb-lang-option${locale === "en-US" ? " active" : ""}" onclick="setLanguage('en-US')">English</button>
-            <button class="sb-lang-option${locale === "zh-CN" ? " active" : ""}" onclick="setLanguage('zh-CN')">中文</button>
+            <button class="sb-lang-option${locale === "en-US" ? " active" : ""}" data-action="setLanguage" data-language="en-US">English</button>
+            <button class="sb-lang-option${locale === "zh-CN" ? " active" : ""}" data-action="setLanguage" data-language="zh-CN">中文</button>
           </div>
         </div>
       </div>
     </div>
 
     <div class="sb-actions-bar">
-      <button class="sb-primary${pullMailBusy ? " is-busy" : ""}" onclick="post('pullMail')"${busyDisabled}>${escapeHtml(labels.toolbar.pullMail)}${renderButtonSpinner(pullMailBusy)}</button>
+      <button class="sb-primary${pullMailBusy ? " is-busy" : ""}" data-action="post" data-message-type="pullMail"${busyDisabled}>${escapeHtml(labels.toolbar.pullMail)}${renderButtonSpinner(pullMailBusy)}</button>
       <div class="sb-analyze-group">
-        <button class="sb-primary${analyzeNextBusy ? " is-busy" : ""}" onclick="runAnalyze()"${analysisDisabled}>${escapeHtml(locale === "zh-CN" ? "分析" : "Analyze")}${renderButtonSpinner(analyzeNextBusy)}</button>
+        <button class="sb-primary${analyzeNextBusy ? " is-busy" : ""}" data-action="runAnalyze"${analysisDisabled}>${escapeHtml(locale === "zh-CN" ? "分析" : "Analyze")}${renderButtonSpinner(analyzeNextBusy)}</button>
         <select class="sb-batch-select" id="batchSelect"${analysisDisabled}>
           <option value="5"${batchSize === 5 ? " selected" : ""}>5</option>
           <option value="10"${batchSize === 10 ? " selected" : ""}>10</option>
@@ -543,7 +544,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
           <option value="all">${escapeHtml(locale === "zh-CN" ? "全部" : "All")}</option>
         </select>
       </div>
-      <button class="sb-secondary" onclick="post('loadMore')"${!hasHistoryAnchors ? " disabled" : busyDisabled} title="${escapeAttr(labels.toolbar.loadMore)}">+</button>
+      <button class="sb-secondary" data-action="post" data-message-type="loadMore"${!hasHistoryAnchors ? " disabled" : busyDisabled} title="${escapeAttr(labels.toolbar.loadMore)}">+</button>
     </div>
     ${!canAnalyze ? `<div class="sb-model-hint"><svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M7.5 1a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM6.3 11c0-.5.4-.9.9-.9s.9.4.9.9-.4.9-.9.9-.9-.4-.9-.9zM6.5 4h2v5h-2V4z"/></svg>${escapeHtml(locale === "zh-CN" ? "请先在下方设置中加载模型" : "Load models in settings below to analyze")}</div>` : ""}
   </div>
@@ -569,15 +570,15 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   <!-- ═══ Fixed bottom ═══ -->
   <div class="sb-bottom">
     <div class="sb-bottom-row">
-      <button class="sb-bottom-btn wb-open" onclick="post('openWorkbench')">
+      <button class="sb-bottom-btn wb-open" data-action="post" data-message-type="openWorkbench">
         <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12" style="flex-shrink:0"><path d="M1 2h14v12H1V2zm1 1v10h5V3H2zm6 0v10h6V3H8z"/></svg>
         ${escapeHtml(locale === "zh-CN" ? "工作台" : "Workbench")}
       </button>
-      <button class="sb-bottom-btn" onclick="post('generateReports')"${busyDisabled}>${escapeHtml(labels.toolbar.generateReports)}</button>
-      <button class="sb-bottom-btn" onclick="post('sampleDigest')"${busyDisabled}>${escapeHtml(labels.toolbar.sample)}</button>
+      <button class="sb-bottom-btn" data-action="post" data-message-type="generateReports"${busyDisabled}>${escapeHtml(labels.toolbar.generateReports)}</button>
+      <button class="sb-bottom-btn" data-action="post" data-message-type="sampleDigest"${busyDisabled}>${escapeHtml(labels.toolbar.sample)}</button>
       <span style="flex:1"></span>
-      <button class="sb-bottom-btn" onclick="toggleSettings()">⚙</button>
-      <button class="sb-bottom-btn danger" onclick="confirmClear()"${busyDisabled} title="${escapeAttr(locale === "zh-CN" ? "清空所有邮件和分析数据" : "Clear all mail and analysis data")}">✕</button>
+      <button class="sb-bottom-btn" data-action="toggleSettings">⚙</button>
+      <button class="sb-bottom-btn danger" data-action="confirmClear"${busyDisabled} title="${escapeAttr(locale === "zh-CN" ? "清空所有邮件和分析数据" : "Clear all mail and analysis data")}">✕</button>
     </div>
     <div class="sb-settings" id="settingsPanel" hidden>
       <div class="sb-settings-grid">
@@ -588,15 +589,15 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
           </select>
         </label>
         ${renderRangeValueControl(config, labels)}
-        <label><span>${escapeHtml(labels.settings.modelFamily)} <button class="sb-bottom-btn" onclick="post('loadModels')" style="display:inline;padding:1px 6px;">${escapeHtml(labels.toolbar.loadModels)}</button></span>
+        <label><span>${escapeHtml(labels.settings.modelFamily)} <button class="sb-bottom-btn" data-action="post" data-message-type="loadModels" style="display:inline;padding:1px 6px;">${escapeHtml(labels.toolbar.loadModels)}</button></span>
           <select id="modelFamily">${modelOptions}</select>
         </label>
-        <button class="sb-bottom-btn" onclick="post('openSettings')">${escapeHtml(locale === "zh-CN" ? "更多设置（VS Code Settings）" : "More settings (VS Code Settings)")}</button>
+        <button class="sb-bottom-btn" data-action="post" data-message-type="openSettings">${escapeHtml(locale === "zh-CN" ? "更多设置（VS Code Settings）" : "More settings (VS Code Settings)")}</button>
       </div>
     </div>
   </div>
 
-<script>
+<script nonce="${escapeAttr(nonce)}">
 const vscode = acquireVsCodeApi();
 const prev = vscode.getState() || {};
 let currentQueue = prev.currentQueue || '${escapeAttr(defaultQueue)}';
@@ -692,8 +693,7 @@ function toggleSettings() {
   vscode.setState(Object.assign({}, vscode.getState() || {}, { settingsOpen: !panel.hidden }));
 }
 
-function toggleLangMenu(e) {
-  if (e) e.stopPropagation();
+function toggleLangMenu() {
   var dd = document.getElementById('langDropdown');
   dd.classList.toggle('open');
 }
@@ -705,6 +705,23 @@ document.addEventListener('click', function(e) {
   if (!e.target.closest('#langToggle')) {
     document.getElementById('langDropdown').classList.remove('open');
   }
+  var target = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+  if (!target) return;
+  var action = target.getAttribute('data-action') || '';
+  if (action === 'post') post(target.getAttribute('data-message-type') || '');
+  if (action === 'showQueue') showQueue(target.getAttribute('data-queue-id') || '');
+  if (action === 'togglePendingFolder') togglePendingFolder(target);
+  if (action === 'toggleAcceptedSchedule') toggleAcceptedSchedule(target);
+  if (action === 'openItem') {
+    var id = target.getAttribute('data-mail-id') || target.getAttribute('data-thread-id') || target.getAttribute('data-meeting-id') || '';
+    openItem(id, target.getAttribute('data-next-action-id') || '');
+  }
+  if (action === 'markNextAction') post('markNextAction', { actionId: target.getAttribute('data-action-id') || '', status: target.getAttribute('data-status') || '' });
+  if (action === 'toggleLangMenu') toggleLangMenu();
+  if (action === 'setLanguage') setLanguage(target.getAttribute('data-language') || '');
+  if (action === 'runAnalyze') runAnalyze();
+  if (action === 'toggleSettings') toggleSettings();
+  if (action === 'confirmClear') confirmClear();
 });
 
 function runAnalyze() {

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { randomBytes } from "node:crypto";
 import { parseDigest, type DigestData } from "./lib/digest";
 import { buildQueueState, ensureClassifications, normalizeClassificationCache, type ClassificationCache } from "./lib/classification";
 import { buildDashboardState, CATEGORY_ORDER, filterVisibleThreadsForDashboard, type DashboardState } from "./lib/dashboard-state";
@@ -408,7 +409,7 @@ export class EasyMailApp {
       availableModels,
       busyKind: this.busy?.kind || "",
       isBusy: !!this.busy
-    });
+    }, randomBytes(16).toString("base64"));
   }
 
   private async getGuideHtml(): Promise<string> {
@@ -427,7 +428,7 @@ export class EasyMailApp {
         analysed: state.overview.totalMails,
         threads: visibleThreadStore.items.length
       }
-    });
+    }, randomBytes(16).toString("base64"));
   }
 
   private async handleGuideMessage(message: unknown): Promise<void> {
@@ -1346,7 +1347,10 @@ export class EasyMailApp {
     const extendedState = state as LoadedDashboardState;
     const availableModels = await this.data.readCachedAvailableModels(this.availableModelsCache, (event, d) => this.log(event, d));
     const nextActionsStore = await this.data.readNextActions();
-    return renderSidebarHtml(buildSidebarRenderInput(extendedState, availableModels, nextActionsStore, this.busy?.kind || "", !!this.busy));
+    return renderSidebarHtml(
+      buildSidebarRenderInput(extendedState, availableModels, nextActionsStore, this.busy?.kind || "", !!this.busy),
+      randomBytes(16).toString("base64")
+    );
   }
 }
 

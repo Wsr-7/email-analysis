@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { renderSidebarHtml } from "../lib/sidebar-render";
+import { renderSidebarHtml as renderSidebarHtmlWithNonce } from "../lib/sidebar-render";
 import { normalizeClassificationCache } from "../lib/classification";
 import { normalizePromptConfig } from "../lib/prompt-config";
 import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/mail-store";
@@ -60,6 +60,10 @@ function stubInput(overrides?: Partial<DashboardRenderInput>): DashboardRenderIn
   };
 }
 
+function renderSidebarHtml(input: DashboardRenderInput): string {
+  return renderSidebarHtmlWithNonce(input, "sidebar-test-nonce");
+}
+
 describe("renderSidebarHtml", () => {
   it("returns valid HTML document", () => {
     const html = renderSidebarHtml(stubInput());
@@ -76,7 +80,7 @@ describe("renderSidebarHtml", () => {
 
   it("renders action buttons", () => {
     const html = renderSidebarHtml(stubInput());
-    assert.ok(html.includes("post('pullMail')"));
+    assert.ok(html.includes('data-message-type="pullMail"'));
     assert.ok(html.includes("post('analyze', { batchSize: Number(sel) })"));
   });
 
@@ -102,6 +106,16 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('data-queue="pending"'));
     assert.ok(html.includes("Hello"));
     assert.ok(html.includes("bob@test.com"));
+  });
+
+  it("uses a nonce CSP and no inline event handlers", () => {
+    const first = renderSidebarHtmlWithNonce(stubInput(), "sidebar-nonce-1");
+    const second = renderSidebarHtmlWithNonce(stubInput(), "sidebar-nonce-2");
+    assert.match(first, /Content-Security-Policy/);
+    assert.match(first, /script-src 'nonce-sidebar-nonce-1'/);
+    assert.match(first, /<script nonce="sidebar-nonce-1">/);
+    assert.doesNotMatch(first, /\son[a-z]+=/i);
+    assert.notEqual(first, second);
   });
 
   it("groups pending mail by configured folder, including empty and legacy folders", () => {
@@ -225,7 +239,7 @@ describe("renderSidebarHtml", () => {
 
   it("renders bottom bar with reports and settings", () => {
     const html = renderSidebarHtml(stubInput());
-    assert.ok(html.includes("post('generateReports')"));
+    assert.ok(html.includes('data-message-type="generateReports"'));
     assert.ok(html.includes("toggleSettings"));
     assert.ok(html.includes("confirmClear"));
   });
@@ -253,7 +267,7 @@ describe("renderSidebarHtml", () => {
     assert.ok(!html.includes('id="autoAnalyzeMaxClassificationLevel"'));
     assert.ok(!html.includes("post('openPromptConfig')"));
     assert.ok(!html.includes("post('refresh')"));
-    assert.ok(html.includes("post('openSettings')"));
+    assert.ok(html.includes('data-message-type="openSettings"'));
   });
 
   it("registers the sidebar-selected model as a free-text fallback setting", () => {
@@ -287,11 +301,11 @@ describe("renderSidebarHtml", () => {
   it("marks active language in dropdown", () => {
     const inputEn = stubInput({ state: stubState({ outputLanguage: "en-US" }) });
     const htmlEn = renderSidebarHtml(inputEn);
-    assert.ok(htmlEn.includes('setLanguage(\'en-US\')'));
+    assert.ok(htmlEn.includes('class="sb-lang-option active" data-action="setLanguage" data-language="en-US"'));
 
     const inputZh = stubInput({ state: stubState({ outputLanguage: "zh-CN" }) });
     const htmlZh = renderSidebarHtml(inputZh);
-    assert.ok(htmlZh.includes('setLanguage(\'zh-CN\')'));
+    assert.ok(htmlZh.includes('class="sb-lang-option active" data-action="setLanguage" data-language="zh-CN"'));
   });
 
   it("renders empty state element", () => {
@@ -329,8 +343,8 @@ describe("renderSidebarHtml", () => {
 
     assert.ok(html.includes('data-next-action-id="thread:t1:review"'));
     assert.ok(html.includes('data-next-action-id="thread:t1:reply"'));
-    assert.ok(html.includes("onclick=\"openItem('t1', 'thread:t1:review')\""));
-    assert.ok(html.includes("onclick=\"openItem('t1', 'thread:t1:reply')\""));
+    assert.ok(html.includes("openItem(id, target.getAttribute('data-next-action-id') || '')"));
+    assert.ok(html.includes("target.getAttribute('data-thread-id')"));
     assert.ok(html.includes("row.getAttribute('data-next-action-id') === id"));
   });
 
