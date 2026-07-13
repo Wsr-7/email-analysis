@@ -534,6 +534,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-13 · F5.4 已完成，代码提交 `e08be3e`：每个分析 chunk 写盘后立即 sidebar-only 更新，workbench 仍只在任务结束时刷新，避免中途打断阅读与草稿。真实 VS Code 验证待用户执行。F5 全部完成。
 - 2026-07-14 · F6.4 已完成，代码提交 `d02bb1d`：批量分析在总量提示后立即报告 `Analyzing chunk 1/N…`，后续 chunk 继续显示剩余时间预估。下一步 claim F6.5。
+- 2026-07-14 · F6.5 已完成，代码提交 `d08a8c4`：默认 hard block 词表扩至 18 个中英文关键词，中文“密码”命中回归已覆盖。下一步记录并 claim 用户新增的单项分析文案优化。
 
 - 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
 
@@ -676,6 +677,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-14 · Codex（F6.4 pre-work checkpoint）**：恢复现场：F6.3 代码与记录已提交（`bd5cba7`、`1230e9d`，文档引用校正为 `15c7313`），工作树干净；HEAD `15c7313`。已重新定位 `analyzeBatchCore`：开工总量进度后，仅 `if (index)` 才输出 `Analyzing chunk i/N`，所以首个 chunk 没有序号；现有双 chunk 测试已锁定第二块的预估消息。边界：只令首块也发序号消息（无预估），后续保留预估格式；不改 chunk 切分、持久化、sidebar 刷新或用户新增的单封/线程文案优化。
 
 - **2026-07-14 · Codex（F6.4 completion）**：完成 `d02bb1d`。`analyzeBatchCore` 现于首个 chunk 开始时发送 `Analyzing chunk 1/N…`，而第二块起的剩余时间预估格式不变。验收：定向 `app-analysis` 27/27、`npm run compile` 零错误、完整 `npm test` 426/426、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，多 chunk Sidebar Analyze 时确认完整序列。Known issues：无新增。Next：claim F6.5。
+
+- **2026-07-14 · Codex（F6.5 pre-work checkpoint）**：恢复现场：F6.4 代码与记录已提交（`d02bb1d`、`1a59d53`），工作树干净；HEAD `1a59d53`。已重新定位：`buildSecuritySettings` 的 hard block 默认值仍仅有四个英文词；`decideMail` 对 `mailText` 调用 `matchKeywords`，后者已按 lower-case 字面子串匹配。边界：仅按计划替换默认硬阻断词表并增加中文“密码”命中回归；不改匹配算法、手动确认词、配置化、store/schema 或 R3。
+
+- **2026-07-14 · Codex（F6.5 completion）**：完成 `d08a8c4`。默认 hard block 词表现含计划规定的 18 个词，继续由既有大小写不敏感子串匹配消费；新增中文“密码”从默认设置进入 `buildMailGateDecision` 后 hard block 的回归。验收：定向 security gate 10/10、`npm run compile` 零错误、完整 `npm test` 427/427、`git diff --check` 均通过。Manual：**needs user validation on real Outlook/VS Code**，确认含“密码”的邮件被 hard block。Known issues：语义/变体覆盖仍属 R3。Next：记录并 claim 用户新增单项分析文案优化。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -852,11 +857,19 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - Known issues：无新增。
   - Commit：`d02bb1d`。
 
-### [ ] F6.5 hardBlockKeywords 扩充（用户反馈#1 短期项，P2）
+### [x] F6.5 hardBlockKeywords 扩充（用户反馈#1 短期项，P2）（commit `d08a8c4`）
 
 - **背景**：现词表 `["password", "api_key", "access_token", "auth_token"]` 是对邮件**原文（主题+正文）的字面子串匹配**（`security-gate.ts:88` `matchKeywords(mailText(input), ...)`），不是语义识别——覆盖天然不全，它只是快速止损层，主防线是分级门控。
 - **做法**：硬编码词表扩充为：`password, passwd, pwd, api_key, apikey, access_token, auth_token, secret_key, private_key, credential, credentials, 密码, 口令, 密钥, 私钥, 凭证, 令牌`；保持子串匹配语义与大小写不敏感现状；单测覆盖中文命中。**可配置化（用户自定义词表 + 正则）列入 R3 安全设置决策**，本 step 不做。
 - **验收**：单测 + `npm test` 全绿。**needs user validation**：含"密码"的中文邮件被 hard block。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/config-utils.ts`、`src/test/security-gate.test.ts`。
+  - 实现边界：默认 hard block 词表严格替换为计划列出的 18 个英文/中文字面关键词；继续复用现有不区分大小写的子串匹配。未改变匹配算法、manual confirm 词、配置化能力、store/schema 或 R3。
+  - 验收结果：中文“密码”默认词表 hard block 测试先 RED 后 GREEN；定向 security gate 10/10 通过；`npm run compile` 零错误；完整 `npm test` 427/427 通过；`git diff --check` 通过。
+  - Manual validation：**needs user validation on real Outlook/VS Code**。拉取或以 sample 构造正文含“密码”的邮件后执行单封 Analyze，确认被 hard block，且不会出现普通 Analyze/Confirm Analyze 流程。
+  - Known issues：此层仍是字面子串快速止损，不覆盖同义改写或语义变体；可配置化与正则仍属于 R3。
+  - Commit：`d08a8c4`。
 
 ### 第四轮验证问答核实记录（2026-07-13）
 
