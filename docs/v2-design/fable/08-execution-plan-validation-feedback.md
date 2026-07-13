@@ -536,6 +536,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
 
+- 2026-07-14 · F6.3 已完成，代码提交 `a0fbca0`：会议的 Open in Outlook 已移至 metadata 下方、正文之前的统一按钮区。下一步按序 claim F6.4。
+
 ## 6. Handover Log
 
 - **2026-07-11 · Claude Fable 5（规划者）**：创建本计划。核实过程要点：① `FormatRestrictDate` 在 `collect-outlook-mails.vbs:529` 与 `collect-outlook-meetings.vbs:444` 均以 `\` 拼日期（mail 版还带秒），Outlook Restrict 静默返回 0 → recentHours 空result；meetings 循环无下界守卫 + `pruneMeetingStore`（`meeting-store.ts:71`）剪掉过期已响应会议 → 队列空但 store 有数据。② `FolderScanSummary` 在 `src/` 零引用，采集诊断从未到达 UI。③ 草稿保留依赖 webview `getState` 客户端回填，真机失效，F1.3 改扩展侧持久化。④ `importantSenders` 为 prompt 级模型匹配，无代码匹配——Exchange DN 直接拉低命中，F1.6 从采集源 SMTP 化。⑤ `classification.ts:88` 语义下模型漏返邮件应留 Pending，用户实测消失——F1.2 要求真机复现 + 对账兜底双管齐下。无 dirty state。Next: worker 从 F1.1 开始 claim。
@@ -665,6 +667,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F6.1 + F6.2 pre-work checkpoint）**：恢复现场：F5 的 VSIX 已提交并推送（`2a883e8`），规划者 F6 计划更新为 HEAD `0be0138`，工作树干净；按 F6 明确允许合并 claim F6.1/F6.2。已重新定位 `workbench-render.ts`：F5.1 遗留 `.wb-with-body { height: 100%; min-height: 100% }`、`.wb-original-section` 的 shrink/hidden 与 `.wb-body` 的 shrink/internal scroll 均仍成立；`.wb-meta-grid` 下边线与 `.wb-actions` 上边线相邻，thread spotlight/timeline 还各有上边线，pending 正文无标签。边界：严格按 F6.1 CSS 处方修正，并只统一邮件/线程详情的分隔结构与 pending 正文标签；会议按钮位置保留给 F6.3，不改 store/schema/工作流。F6.1 完成前必须进行 Extension Development Host 三视图目视验证，不能以单测替代。
 
 - **2026-07-14 · Codex（F6.1 + F6.2 completion）**：完成 `0a44b9b`。严格采用处方：删除 `.wb-with-body` 的 `height:100%` 与 F5.1 的 `.wb-mail-with-body` 规则；原文区/正文改为 `flex: 1 0 auto`，正文最小高 140px，不再自身滚动，滚动由 `.wb-pane` 承担。统一邮件/线程结构为 metadata → 单线 → actions → 单线 → 内容，pending 补原文标签；会议按钮位置仍留 F6.3。按用户追加的验证需求，sample 新增 `Long body layout verification`，24 行正文，且不改 digest/store 结构。验收：`npm run compile` 零错误、布局定向 40/40、完整 `npm test` 426/426、`git diff --check`、mail VBS `--help`/`--sample` 均通过。Manual：**Extension Development Host 已验证**：未分析单封、已分析单封、线程三视图短内容完整可读且留有空余；长 sample 显示完整并由整个 Workbench 滚动（这是 F6.1 处方指定行为，非原文容器滚动）。Known issues：无新增。Next：claim F6.3/F6.4/F6.5。
+
+- **2026-07-14 · Codex（F6.3 pre-work checkpoint）**：恢复现场：F6.1/F6.2 代码与记录已提交（`0a44b9b`、`8e6d851`），工作树干净；HEAD `8e6d851`。已重新定位 `renderMeetingDetail`：`wb-meta-grid` 后先渲染正文、再渲染 `openMeetingInOutlook` actions，故按钮在底部；F6.2 已使 actions 自带前后单线，移动到 metadata 后即可与邮件一致。边界：仅重排既有会议详情模板与回归断言；不改 EntryID/VBS、meeting store/schema 或 F6.4/F6.5。
+
+- **2026-07-14 · Codex（F6.3 completion）**：完成 `a0fbca0`。会议模板只将既有 `wb-actions` 从正文后移至 metadata 后，继续使用同一 `openMeetingInOutlook` EntryID 按钮和 F6.2 统一样式；正文内容与数据路径不变。验收：`npm run compile` 零错误、Workbench 定向 40/40、完整 `npm test` 426/426、`git diff --check` 通过。Manual：**needs user validation on real VS Code/Outlook**，打开会议详情确认按钮在 metadata 下方，并确认原 EntryID 项仍能打开。Known issues：真实 Outlook 打开行为仍依赖既有 F5.2 真机验证。Next：claim F6.4。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -816,9 +822,17 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - Known issues：无新增。
   - Commit：`0a44b9b`。
 
-### [ ] F6.3 会议详情 Open in Outlook 按钮位置（用户反馈#2，P2）
+### [x] F6.3 会议详情 Open in Outlook 按钮位置（用户反馈#2，P2）
 
 - 会议详情的 `Open in Outlook` 从底部移到 metadata 下方的按钮区（与邮件详情一致的位置与样式）。验收：单测 + `npm test` 全绿。
+
+- Completion Notes（2026-07-14）：
+  - 改动文件：`src/lib/workbench-render.ts`、`src/test/workbench-render.test.ts`。
+  - 实现边界：仅重排已有按钮和正文的模板顺序；不改 EntryID、Outlook 脚本或会议数据。
+  - 验收结果：`npm run compile` 零错误、Workbench 定向 40/40、完整 `npm test` 426/426、`git diff --check` 通过。
+  - Manual validation：**needs user validation on real VS Code/Outlook**：确认会议按钮位置及原日历项打开。
+  - Known issues：真实 Outlook 打开行为仍待既有真机验证。
+  - Commit：`a0fbca0`。
 
 ### [ ] F6.4 chunk 进度序列补首块（用户反馈#3，P2）
 
