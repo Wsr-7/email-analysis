@@ -513,6 +513,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 ---
 
+- **2026-07-13 · Claude Fable 5（规划者核实第二轮验证结果，产出 F4 批）**：用户回填 §7 十六项：通过 #4/#5/#6/#7/#9/#10/#14/#15/#16 主体；失败/残留项全部完成根因定位并立项 F4.1-F4.8（§2.10）。两个 P0 为本地确证而非推测：F4.1 用 sample 数据复现整条 TS 链（parse→merge→prune 6/6 存活、`renderSidebarHtml` 显式传 meetingStore 即出 6 行），锁定 `getDashboardHtml`（extension.ts ~L1317）漏传字段；F4.2 锁定 flush 空 textarea 经 `workingDraftsFlushed` 写空串进 Map，使 `workingDrafts.get(id) ?? item.draftReply` 的 fallback 失效。F4.3 定位到 VBScript 块 If 条件出错时 Resume Next 直接进入 Then 块的语义陷阱（IsSentFolder 全文件夹误判 SentOn）。§7#3 注入邮件测试经日志键比对确认跑在旧构建（`skippedChunkedMails` vs 当前 `skippedChunks`/`omittedMails`），列入第三轮复测。会议队列产品定位与分析提速两个方向记入 §3 R3 决策输入。Next: worker 按序 claim F4.1（P0）→ F4.2（P0）→ F4.3/F4.4 → F4.5-F4.8；全部完成后重新打包 vsix，用户做第三轮复测（重点：Meetings 队列、自动草稿、注入邮件新构建复测、取消提示、SentOn）。
+
+---
+
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
 > 前置：安装重新打包后的 `releases/easymail-0.3.0.vsix`（含全部 F 批改动）。结果列填 ✅ / ❌ / ⏭️，❌ 请附现象与相关日志行（日志：globalStorage 下 `logs/easy-mail.log`）。
@@ -535,5 +539,3 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 | 14 | Pending 文件夹分组（F3.4） | 打开 Sidebar 的 Pending 队列 | 按已配置 folder 分组显示 `文件夹名 (N)`（含 0 封的显示 (0)），点组头展开/收起邮件列表，切换队列后再回来展开状态仍在 | 正常 |
 | 15 | ignoredSenders（F3.5） | Settings 里 `easyMail.ignoredSenders` 加一个真实 no-reply 地址，刷新/Fetch | 该发件人所有未分析邮件移入 Ignored 队列（不再出现在 Pending）；从设置删除该条目后恢复回 Pending | 正常 |
 | 16 | 其他小项（F3.2/F3.3） | ① Settings 页看 `easyMail.modelFamily`；② VS Code 扩展详情页看 Details | ① 是自由文本框（无下拉），从 dashboard 选任意模型写回后不标非法；② Details 结构完整（README 渲染正常，5 处截图占位待你补图） | 正常。但是details如果是对应 readme 的话，其实我不打算让用户可以在详情页有超链接跳转，它不需要跳转这个外部链接。这个details能否跟 readme 是独立的，而不是相关联的？或者可以做本地版 |
-
-- **2026-07-13 · Claude Fable 5（规划者核实第二轮验证结果，产出 F4 批）**：用户回填 §7 十六项：通过 #4/#5/#6/#7/#9/#10/#14/#15/#16 主体；失败/残留项全部完成根因定位并立项 F4.1-F4.8（§2.10）。两个 P0 为本地确证而非推测：F4.1 用 sample 数据复现整条 TS 链（parse→merge→prune 6/6 存活、renderSidebarHtml 显式传 meetingStore 即出 6 行），锁定 getDashboardHtml（extension.ts ~L1317）漏传字段；F4.2 锁定 flush 空 textarea 经 workingDraftsFlushed 写空串进 Map、 失效。F4.3 定位到 VBScript 块 If 条件出错时 Resume Next 进入 Then 块的语义陷阱（IsSentFolder 全文件夹误判 SentOn）。§7#3 注入邮件测试经日志键比对确认跑在旧构建（skippedChunkedMails vs 当前 skippedChunks/omittedMails），列入第三轮复测。会议队列产品定位与分析提速两个方向记入 §3 R3 决策输入。工作树含用户回填的 §7 结果，随本次提交一并入库。Next: worker 按序 claim F4.1（P0）→ F4.2（P0）→ F4.3/F4.4 → F4.5-F4.8；全部完成后重新打包 vsix，用户做第三轮复测（重点：Meetings 队列、自动草稿、注入邮件新构建复测、取消提示、SentOn）。
