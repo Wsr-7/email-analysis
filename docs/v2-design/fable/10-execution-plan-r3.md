@@ -126,6 +126,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G5 已完成（`4c8cce3`）：Sidebar 23 处内联 click handler 迁入统一事件委托，三个 Webview 由 extension caller 传入独立随机 nonce，全部启用严格 CSP 且 script 带 nonce。全量测试 450 pass。Next: claim G6。
 - 2026-07-14 · G6 已完成（`5d48d65`）：Sidebar 列表可聚焦，ArrowUp/ArrowDown 仅遍历当前真实可见 `.sb-row`，跳过两类折叠组隐藏项与组头，复用 openItem 并滚动入视野。全量测试 451 pass。Next: claim G7。
 - 2026-07-14 · G7 已完成（`e323af6`）：pending/analyzed 单封邮件在 Sidebar 与 Workbench 显示附件元数据，batch prompt 含 count/name 且附件名先脱敏，实际 system prompt 明确禁止声称读取附件内容。全量测试 454 pass。Next: 全量收口复验。
+- 2026-07-14 · R3 G 批次收口完成：G1-G7 全部 `[x]`，整体 diff 复核未发现 Critical/Important 问题；最终 `npm run compile`、454 项全量测试与 `git diff --check` 均通过。14 个本地 commit，未 push。
 
 ---
 
@@ -218,3 +219,5 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Manual validation：**needs user validation**，真实 Outlook 附件采集值、Webview tooltip/metadata 与真实模型对附件存在/漏附的判断需实机确认。
   - Known issues：确认项结论为旧 `redactStoredMails` **不覆盖** attachmentNames，本 step 已补齐；模型仍只能看到 count/name，无法验证附件内容。
   - Commit：`e323af6`（本地，未 push）。
+
+- **2026-07-14 · Codex（R3 G 批次 final verification）**：Action: 对 `fc062db..b499ac9` 的 34 个改动文件、G1-G7 状态/边界及 commit 链做整体复核，无 Critical/Important 发现；未越界改 VBS、collector 或 digest 文件格式。Validated: fresh `npm run compile` 通过；fresh `npm test` 454 pass / 0 fail（69 suites）；`git diff --check` 通过；G1-G7 均 `[x]` 且附实现 commit。Manual: 仍按各 step Completion Notes 的 **needs user validation** 清单进入真实 VS Code/Copilot/Outlook 验证轮。Next: 规划者全量复审与重打 VSIX；当前 worker 不 push。
