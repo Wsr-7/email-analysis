@@ -75,7 +75,7 @@
 - **验收**：单测——normalize 校验、排序规则、过期标红判定、翻译不动 dueDate；`npm test` 全绿。**needs user validation**：含明确期限的邮件分析后有期限徽标且排序靠前。
 - **边界**：不做提醒/通知；overview 计数不加新维度；digest 格式不动。
 
-### [~] G5 Webview CSP 加固（D5，S-M 级）
+### [x] G5 Webview CSP 加固（D5，S-M 级）— `4c8cce3`
 
 - **现状锚点**：`sidebar-render.ts` / `workbench-render.ts` / `guide-webview.ts` 三个 HTML 模板均无 CSP meta，脚本为裸 inline `<script>`；**且模板中存在 `onclick="..."` 等内联事件属性**（如 pending 分组头 `onclick="togglePendingFolder(this)"`、meeting 行 `onclick="openItem(...)"`、dashboard 的 `onclick="post(...)"` 等）。
 - **前置认知（本 step 最大的坑）**：`script-src 'nonce-...'` 的 CSP **不放行内联事件属性**——只加 CSP meta 不迁移 onclick，三个页面的按钮会全部失效。因此本 step 分两步走，顺序不可颠倒：
@@ -123,6 +123,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G2 已完成（`96723b8`）：会议队列更名为会议邀请，未响应邀请平铺，未来已接受/暂定/组织者日程默认折叠，徽标仅计未响应。全量测试 438 pass。Next: claim G3。
 - 2026-07-14 · G3 已完成（`789799b`）：hard-block/manual-confirm 与 3/2 级分类词表均可在 Settings 编辑，空数组关闭，非法值回落，分级词表 hash 变化触发全量重算。全量测试 443 pass。Next: claim G4。
 - 2026-07-14 · G4 已完成（`b6a6ead`）：分析输出新增合法 `YYYY-MM-DD` dueDate，两个行动桶按期限优先排序，Sidebar/Workbench 显示期限且过期或今日到期标红，翻译保持日期不变。全量测试 447 pass。Next: claim G5。
+- 2026-07-14 · G5 已完成（`4c8cce3`）：Sidebar 23 处内联 click handler 迁入统一事件委托，三个 Webview 由 extension caller 传入独立随机 nonce，全部启用严格 CSP 且 script 带 nonce。全量测试 450 pass。Next: claim G6。
 
 ---
 
@@ -181,3 +182,13 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Commit：`b6a6ead`（本地，未 push）。
 
 - **2026-07-14 · Codex（G5 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `105c0db`；重新定位确认三个模板的 `<script>` 仍无 nonce/CSP，Sidebar 有 23 处 `onclick=`（邮件/线程/会议/Next Action 行、两个折叠组、queue nav、语言/设置/toolbar 按钮），Workbench 与 Guide 已使用 `data-action` document click 委托且无内联 handler；真实 render caller 均在 `src/extension.ts` 的 `getDashboardHtml` / `getWorkbenchHtml` / `getGuideHtml`。边界：先把 Sidebar 全部内联 handler 等价迁到统一委托，再由 extension caller 为三个纯 render 函数传随机 nonce 并添加严格 CSP；不引入资源/依赖，不改功能或视觉，不进入 G6 键盘导航。Action: claim G5。
+
+- **2026-07-14 · Codex（G5 completion）**：Action: 将 Sidebar 所有内联 click handler 迁为 `data-action` + document 级委托；Workbench/Guide 复用既有委托；三个纯 render 函数接收 caller nonce，extension 每次渲染用 `randomBytes(16)` 生成，CSP 仅放行 nonce script、inline style 与 data image。Validated: `npm run compile` 通过；三个 render 测试 90 pass；`npm test` 450 pass / 0 fail；输出断言无内联 `on*=`；`git diff --check` 通过。Manual: **needs user validation**——逐一点击 Sidebar 的 Fetch/Analyze/Load More/队列/邮件/线程/会议/Next Action/折叠/语言/设置/报表/清空入口，Workbench 的所有详情与草稿动作，以及 Guide 的全部动作（含会打开 QuickPick 的文件夹选择）。Next: G6。
+
+  **Completion Notes**
+  - 改动文件：`src/extension.ts`、`src/lib/sidebar-render.ts`、`src/lib/workbench-render.ts`、`src/lib/guide-webview.ts`、三个对应 render 测试、本计划。
+  - 实现边界：仅迁移事件绑定并加 nonce CSP；未引入外部资源/依赖，未改变页面视觉或消息协议，也未加入 G6 键盘行为。
+  - 验收结果：三个页面均有 CSP meta、全部 script 带 caller nonce、两次不同 nonce 渲染结果不同、输出无内联事件属性；全量 450 pass。
+  - Manual validation：**needs user validation**，CSP 与事件委托只能通过真实 VS Code Webview 完整点击回归确认。
+  - Known issues：`style-src 'unsafe-inline'` 仍保留以支持现有内嵌样式；script 已收紧为单次随机 nonce，未使用 `unsafe-inline`/`unsafe-hashes`。
+  - Commit：`4c8cce3`（本地，未 push）。
