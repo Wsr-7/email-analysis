@@ -202,14 +202,36 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes(".wb-reader.active ~ .wb-placeholder { display: none; }"));
   });
 
-  it("keeps analyzed original mail in the remaining reader area", () => {
+  it("lets analyzed original mail grow with the reading pane", () => {
     const html = renderWorkbenchHtml(stubInput());
 
     assert.ok(html.includes(".wb-reader.active { display: flex; width: 100%; height: 100%; min-height: 0; }"));
-    assert.ok(html.includes(".wb-reader.active .wb-mail-with-body { flex: 1 1 auto; height: auto; min-height: 0; }"));
-    assert.ok(html.includes(".wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; width: 100%; overflow: hidden; }"));
-    assert.ok(html.includes(".wb-body { flex: 1 1 auto; min-height: 0; width: 100%;"));
+    assert.ok(html.includes(".wb-reader.active .wb-with-body { display: flex; flex-direction: column; min-height: 100%; width: 100%; }"));
+    assert.ok(!html.includes(".wb-reader.active .wb-mail-with-body"));
+    assert.ok(html.includes(".wb-original-section { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; }"));
+    assert.ok(html.includes(".wb-body { flex: 1 0 auto; min-height: 140px; width: 100%;"));
     assert.ok(!html.includes("max-height: 400px"));
+  });
+
+  it("uses one separator before and after detail actions", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes(".wb-meta-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 0; }"));
+    assert.ok(html.includes(".wb-actions { display: flex; gap: 8px; margin: 0 0 12px; padding: 12px 0; border-top: 1px solid"));
+    assert.ok(html.includes("border-bottom: 1px solid var(--vscode-panel-border"));
+    assert.ok(html.includes(".wb-thread-analysis { margin-top: 12px; padding-top: 0; }"));
+    assert.ok(html.includes(".wb-timeline-section { margin-top: 20px; padding-top: 0; }"));
+  });
+
+  it("labels the pending original body after the action separator", () => {
+    const html = renderWorkbenchHtml(stubInput({
+      queue: { pending: [], blocked: [], analysed: [], allowed: [stubMail({ mailId: "pending-body", bodyExcerpt: "Pending original body" })], ignoredPending: [] }
+    }));
+
+    const actionIndex = html.indexOf('data-action="openInOutlook" data-mail-id="pending-body"');
+    const bodyLabelIndex = html.indexOf("<strong>Body:</strong></div><div class=\"wb-body\">Pending original body");
+    assert.ok(actionIndex !== -1 && bodyLabelIndex !== -1 && actionIndex < bodyLabelIndex);
+    assert.ok(html.includes('<div class="wb-section wb-original-section"><div class="wb-field"><strong>Body:</strong>'));
   });
 
   it("marks a timeline body truncated by collection", () => {

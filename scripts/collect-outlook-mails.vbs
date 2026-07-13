@@ -1216,6 +1216,7 @@ Sub WriteSampleDigest(byVal outputPath, byRef target)
   Dim recordCount
   recordCount = 0
   Dim record
+  Dim longSampleBody
 
   Set record = BuildSampleRecord(1, "Approve release decision by 16:00 today", "Maya Chen", "maya.chen@example.com", "Inbox/Release", "high", True, False, "The launch window closes today." & vbCrLf & "Please approve or decline the release decision." & vbCrLf & "The deadline is 16:00 today.")
   record("conversationId") = "sample-thread-release"
@@ -1261,6 +1262,33 @@ Sub WriteSampleDigest(byVal outputPath, byRef target)
   Set record = BuildSampleRecord(10, "HIGHLY RESTRICTED: acquisition diligence", "Legal Counsel", "legal@example.com", "Inbox/Legal", "high", True, False, "Secret board materials for the acquisition diligence review." & vbCrLf & "Do not forward these materials." & vbCrLf & "Please review the attachments before the confidential meeting.")
   record("attachmentCount") = 2
   record("attachmentNames") = "diligence-summary.pdf; board-notes.docx"
+  AddRecordToArray records, recordCount, record
+
+  longSampleBody = "This sample verifies that long original mail remains readable in the workbench." & vbCrLf & _
+    "It intentionally contains enough lines to require the reading pane to scroll." & vbCrLf & _
+    "Review the release checklist before the planned deployment window." & vbCrLf & _
+    "Confirm that the implementation owner and backup owner are available." & vbCrLf & _
+    "Record any dependency that could delay the release decision." & vbCrLf & _
+    "Share the final readiness summary with the delivery group." & vbCrLf & _
+    "Use the linked runbook for the rollback criteria and escalation path." & vbCrLf & _
+    "Keep the customer communication draft ready until approval is confirmed." & vbCrLf & _
+    "Validate the monitoring dashboard after the configuration change." & vbCrLf & _
+    "Document the outcome in the weekly operations update." & vbCrLf & _
+    "Escalate only if a blocker remains after the final review." & vbCrLf & _
+    "Review the approval record before sharing the release status." & vbCrLf & _
+    "Check that every open question has a named owner and next step." & vbCrLf & _
+    "Confirm the quality assurance sign-off is attached to the final update." & vbCrLf & _
+    "Keep the deployment timeline visible while reviewing the remaining tasks." & vbCrLf & _
+    "Verify the fallback contact can join the escalation bridge if needed." & vbCrLf & _
+    "Ensure the monitoring alerts use the agreed production thresholds." & vbCrLf & _
+    "Capture the decisions that affect the next weekly planning meeting." & vbCrLf & _
+    "Confirm the customer-facing notes match the approved release scope." & vbCrLf & _
+    "Compare the final checklist against the change-management record." & vbCrLf & _
+    "Leave enough time for a final review before the deployment window." & vbCrLf & _
+    "Confirm that all supporting documents are available to the delivery group." & vbCrLf & _
+    "Review the rollback contacts once more before closing the readiness review." & vbCrLf & _
+    "This final line ensures the sample body is visibly longer than the reader viewport."
+  Set record = BuildSampleRecord(11, "Long body layout verification", "EasyMail QA", "qa@example.com", "Inbox/Release", "normal", False, False, longSampleBody)
   AddRecordToArray records, recordCount, record
 
   WriteDigest outputPath, target, records, recordCount, "ok"

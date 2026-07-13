@@ -28,6 +28,9 @@ test("sample mail bodies each contain multiple lines", () => {
 
   assert.ok(sampleDigest);
   const records = sampleDigest[0].match(/^  Set record = BuildSampleRecord.*$/gm) || [];
-  assert.equal(records.length, 10);
-  assert.ok(records.every((record) => (record.match(/vbCrLf/g) || []).length >= 2));
+  assert.equal(records.length, 11);
+  assert.ok(records.filter((record) => !record.includes("BuildSampleRecord(11,")).every((record) => (record.match(/vbCrLf/g) || []).length >= 2));
+  const longBody = sampleDigest[0].match(/longSampleBody = ([\s\S]*?)\r?\n\s*Set record = BuildSampleRecord\(11, "Long body layout verification"/);
+  assert.ok(longBody);
+  assert.ok((longBody[1].match(/vbCrLf/g) || []).length >= 23);
 });

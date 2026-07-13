@@ -56,7 +56,7 @@ function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabe
       <button class="wb-btn" data-action="openInOutlook" data-mail-id="${escapeAttr(item.mailId)}">${escapeHtml(labels.card.openInOutlook)}</button>
       ${ignoreOrRestore(queue, item.mailId, labels)}
     </div>
-    <div class="wb-body">${escapeHtml(item.bodyExcerpt || "")}</div>
+    <div class="wb-section wb-original-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(item.bodyExcerpt || "")}</div></div>
   </div>`;
 }
 
@@ -309,21 +309,20 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
 
   /* Detail card styles */
   .wb-detail-card { width: 100%; padding: 24px 28px; }
-  .wb-reader.active .wb-with-body { display: flex; flex-direction: column; height: 100%; min-height: 100%; width: 100%; }
-  .wb-reader.active .wb-mail-with-body { flex: 1 1 auto; height: auto; min-height: 0; }
+  .wb-reader.active .wb-with-body { display: flex; flex-direction: column; min-height: 100%; width: 100%; }
   .wb-detail-card h3 { font-size: 17px; line-height: 1.4; margin-bottom: 4px; font-weight: 600; }
   .wb-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .wb-detail-header h3 { flex: 1; }
   .wb-priority { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); white-space: nowrap; flex-shrink: 0; margin-top: 4px; }
-  .wb-meta-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); margin-bottom: 12px; }
+  .wb-meta-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 0; }
   .wb-field { font-size: 12px; line-height: 1.6; }
   .wb-warn { color: var(--vscode-errorForeground, #f48771); }
   .wb-gate-reasons { display: grid; gap: 2px; margin-top: 2px; }
   .wb-section { margin-bottom: 12px; }
-  .wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; width: 100%; overflow: hidden; }
+  .wb-original-section { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; }
   .wb-section-body { font-size: 13px; line-height: 1.6; padding: 4px 0; opacity: 0.9; }
-  .wb-body { flex: 1 1 auto; min-height: 0; width: 100%; font-size: 12px; line-height: 1.7; white-space: pre-wrap; padding: 12px 14px; margin: 8px 0; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; border-left: 3px solid var(--vscode-focusBorder, #007fd4); overflow-y: auto; }
-  .wb-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); flex-wrap: wrap; }
+  .wb-body { flex: 1 0 auto; min-height: 140px; width: 100%; font-size: 12px; line-height: 1.7; white-space: pre-wrap; padding: 12px 14px; margin: 8px 0; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; border-left: 3px solid var(--vscode-focusBorder, #007fd4); }
+  .wb-actions { display: flex; gap: 8px; margin: 0 0 12px; padding: 12px 0; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); flex-wrap: wrap; }
   .wb-btn { padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: 500; background: var(--vscode-button-background, #0e639c); color: var(--vscode-button-foreground, #fff); display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, transform 0.1s; }
   .wb-btn:hover:not(:disabled) { background: var(--vscode-button-hoverBackground, #1177bb); }
   .wb-btn:active:not(:disabled) { transform: scale(0.97); }
@@ -333,7 +332,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-btn.is-busy { gap: 6px; }
 
   /* Thread analysis */
-  .wb-thread-analysis { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); }
+  .wb-thread-analysis { margin-top: 12px; padding-top: 0; }
   .wb-thread-analysis h4 { font-size: 12px; font-weight: 600; margin: 12px 0 4px 0; opacity: 0.8; }
   .wb-thread-analysis h4:first-child { margin-top: 0; }
   .wb-ul { margin: 4px 0 4px 20px; font-size: 13px; }
@@ -341,7 +340,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-risk-level { font-size: 10px; padding: 1px 5px; border-radius: 6px; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); text-transform: uppercase; margin-right: 4px; }
 
   /* Timeline */
-  .wb-timeline-section { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); }
+  .wb-timeline-section { margin-top: 20px; padding-top: 0; }
   .wb-timeline-section > h4 { font-size: 13px; font-weight: 600; margin-bottom: 12px; opacity: 0.7; }
   .wb-tl-item { padding: 10px 0 10px 14px; border-left: 2px solid var(--vscode-panel-border, rgba(128,128,128,0.25)); margin-bottom: 2px; }
   .wb-tl-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
