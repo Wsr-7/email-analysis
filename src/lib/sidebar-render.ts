@@ -187,14 +187,16 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     queueCounts[cat.id] = cat.items.length;
   }
   const meetingStore = input.meetingStore || emptyMeetingStore();
-  const sortedMeetings = [...meetingStore.items].sort((a, b) => {
-    if (a.responseStatus === "notResponded" && b.responseStatus !== "notResponded") return -1;
-    if (a.responseStatus !== "notResponded" && b.responseStatus === "notResponded") return 1;
-    return (b.start || "").localeCompare(a.start || "");
-  });
+  const meetingInvites = meetingStore.items
+    .filter((item) => item.responseStatus === "notResponded")
+    .sort((a, b) => (b.start || "").localeCompare(a.start || ""));
+  const acceptedSchedule = meetingStore.items
+    .filter((item) => ["accepted", "tentative", "organizer"].includes(item.responseStatus)
+      && new Date(String(item.start || "").replace(" ", "T")).getTime() >= Date.now())
+    .sort((a, b) => (b.start || "").localeCompare(a.start || ""));
 
   const nextActionsItems = (input.nextActionsStore?.items || []).filter((a) => a.status === "open");
-  queueCounts["meetings"] = meetingStore.items.length;
+  queueCounts["meetings"] = meetingInvites.length;
   queueCounts["nextActions"] = nextActionsItems.length;
   queueCounts["pending"] = queue.allowed.length;
   queueCounts["blocked"] = queue.blocked.length;
@@ -231,7 +233,15 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     String(b.lastTime || "").localeCompare(String(a.lastTime || ""))
   ).map((thread) => renderCompactThreadRow(thread, "threads", labels)).join("");
   const nextActionRows = nextActionsItems.map((a) => renderCompactNextActionRow(a, labels)).join("");
-  const meetingRows = sortedMeetings.map((m) => renderCompactMeetingRow(m, labels)).join("");
+  const meetingRows = [
+    ...meetingInvites.map((meeting) => renderCompactMeetingRow(meeting, labels)),
+    acceptedSchedule.length
+      ? `<section class="sb-meeting-schedule" data-queue="meetings">
+          <button class="sb-pending-folder-header" type="button" aria-expanded="false" onclick="toggleAcceptedSchedule(this)">${escapeHtml(labels.meetings.acceptedSchedule)} (${acceptedSchedule.length})</button>
+          <div class="sb-meeting-schedule-items" hidden>${acceptedSchedule.map((meeting) => renderCompactMeetingRow(meeting, labels)).join("")}</div>
+        </section>`
+      : ""
+  ].join("");
 
   const statusText = isBusy
     ? `<span class="sb-status-dot busy"></span> ${escapeHtml(busyKind === "cancelling" ? labels.progress.cancelling : busyKind)}`
@@ -409,7 +419,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
 
   .sb-row-dim { opacity: 0.45; }
   .sb-action-status { cursor: pointer; font-size: 10px; padding: 1px 6px; border-radius: 8px; border: none; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); }
-  .sb-pending-folder[hidden] { display: none; }
+  .sb-pending-folder[hidden], .sb-meeting-schedule[hidden] { display: none; }
   .sb-pending-folder-header { width: 100%; padding: 6px 12px; text-align: left; background: transparent; color: var(--vscode-sideBar-foreground, var(--vscode-foreground, #ccc)); font-size: 11px; font-weight: 600; }
   .sb-pending-folder-header:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08)); }
   .sb-pending-folder-header::before { content: "›"; display: inline-block; width: 12px; }
@@ -586,6 +596,7 @@ let currentQueue = prev.currentQueue || '${escapeAttr(defaultQueue)}';
 
 applyQueue(currentQueue, false);
 restorePendingFolders();
+restoreAcceptedSchedule();
 if (prev.settingsOpen) { document.getElementById('settingsPanel').hidden = false; }
 if (prev.batchSelect) { document.getElementById('batchSelect').value = prev.batchSelect; }
 if (prev.currentItemId) setActiveRow(prev.currentItemId);
@@ -609,7 +620,7 @@ function applyQueue(queueId, smooth) {
     btn.classList.toggle('active', btn.getAttribute('data-queue-id') === queueId);
   }
   let anyVisible = false;
-  for (const row of document.querySelectorAll('.sb-row, .sb-pending-folder')) {
+  for (const row of document.querySelectorAll('.sb-row, .sb-pending-folder, .sb-meeting-schedule')) {
     const match = row.getAttribute('data-queue') === queueId;
     row.hidden = !match;
     if (match) anyVisible = true;
@@ -637,6 +648,22 @@ function togglePendingFolder(button) {
   button.setAttribute('aria-expanded', String(open));
   group.querySelector('.sb-pending-folder-items').hidden = !open;
   vscode.setState(Object.assign({}, state, { pendingFolders: expanded }));
+}
+
+function restoreAcceptedSchedule() {
+  var group = document.querySelector('.sb-meeting-schedule');
+  if (!group) return;
+  var open = prev.acceptedScheduleOpen === true;
+  group.querySelector('.sb-pending-folder-header').setAttribute('aria-expanded', String(open));
+  group.querySelector('.sb-meeting-schedule-items').hidden = !open;
+}
+
+function toggleAcceptedSchedule(button) {
+  var group = button.closest('.sb-meeting-schedule');
+  var open = button.getAttribute('aria-expanded') !== 'true';
+  button.setAttribute('aria-expanded', String(open));
+  group.querySelector('.sb-meeting-schedule-items').hidden = !open;
+  vscode.setState(Object.assign({}, vscode.getState() || {}, { acceptedScheduleOpen: open }));
 }
 
 function openItem(id, activeId) {

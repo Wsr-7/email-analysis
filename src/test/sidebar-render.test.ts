@@ -459,9 +459,10 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("Standup"));
     assert.ok(html.includes("sb-mtg-warn"), "should show status badge");
     assert.ok(!html.includes("sb-detail"), "compact row should not have detail section");
+    assert.ok(html.includes("Meeting Invites"));
   });
 
-  it("orders meetings with unanswered invitations first, then newest start time", () => {
+  it("renders unanswered invitations directly and future accepted schedules in a collapsed group", () => {
     const meeting = (entryId: string, start: string, responseStatus: StoredMeetingItem["responseStatus"]): StoredMeetingItem => ({
       meetingId: entryId, entryId, subject: entryId, organizer: "Alice", start, end: start,
       location: "", isAllDay: false, isRecurring: false, requiredAttendees: "", optionalAttendees: "",
@@ -469,14 +470,22 @@ describe("renderSidebarHtml", () => {
     });
     const html = renderSidebarHtml(stubInput({ meetingStore: {
       generatedAt: "", lastPullAt: "", items: [
-        meeting("accepted-old", "2026-07-01 09:00", "accepted"),
+        meeting("accepted-old", "2099-07-01 09:00", "accepted"),
         meeting("unanswered", "2026-07-02 09:00", "notResponded"),
-        meeting("accepted-new", "2026-07-03 09:00", "accepted")
+        meeting("accepted-new", "2099-07-03 09:00", "accepted"),
+        meeting("declined", "2099-07-04 09:00", "declined")
       ]
     } }));
 
     assert.ok(html.indexOf('data-meeting-id="unanswered"') < html.indexOf('data-meeting-id="accepted-new"'));
     assert.ok(html.indexOf('data-meeting-id="accepted-new"') < html.indexOf('data-meeting-id="accepted-old"'));
+    assert.match(html, /data-queue-id="meetings"[\s\S]*?<span class="sb-queue-count">1<\/span>/);
+    assert.ok(html.includes('class="sb-meeting-schedule"'));
+    assert.ok(html.includes('aria-expanded="false"'));
+    assert.ok(html.includes("Accepted schedule (2)"));
+    assert.ok(html.includes('class="sb-meeting-schedule-items" hidden'));
+    assert.ok(!html.includes('data-meeting-id="declined"'));
+    assert.ok(html.includes("acceptedScheduleOpen"));
   });
 
   it("shows meetings queue in nav even when empty", () => {

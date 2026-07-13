@@ -39,7 +39,7 @@ export type DashboardLabels = {
   card: Record<"from" | "to" | "cc" | "body" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "analyze" | "reanalyze" | "openInOutlook" | "noItems" | "thread", string>;
   pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select" | "confirmAnalyze", string>;
   threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "contentTruncated" | "attachments" | "mailIds", string>;
-  meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "requiredAttendees" | "optionalAttendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
+  meetings: Record<"title" | "acceptedSchedule" | "organizer" | "time" | "location" | "attendees" | "requiredAttendees" | "optionalAttendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
   nextActions: Record<"title" | "owner" | "task" | "deadline" | "source" | "markDone" | "markIgnored" | "reopen" | "noActions", string>;
   progress: Record<"pullMail" | "loadMore" | "sampleDigest" | "analyze" | "reports" | "loadModels" | "translate" | "cancelling", string> & { detail: string };
   model: Record<"fallback" | "preferred", string>;
@@ -193,7 +193,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       mailIds: "邮件 ID"
     },
     meetings: {
-      title: "会议",
+      title: "会议邀请",
+      acceptedSchedule: "已接受的日程",
       organizer: "组织者",
       time: "时间",
       location: "地点",
@@ -384,7 +385,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       mailIds: "Mail IDs"
     },
     meetings: {
-      title: "Meetings",
+      title: "Meeting Invites",
+      acceptedSchedule: "Accepted schedule",
       organizer: "Organizer",
       time: "Time",
       location: "Location",
