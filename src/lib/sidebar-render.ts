@@ -554,7 +554,7 @@ export function renderSidebarHtml(input: DashboardRenderInput, nonce: string): s
     <div class="sb-queue-nav" id="queueNav">
       ${queueNav}
     </div>
-    <div class="sb-list-area" id="itemList">
+    <div class="sb-list-area" id="itemList" tabindex="0">
       ${meetingRows}
       ${nextActionRows}
       ${pendingRows}
@@ -679,6 +679,10 @@ function openItem(id, activeId) {
   post('openInWorkbench', { mailId: id });
 }
 
+function rowItemId(row) {
+  return row.getAttribute('data-mail-id') || row.getAttribute('data-thread-id') || row.getAttribute('data-meeting-id') || '';
+}
+
 function setActiveRow(id) {
   for (var row of document.querySelectorAll('.sb-row')) {
     var match = row.getAttribute('data-mail-id') === id || row.getAttribute('data-thread-id') === id || row.getAttribute('data-meeting-id') === id || row.getAttribute('data-next-action-id') === id;
@@ -713,7 +717,8 @@ document.addEventListener('click', function(e) {
   if (action === 'togglePendingFolder') togglePendingFolder(target);
   if (action === 'toggleAcceptedSchedule') toggleAcceptedSchedule(target);
   if (action === 'openItem') {
-    var id = target.getAttribute('data-mail-id') || target.getAttribute('data-thread-id') || target.getAttribute('data-meeting-id') || '';
+    document.getElementById('itemList').focus({ preventScroll: true });
+    var id = rowItemId(target);
     openItem(id, target.getAttribute('data-next-action-id') || '');
   }
   if (action === 'markNextAction') post('markNextAction', { actionId: target.getAttribute('data-action-id') || '', status: target.getAttribute('data-status') || '' });
@@ -722,6 +727,26 @@ document.addEventListener('click', function(e) {
   if (action === 'runAnalyze') runAnalyze();
   if (action === 'toggleSettings') toggleSettings();
   if (action === 'confirmClear') confirmClear();
+});
+
+document.getElementById('itemList').addEventListener('keydown', function(e) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  var rows = Array.prototype.slice.call(this.querySelectorAll('.sb-row')).filter(function(row) {
+    return !row.hidden && row.offsetParent !== null;
+  });
+  if (!rows.length) return;
+  var current = this.querySelector('.sb-row.active');
+  var index = rows.indexOf(current);
+  var nextIndex = index < 0
+    ? (e.key === 'ArrowDown' ? 0 : rows.length - 1)
+    : Math.max(0, Math.min(rows.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1)));
+  if (index === nextIndex) return;
+  var next = rows[nextIndex];
+  var id = rowItemId(next);
+  var activeId = next.getAttribute('data-next-action-id') || '';
+  openItem(id, activeId);
+  next.scrollIntoView({ block: 'nearest' });
 });
 
 function runAnalyze() {

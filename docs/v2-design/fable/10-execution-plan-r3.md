@@ -84,7 +84,7 @@
 - **验收**：单测——三个页面输出含 CSP meta、script 带 nonce、两次渲染 nonce 不同、**输出 HTML 中不再含任何 `onclick=` 内联属性**；`npm test` 全绿。**needs user validation**：三个页面全功能回归（每个按钮/输入/折叠/QuickPick 入口点一遍）——CSP 配错或迁移遗漏的典型症状是局部按钮点了没反应。
 - **边界**：不引入外部资源；不改页面功能与视觉；改动量因 onclick 迁移比原估大（S-M → M），如单人完成压力大可拆两个 commit（迁移 / CSP）但同一 step 内完成。
 
-### [ ] G6 Sidebar 上下方向键导航（D6 裁剪版，S 级）
+### [~] G6 Sidebar 上下方向键导航（D6 裁剪版，S 级）
 
 - **做法**：sidebar 列表获得焦点时，↑/↓ 在**当前可见队列**的条目间移动选中（跳过折叠分组内隐藏项与组头），选中行高亮 + 滚动入视野 + 触发与点击相同的 `openItem`（workbench 自动跟随——现有行为，点击即打开）。仅此一个动作，不做 Enter/其他快捷键。注意与 F3.4 pending 折叠分组、G2 会议折叠分组的可见性判定兼容。
 - **验收**：webview 脚本单测（断言键盘 handler 与可见性过滤逻辑存在于输出 HTML）；`npm test` 全绿。**needs user validation**：↑/↓ 切换流畅、workbench 跟随、折叠组内隐藏项被跳过。
@@ -192,3 +192,5 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Manual validation：**needs user validation**，CSP 与事件委托只能通过真实 VS Code Webview 完整点击回归确认。
   - Known issues：`style-src 'unsafe-inline'` 仍保留以支持现有内嵌样式；script 已收紧为单次随机 nonce，未使用 `unsafe-inline`/`unsafe-hashes`。
   - Commit：`4c8cce3`（本地，未 push）。
+
+- **2026-07-14 · Codex（G6 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `1f4bb9c`；重新定位确认 Sidebar `#itemList` 尚不可聚焦，所有可导航实体均为 `.sb-row[data-action="openItem"]`，`applyQueue` 用 row/group `hidden` 切换队列，pending 与 accepted schedule 的子容器另以 `hidden` 控制折叠，`openItem`/`setActiveRow` 已统一点击与高亮路径。边界：只让 Sidebar 列表可聚焦并处理 ArrowUp/ArrowDown，按真实可见性过滤 `.sb-row`、滚动入视野并复用 `openItem`；不做 Enter/循环导航/Workbench 快捷键或其他按键。Action: claim G6。

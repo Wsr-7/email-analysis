@@ -251,6 +251,16 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("openItem"));
   });
 
+  it("navigates only visible rows with ArrowUp and ArrowDown", () => {
+    const html = renderSidebarHtml(stubInput());
+    assert.ok(html.includes('id="itemList" tabindex="0"'));
+    assert.ok(html.includes("addEventListener('keydown'"));
+    assert.ok(html.includes("e.key !== 'ArrowDown' && e.key !== 'ArrowUp'"));
+    assert.ok(html.includes("!row.hidden && row.offsetParent !== null"));
+    assert.ok(html.includes("scrollIntoView({ block: 'nearest' })"));
+    assert.ok(html.includes("openItem(id, activeId)"));
+  });
+
   it("renders settings panel hidden by default", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes('id="settingsPanel"'));
@@ -344,7 +354,7 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('data-next-action-id="thread:t1:review"'));
     assert.ok(html.includes('data-next-action-id="thread:t1:reply"'));
     assert.ok(html.includes("openItem(id, target.getAttribute('data-next-action-id') || '')"));
-    assert.ok(html.includes("target.getAttribute('data-thread-id')"));
+    assert.ok(html.includes("row.getAttribute('data-thread-id')"));
     assert.ok(html.includes("row.getAttribute('data-next-action-id') === id"));
   });
 
