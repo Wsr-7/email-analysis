@@ -534,6 +534,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-13 · F5.4 已完成，代码提交 `e08be3e`：每个分析 chunk 写盘后立即 sidebar-only 更新，workbench 仍只在任务结束时刷新，避免中途打断阅读与草稿。真实 VS Code 验证待用户执行。F5 全部完成。
 
+- 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
+
 ## 6. Handover Log
 
 - **2026-07-11 · Claude Fable 5（规划者）**：创建本计划。核实过程要点：① `FormatRestrictDate` 在 `collect-outlook-mails.vbs:529` 与 `collect-outlook-meetings.vbs:444` 均以 `\` 拼日期（mail 版还带秒），Outlook Restrict 静默返回 0 → recentHours 空result；meetings 循环无下界守卫 + `pruneMeetingStore`（`meeting-store.ts:71`）剪掉过期已响应会议 → 队列空但 store 有数据。② `FolderScanSummary` 在 `src/` 零引用，采集诊断从未到达 UI。③ 草稿保留依赖 webview `getState` 客户端回填，真机失效，F1.3 改扩展侧持久化。④ `importantSenders` 为 prompt 级模型匹配，无代码匹配——Exchange DN 直接拉低命中，F1.6 从采集源 SMTP 化。⑤ `classification.ts:88` 语义下模型漏返邮件应留 Pending，用户实测消失——F1.2 要求真机复现 + 对账兜底双管齐下。无 dirty state。Next: worker 从 F1.1 开始 claim。
@@ -660,6 +662,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - **2026-07-13 · Codex（F5.4 completion）**：完成 `e08be3e`。`AnalysisContext` 新增可选 `onChunkPersisted`，唯一 `mergeAndPersist` 在 analysis 与 summary 都写盘后 await 它；`runAnalysisWithBusy` 注入既有 `refreshCancellationSidebar`，因此每个成功或 fallback chunk 均只执行 `dashboardProvider.update()`，不触及 workbench rebuild。回归测试用两个 chunk 在回调中读取分析文件，确认回调逐 chunk 触发且可观察到已落盘结果。验收：`npm run compile` 零错误、定向 42/42、完整 `npm test` 424/424、`git diff --check` 均通过；代码审查未发现 P0/P1/P2。Manual：**needs user validation on real VS Code**，分析 20+ 封邮件，首个 chunk 完成后确认 sidebar 分类已出现部分结果，且 workbench 阅读/草稿未被打断。Known issues：真实 VS Code 刷新时序待用户确认。Next：F5 全部完成，等待下一轮计划或验证反馈。
 
+- **2026-07-13 · Codex（F6.1 + F6.2 pre-work checkpoint）**：恢复现场：F5 的 VSIX 已提交并推送（`2a883e8`），规划者 F6 计划更新为 HEAD `0be0138`，工作树干净；按 F6 明确允许合并 claim F6.1/F6.2。已重新定位 `workbench-render.ts`：F5.1 遗留 `.wb-with-body { height: 100%; min-height: 100% }`、`.wb-original-section` 的 shrink/hidden 与 `.wb-body` 的 shrink/internal scroll 均仍成立；`.wb-meta-grid` 下边线与 `.wb-actions` 上边线相邻，thread spotlight/timeline 还各有上边线，pending 正文无标签。边界：严格按 F6.1 CSS 处方修正，并只统一邮件/线程详情的分隔结构与 pending 正文标签；会议按钮位置保留给 F6.3，不改 store/schema/工作流。F6.1 完成前必须进行 Extension Development Host 三视图目视验证，不能以单测替代。
+
+- **2026-07-14 · Codex（F6.1 + F6.2 completion）**：完成 `0a44b9b`。严格采用处方：删除 `.wb-with-body` 的 `height:100%` 与 F5.1 的 `.wb-mail-with-body` 规则；原文区/正文改为 `flex: 1 0 auto`，正文最小高 140px，不再自身滚动，滚动由 `.wb-pane` 承担。统一邮件/线程结构为 metadata → 单线 → actions → 单线 → 内容，pending 补原文标签；会议按钮位置仍留 F6.3。按用户追加的验证需求，sample 新增 `Long body layout verification`，24 行正文，且不改 digest/store 结构。验收：`npm run compile` 零错误、布局定向 40/40、完整 `npm test` 426/426、`git diff --check`、mail VBS `--help`/`--sample` 均通过。Manual：**Extension Development Host 已验证**：未分析单封、已分析单封、线程三视图短内容完整可读且留有空余；长 sample 显示完整并由整个 Workbench 滚动（这是 F6.1 处方指定行为，非原文容器滚动）。Known issues：无新增。Next：claim F6.3/F6.4/F6.5。
+
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
 > 前置：安装重新打包后的 `releases/easymail-0.3.0.vsix`（含全部 F 批改动）。结果列填 ✅ / ❌ / ⏭️，❌ 请附现象与相关日志行（日志：globalStorage 下 `logs/easy-mail.log`）。
@@ -778,7 +784,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 > F5 复验结论：F5.2/F5.3/F5.4 通过（F5.2 留一个按钮位置小优化）；**F5.1 第三次失败且更严重**。规划者已通读 workbench-render 全部布局代码，F6.1 不再让 worker 自行设计方案——按处方照改，并且必须在 Extension Development Host 目视验证三种视图后才允许标记完成。
 
-### [ ] F6.1 已分析邮件原文区（三修，P1，处方式修复）
+### [x] F6.1 已分析邮件原文区（三修，P1，处方式修复）
 
 - **失败根因（规划者定位，两轮修复都在错误模型上加码）**：`.wb-reader.active .wb-with-body` 同时设了 `height: 100%; min-height: 100%`——卡片被**钳死在视口高度**。pending 单封的固定内容少、弹性只有正文，看起来正常；analyzed 卡片固定内容（标题+meta+按钮+summary/reason/action 三区+草稿框）本身超过一屏，`.wb-original-section { flex: 1 1 auto; min-height: 0 }` 的原文区被 flex 压缩到近零，F5.1 又补了 `overflow: hidden`，于是"只剩 body 标签上半截"。
 - **处方（照改，不要再发明新模型）**：
@@ -788,11 +794,27 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   4. F5.1 加的 `.wb-mail-with-body { flex: 1 1 auto; height: auto; min-height: 0 }` 整行删除（新模型下无用）。
 - **完成门槛（缺一不可）**：① 布局单测更新；② `npm test` 全绿；③ **worker 在 Extension Development Host 加载 sample 数据，逐一打开"未分析单封 / 已分析单封 / 线程"三种详情，确认原文完整可读、短内容撑满、长内容随面板滚动，并把三种视图的观察结果写进 Completion Notes**——仅凭单测通过不得标记完成。
 
-### [ ] F6.2 Workbench 详情区结构统一（用户反馈#5，P2；与 F6.1 同文件，允许同 worker 合并 claim）
+- Completion Notes（2026-07-14）：
+  - 改动文件：`src/lib/workbench-render.ts`、`scripts/collect-outlook-mails.vbs`、`src/test/workbench-render.test.ts`、`src/test/collector-scripts.test.ts`。
+  - 实现边界：严格应用 CSS 处方，正文改由整个 `.wb-pane` 滚动；为覆盖长正文验证，新增 24 行 sample。未改 digest/store/schema 或采集逻辑。
+  - 验收结果：`npm run compile` 零错误、布局定向 40/40、完整 `npm test` 426/426、`git diff --check`、mail VBS `--help`/`--sample` 均通过。
+  - Manual validation：Extension Development Host 中已验证未分析单封、已分析单封、线程三视图；短内容完整可读且撑满，长 sample 随 Workbench 滚动。
+  - Known issues：无新增。
+  - Commit：`0a44b9b`。
+
+### [x] F6.2 Workbench 详情区结构统一（用户反馈#5，P2；与 F6.1 同文件，允许同 worker 合并 claim）
 
 - **现状**：详情区出现双横线且顺序混乱（metadata → 横线 → 横线 → 按钮 → 正文框；线程更甚：metadata → 横线 → 横线 → 按钮 → 横线 → Timeline）。来源：`.wb-meta-grid` 底部边线与 `.wb-actions { border-top }` 叠加、各 section 边线不统一。
 - **目标结构（所有详情视图统一）**：标题+metadata → **单横线** → 按钮区 → **单横线** → 内容区（analyzed：summary/reason/action/草稿/`原文:` 标签+正文框；pending：`原文:` 标签+正文框；线程：Timeline(n)…）。pending 单封的正文框上方补 `原文:`/`Body:` 标签与 analyzed 一致。
 - **验收**：渲染单测断言无相邻双横线结构；`npm test` 全绿。**needs user validation**：三种视图结构目视符合上述顺序。
+
+- Completion Notes（2026-07-14）：
+  - 改动文件：`src/lib/workbench-render.ts`、`src/test/workbench-render.test.ts`。
+  - 实现边界：metadata 去掉底线；actions 负责前后两条唯一分隔线；thread spotlight/timeline 去额外顶线，pending 补原文标签。会议按钮重排留给 F6.3。
+  - 验收结果：结构与布局定向 40/40、完整 `npm test` 426/426、`git diff --check` 通过。
+  - Manual validation：Extension Development Host 三种邮件/线程详情结构已目视验证。
+  - Known issues：无新增。
+  - Commit：`0a44b9b`。
 
 ### [ ] F6.3 会议详情 Open in Outlook 按钮位置（用户反馈#2，P2）
 
