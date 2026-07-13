@@ -530,7 +530,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-13 · F5.2 已完成，代码提交 `708e4c4`：Workbench 接收 meetingStore，点击会议可按 EntryID 聚焦详情；补参会人字段，未响应优先、余项按开始时间倒序。真实 VS Code/Outlook 验证待用户执行。下一步按序 claim F5.3。
 
-- 2026-07-13 · F5.3 已完成，代码提交 `8037ec3`：folder picker 保留原有 title，进度 message 按界面语言只显示一句简洁的 Outlook 启动提示；中英文均有回归覆盖。真实 VS Code 验证待用户执行。下一步按序 claim F5.4。
+- 2026-07-13 · F5.3 已完成，代码提交 `722ecb3`：folder picker 保留原有 title，进度 message 按界面语言只显示一句简洁的 Outlook 启动提示；中英文均有回归覆盖。真实 VS Code 验证待用户执行。下一步按序 claim F5.4。
 
 ## 6. Handover Log
 
@@ -652,7 +652,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - **2026-07-13 · Codex（F5.3 pre-work checkpoint）**：恢复现场：F5.2 代码与记录已提交（`708e4c4`、`431983a`），HEAD `431983a`；本 step claim 已写入，除此以外工作树干净。已重新定位 `selectFolders`：Notification title 已是 `Loading Outlook folders…`，但进度 message 同时包含启动提示和第二段 `Loading Outlook and reading mail folders…`，与 title 重复；现有回归测试固化该冗长英文。边界：只将 message 改为按现有 `outputLanguage` 输出的一句简洁提示并更新覆盖中英文的测试；不改枚举、超时、QuickPick、store/schema 或 F5.4。
 
-- **2026-07-13 · Codex（F5.3 completion）**：完成 `8037ec3`。`selectFolders` 的 Notification title 保持 `Loading Outlook folders…`；message 改为 en-US `Tip: starting Outlook first makes this faster.` 或 zh-CN `提示：先启动 Outlook 可加快加载。`，不再重复 Loading。回归测试分别锁定两种语言各仅一条提示。验收：`npm run compile` 零错误、定向 15/15、完整 `npm test` 424/424、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，运行 folder picker，确认通知为 title 加单句本地化提示。Known issues：无新增；真实通知排版待真机确认。Next：claim F5.4。
+- **2026-07-13 · Codex（F5.3 completion）**：完成 `722ecb3`。`selectFolders` 的 Notification title 保持 `Loading Outlook folders…`；message 改为 en-US `Tip: starting Outlook first makes this faster.` 或 zh-CN `提示：先启动 Outlook 可加快加载。`，不再重复 Loading。回归测试分别锁定两种语言各仅一条提示。验收：`npm run compile` 零错误、定向 15/15、完整 `npm test` 424/424、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，运行 folder picker，确认通知为 title 加单句本地化提示。Known issues：无新增；真实通知排版待真机确认。Next：claim F5.4。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -743,7 +743,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - 验收结果：`npm run compile` 零错误、定向 15/15、完整 `npm test` 424/424、`git diff --check` 均通过。
   - Manual validation：**needs user validation on real VS Code**：执行 Select Outlook Folders，确认通知显示 `Loading Outlook folders…` 加一条简洁本地化提示，且没有第二段 Loading。
   - Known issues：真实 VS Code Notification 的视觉换行尚待用户确认。
-  - Commit：`8037ec3`。
+  - Commit：`722ecb3`。
 
 ### [ ] F5.4 分析结果按 chunk 增量进入分类（用户新确认#2，P2 体验）
 
