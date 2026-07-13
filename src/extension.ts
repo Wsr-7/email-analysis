@@ -886,6 +886,9 @@ export class EasyMailApp {
   public async selectFolders(): Promise<void> {
     const config = await this.readConfig();
     const currentFolders = normalizeMailFolders(config.folders, ["Inbox", "Sent Items"]).map(String);
+    const folderLoadingTip = getLocaleFromConfig(config) === "zh-CN"
+      ? "提示：先启动 Outlook 可加快加载。"
+      : "Tip: starting Outlook first makes this faster.";
     const scriptPath = await this.findScript("collect-outlook-mails.vbs");
     const outputPath = path.join(this.context.globalStorageUri.fsPath, "outlook-folder-list.txt");
     let folderList;
@@ -895,7 +898,7 @@ export class EasyMailApp {
       folderList = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Loading Outlook folders…" },
         async (progress) => {
-          progress.report({ message: "Start Outlook first to significantly speed up folder loading. Loading Outlook and reading mail folders…" });
+          progress.report({ message: folderLoadingTip });
           await runProcess("cscript.exe", ["//nologo", scriptPath, "--list-folders", "--output", outputPath], 90000, (event, data) => {
             void this.log(`listFolders:${event}`, data);
           });

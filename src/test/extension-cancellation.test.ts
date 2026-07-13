@@ -94,7 +94,7 @@ test("runWithBusy reports cancellation immediately without changing cancellation
   assert.deepEqual(informationMessages, ["EasyMail: Cancelling… Waiting for the current request to finish."], "a cancelled task must not show its completion toast");
 });
 
-test("folder picker tells the user to start Outlook before listing folders", async () => {
+test("folder picker shows one concise English Outlook startup tip", async () => {
   progressMessages.length = 0;
   const globalStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), "easy-mail-test-"));
   const app = new EasyMailApp({ globalStorageUri: { fsPath: globalStoragePath }, extensionPath: "", subscriptions: [] });
@@ -106,7 +106,26 @@ test("folder picker tells the user to start Outlook before listing folders", asy
   processRunner.runProcess = async () => { throw new Error("stop after progress"); };
   try {
     await (app as any).selectFolders();
-    assert.deepEqual(progressMessages, ["Start Outlook first to significantly speed up folder loading. Loading Outlook and reading mail folders…"]);
+    assert.deepEqual(progressMessages, ["Tip: starting Outlook first makes this faster."]);
+  } finally {
+    processRunner.runProcess = originalRunProcess;
+    fs.rmSync(globalStoragePath, { recursive: true, force: true });
+  }
+});
+
+test("folder picker shows one concise Chinese Outlook startup tip", async () => {
+  progressMessages.length = 0;
+  const globalStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), "easy-mail-test-"));
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: globalStoragePath }, extensionPath: "", subscriptions: [] });
+  const processRunner = require("../lib/process-runner") as { runProcess: () => Promise<void> };
+  const originalRunProcess = processRunner.runProcess;
+  (app as any).readConfig = async () => ({ folders: ["Inbox"], outputLanguage: "zh-CN" });
+  (app as any).findScript = async () => "collector.vbs";
+  (app as any).log = async () => {};
+  processRunner.runProcess = async () => { throw new Error("stop after progress"); };
+  try {
+    await (app as any).selectFolders();
+    assert.deepEqual(progressMessages, ["提示：先启动 Outlook 可加快加载。"]);
   } finally {
     processRunner.runProcess = originalRunProcess;
     fs.rmSync(globalStoragePath, { recursive: true, force: true });
