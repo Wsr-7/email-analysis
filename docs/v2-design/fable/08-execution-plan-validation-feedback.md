@@ -383,11 +383,19 @@
   - Known issues：无真实 Outlook COM 环境可直接验证。
   - Commit：`c75063d`。
 
-### [ ] F4.4 取消中状态在真实环境不显示（§7#8 复验仍失败，P1）
+### [x] F4.4 取消中状态在真实环境不显示（§7#8 复验仍失败，P1，commit `d43062b`）
 
 - **现象**：点取消后无"正在取消"提示，约十几秒后直接出现"任务已取消"。F1.7 的 cancelling 态单测通过但真实环境不可见。
 - **做法**：在 Extension Development Host 实际复现，排查链路：`withProgress` 取消回调 → busy kind 切换 → `refreshCancellationSidebar` 是否执行、sidebar label 是否映射并被看见、是否被后续刷新覆盖。另外**在取消瞬间追加一条不依赖 sidebar 重渲染的即时反馈**（如 status bar message / information toast "正在取消，等待当前请求返回…"）作为兜底。Completion Notes 写明真实根因。
 - **验收**：`npm test` 全绿。**needs user validation**：点取消 ≤1s 内可感知"正在取消"反馈。
+
+- **Completion Notes**：
+  - 改动文件：`src/extension.ts`、`src/test/extension-cancellation.test.ts`。
+  - 实现边界：取消回调保留 progress 与 Sidebar cancelling 更新，并在可取消任务时同步显示 `EasyMail: Cancelling… Waiting for the current request to finish.`；不可取消任务不显示该提示。未改取消 token、分析流程、store/schema。
+  - 验收结果：即时反馈断言在旧代码实际 RED；review 发现不可取消任务误提示 P1，补 `cancellable` 守卫与回归测试后复审通过。`npm run compile` 零错误，定向 12/12、全量 `npm test` 413/413、`git diff --check` 通过。
+  - Manual validation：**needs user validation on real Extension Development Host/VS Code**。分析中点取消，确认 ≤1s 出现即时 toast，任务返回后仍显示既有取消结果且不出现成功 toast。
+  - Known issues：真实宿主未在本机运行，无法验证 toast 的视觉时序。
+  - Commit：`d43062b`。
 
 ### [ ] F4.5 Workbench 布局三处修复（§7#11 残留，P2）
 
@@ -560,6 +568,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.3 pre-work checkpoint）**：恢复现场：F4.2 代码与记录已提交（`897fcbd`、`a528d0c`），工作树干净；HEAD `a528d0c`。已重新定位 `IsSentFolder`：在 `On Error Resume Next` 区域内，循环直接把 `SafeString(current.EntryID)` 放进块 If 条件（`collect-outlook-mails.vbs:528-531`）；上溯至没有 `EntryID` 的 COM 对象时错误会落入 Then，导致非 Sent folder 误判。`sentEntryId` 空值已有防线，但 current EntryID 仍未分离读取。边界：仅在此 VBS 的 COM 属性读取守护与同类 If 条件审查范围内修复；不动采集参数、digest/store/schema 或 F4.4。
 
 - **2026-07-13 · Codex（F4.3 completion）**：完成 `c75063d`。`IsSentFolder` 读取 `current.EntryID` 后先检查错误，读取失败即清除并停止上溯，再比较普通变量；同文件唯一同类 `recipient.Type` 条件同步改为变量读取与错误检查。静态回归测试分别在旧写法实际 RED，review 通过。验收：`npm run compile` 零错误、`npm test` 412/412、mail VBS `--help`/`--sample`、`git diff --check` 均通过。Manual：**needs user validation on real Outlook**，确认 Inbox `timeProperty=ReceivedTime` 且 Sent Items 仍为 `SentOn`。Next：claim F4.4。
+
+- **2026-07-13 · Codex（F4.4 pre-work checkpoint）**：恢复现场：F4.3 代码与补全记录已提交（`c75063d`、`49ff7a2`、`b24e633`），工作树干净；HEAD `b24e633`。已重新定位现有链路：取消回调已把 busy 切为 `cancelling`、更新 progress，并仅调用 `dashboardProvider.update()`（`extension.ts:737-742`、`771-777`）；Sidebar 已映射 cancelling 文案（`sidebar-render.ts:234-236`），单测只验证 update 被调用。真机仍不可见，故按计划保留现有 sidebar 路径并在取消瞬间增加独立即时反馈，避免依赖 webview 重渲染。边界：仅 F4.4 取消反馈与回归测试；不改取消 token、分析逻辑、store/schema 或 F4.5。
 
 ---
 
