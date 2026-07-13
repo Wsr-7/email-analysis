@@ -1,6 +1,7 @@
 import type { AnalysisResult } from "./analysis-schema";
 import { parseClassificationLevel, parseFolders } from "./config-utils";
 import type { StoredMail } from "./mail-store";
+import type { SecurityGateDecisionResult } from "./security-types";
 
 export interface MailClassification {
   mailId: string;
@@ -80,7 +81,8 @@ export function buildQueueState(
   classifications: ClassificationCache,
   autoAnalyzeEnabled: boolean,
   maxAutoLevel: unknown,
-  ignoredSenders: unknown = []
+  ignoredSenders: unknown = [],
+  securityDecisions: ReadonlyMap<string, SecurityGateDecisionResult> = new Map()
 ): AnalysisQueueState {
   const analysedIds = new Set((analysis.items || []).map((item) => item.mailId));
   const ignored = new Set(ignoredIds || []);
@@ -92,7 +94,7 @@ export function buildQueueState(
   const pending = storeItems.filter((item) => !analysedIds.has(item.mailId) && !ignored.has(item.mailId) && !ignoredBySender.has(item.mailId));
   const allowed = pending.filter((item) => {
     const classification = classificationById.get(item.mailId);
-    return Number(classification?.level || 0) <= allowedMaxLevel;
+    return Number(classification?.level || 0) <= allowedMaxLevel && securityDecisions.get(item.mailId)?.decision !== "block";
   });
   const blocked = pending.filter((item) => !allowed.includes(item));
   const analysed = storeItems.filter((item) => analysedIds.has(item.mailId) && !ignored.has(item.mailId));

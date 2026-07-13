@@ -69,6 +69,23 @@ test("buildQueueState uses max classification level, not obsolete auto analyze f
   assert.equal(queue.allowed[0].mailId, "mail-1");
 });
 
+test("buildQueueState puts a hard-block mail in the blocked queue", () => {
+  const cache = ensureClassifications(mails, normalizeClassificationCache({}));
+  const queue = buildQueueState(
+    mails,
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    [],
+    cache,
+    true,
+    2,
+    [],
+    new Map([["mail-1", { decision: "block" } as any]])
+  );
+
+  assert.deepEqual(queue.allowed.map((item) => item.mailId), []);
+  assert.deepEqual(queue.blocked.map((item) => item.mailId).sort(), ["mail-1", "mail-2"]);
+});
+
 test("buildQueueState accepts classification level labels from settings", () => {
   const registeredMail: StoredMail = {
     ...mails[0],

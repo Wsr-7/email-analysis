@@ -1261,7 +1261,8 @@ export class EasyMailApp {
       classifications,
       true,
       config.autoAnalyzeMaxClassificationLevel,
-      config.ignoredSenders
+      config.ignoredSenders,
+      securityDecisions
     );
     const state = buildDashboardState(config, digest, analysis, ignoredIds, allowedCategoryIds(promptConfig), securedThreadStore) as LoadedDashboardState;
     state.modelInfo = await this.data.readModelInfo();

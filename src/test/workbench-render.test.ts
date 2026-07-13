@@ -136,6 +136,8 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(!html.includes('data-action="analyzeSelected" data-mail-id="block-1"'));
     assert.ok(html.includes("Manual Confirmation Required"));
     assert.ok(html.includes("Requires manual confirmation"));
+    assert.ok(html.includes("Blocked by security gate"));
+    assert.ok(html.includes("Hard block"));
     assert.ok(html.includes("wb-gate-reason"));
     assert.ok(html.includes("post('analyzeSelected', { mailIds: [t.getAttribute('data-mail-id') || ''] })"));
   });

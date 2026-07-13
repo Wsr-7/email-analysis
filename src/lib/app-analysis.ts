@@ -237,7 +237,8 @@ export async function analyzeBatchCore(
     classificationCache,
     true,
     config.autoAnalyzeMaxClassificationLevel,
-    config.ignoredSenders
+    config.ignoredSenders,
+    securityDecisions
   );
   const batchSize = typeof selection === "number" ? Math.max(1, Math.floor(selection)) : 5;
   const requestedBatch = Array.isArray(selection)

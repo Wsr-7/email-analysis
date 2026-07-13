@@ -143,6 +143,36 @@ describe("analyzeBatchCore", () => {
     }
   });
 
+  it("does not send an explicitly selected hard-block mail to the model", async () => {
+    const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
+    try {
+      const data = new AppDataStore({ globalStoragePath, extensionPath: process.cwd() });
+      await data.ensureConfig();
+      await fs.mkdir(data.getDataDir(), { recursive: true });
+      await data.writeMailStore({ generatedAt: "", lastPullAt: "", items: [{ ...mail(1), bodyExcerpt: "The password is attached." }] });
+      await data.writeMailIndex(emptyMailIndex());
+      await data.writeIgnoredIds([]);
+      await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model" }]);
+      const provider = new MockProvider({ responses: [analysisResponse("mail-001")] });
+
+      await assert.rejects(
+        () => analyzeBatchCore({
+          data,
+          llmProvider: provider,
+          extensionPath: process.cwd(),
+          readConfig: async () => ({ autoAnalyzeMaxClassificationLevel: 2, hardBlockKeywords: ["password"], modelFamily: "mock-model", outputLanguage: "en-US", analysisRetentionDays: 365 }),
+          log: async () => {},
+          availableModelsCache: null
+        }, ["mail-001"]),
+        /No mail is available/
+      );
+
+      assert.equal(provider.prompts.length, 0);
+    } finally {
+      await fs.rm(globalStoragePath, { recursive: true, force: true });
+    }
+  });
+
   it("allows an explicitly selected ignored sender to be re-analyzed", async () => {
     const globalStoragePath = await fs.mkdtemp(path.join(os.tmpdir(), "easy-mail-test-"));
     try {
