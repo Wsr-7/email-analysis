@@ -667,12 +667,51 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 | # | 验证点（来源） | 操作方法 | 预期结果 | 结果 |
 |---|---|---|---|---|
-| 1 | **Meetings 队列（F4.1，重点）** | 先 Generate Sample Digest 看队列，再真实 Outlook 拉取 | sample 显示 6 条会议（未响应排前）；真实拉取显示今天/未来实例与未响应邀请 | |
-| 2 | **自动草稿（F4.2，重点）** | 分析一批含需回复邮件；再对一封已在 workbench 打开过的邮件做分析 | 需回复邮件草稿框自动带模型草稿（两种场景都不丢）；Notice 类留空显示 Generate Draft | |
-| 3 | **注入邮件（F4.9，重点）** | 重析注入测试邮件（或直接刷新查看） | 出现在 Ignored 队列，带完整 summary/evidence；手动 ignore 其他邮件不回归 | |
-| 4 | Inbox 时间属性（F4.3） | Fetch 后看日志 FolderScan 行 | Inbox 行 `timeProperty=ReceivedTime`；Sent Items 行仍 `SentOn` | |
-| 5 | 取消反馈（F4.4） | 分析进行中点取消 | ≤1s 出现 "Cancelling…" toast 与进度文案变化，无成功 toast，结束后复原 | |
-| 6 | Workbench 布局（F4.5） | 用 sample 短邮件打开单封与线程详情 | reader 占满 workbench 宽度；无 placeholder 残影叠字；单封原文容器自适应 | |
-| 7 | Guide 重装（F4.6） | 卸载后重装同版本 vsix 并激活 | Guide 再次弹出；同一安装内重启 VS Code 不重复弹 | |
-| 8 | Details 无外链（F4.7） | 看扩展详情页 Details | 内容来自本地版（无 GitHub/releases 等超链接可点） | |
-| 9 | 分析进度（F4.8） | 分析 20+ 封（多 chunk） | 进度显示 `chunk i/N（约剩 X 分钟）`；folder picker 一打开就有"先启动 Outlook"提示 | |
+| 1 | **Meetings 队列（F4.1，重点）** | 先 Generate Sample Digest 看队列，再真实 Outlook 拉取 | sample 显示 6 条会议（未响应排前）；真实拉取显示今天/未来实例与未响应邀请 | 真实数据和示例数据里面的内容已经可以正常展示，可以看到已接受、组织者、未回复或暂定等状态。但是点击某个会议之后，他们是不会有任何内容的，设计如此吗？可是这样不就没有办法跳回outlook或者无法看到邀请详情/对应邀请邮件吗？会议只有一个sidebar 的展示? 如果就是这样的，这个会议队列的功能也太尴尬了。还有一个小问题：邮件那边所有的邮件都是倒序排序，但是会议又是顺序排序。它们应该都统一成倒序排序。 |
+| 2 | **自动草稿（F4.2，重点）** | 分析一批含需回复邮件；再对一封已在 workbench 打开过的邮件做分析 | 需回复邮件草稿框自动带模型草稿（两种场景都不丢）；Notice 类留空显示 Generate Draft | 分析之后在 must handle today 和 follow-up 这些分类里面，都还是没有立刻出现已经生成的草稿。我不确定是这些邮件的内容本身就不需要回复，还是其他什么原因，但我确实没有看到自动生成任何草稿。不过，示例数据的草稿是可以自动生成的。所以我会先观察一下，暂时不会把它当成一个 bug。 |
+| 3 | **注入邮件（F4.9，重点）** | 重析注入测试邮件（或直接刷新查看） | 出现在 Ignored 队列，带完整 summary/evidence；手动 ignore 其他邮件不回归 | 正常 |
+| 4 | Inbox 时间属性（F4.3） | Fetch 后看日志 FolderScan 行 | Inbox 行 `timeProperty=ReceivedTime`；Sent Items 行仍 `SentOn` | 正常。 |
+| 5 | 取消反馈（F4.4） | 分析进行中点取消 | ≤1s 出现 "Cancelling…" toast 与进度文案变化，无成功 toast，结束后复原 | 正常。 |
+| 6 | Workbench 布局（F4.5） | 用 sample 短邮件打开单封与线程详情 | reader 占满 workbench 宽度；无 placeholder 残影叠字；单封原文容器自适应 | 我觉得你可能把单封邮件原文展示的 size（宽度）改坏了。现在它们全都是很窄的只能看到第一行字而且滚动不下去，这可能有问题，你检查一下。但是未分析邮件还有线程邮件里面的原文却是正常，只有被分析之后的单封邮件的原文展示有问题。这个问题在示例数据还有真实数据上都有。即使示例数据的正文只有一行字，在单封邮件的原文展示中，都只能看到一行文字的上半截.顺便把示例邮件的正文都写成多行的，而不是全部只有一行字。 |
+| 7 | Guide 重装（F4.6） | 卸载后重装同版本 vsix 并激活 | Guide 再次弹出；同一安装内重启 VS Code 不重复弹 | 正常。 |
+| 8 | Details 无外链（F4.7） | 看扩展详情页 Details | 内容来自本地版（无 GitHub/releases 等超链接可点） | 这个没问题，已经没有超链接了。我想知道它是对应哪个文件？如果我想手动改，或者我到时候加图片，我要加到哪里？ |
+| 9 | 分析进度（F4.8） | 分析 20+ 封（多 chunk） | 进度显示 `chunk i/N（约剩 X 分钟）`；folder picker 一打开就有"先启动 Outlook"提示 | 进度显示这个正常，但是 folder select 的toast 目前是: Loading Outlook folders...: Start Outlook first to significantly<br/>speed up folder loading. Loading Outlook and reading mail<br/>folders... 重复且啰嗦.前面已有 Loading Outlook folders... 后面为什么还需要Loading Outlook and reading mail<br/>。写得简洁和专业一些。 |
+
+---
+
+## 9. Milestone F5 — 第三轮验证反馈批（2026-07-13，§8 结果 + 两条新确认）
+
+> 来源：用户回填 §8（#3/#4/#5/#7/#8/#9 主体通过）+ 两条新问题。F5.1 为 F4.5 引入的回归（P1），其余为交互补全与文案打磨。互相独立。
+
+### [ ] F5.1 已分析单封邮件的原文容器被 F4.5 改坏（§8#6，P1 回归）
+
+- **现象**：被分析后的单封邮件详情里，原文展示框变得极窄——只能看到一行字的上半截且无法滚动；未分析邮件与线程详情的原文正常；sample 与真实数据均复现。
+- **定位线索**：F4.5（`8f3e9d6`）统一改了 reader/detail 容器与 `.wb-body` 宽高规则，`renderAnalysisDetail` 的原文区（analyzed 路径与 pending 路径用的不是同一段模板）受了牵连。修复后三处（pending 单封 / analyzed 单封 / 线程）原文区行为必须一致：占满可用宽度、高度自适应填充剩余空间、内容超出时内部滚动。
+- **顺带**：sample 邮件正文全部改为多行文本（现在都是单行，掩盖此类布局问题），`WriteSampleDigest` 的 bodyExcerpt 用 `\n`（vbCrLf）写 3-5 行。
+- **验收**：渲染单测覆盖 analyzed 单封原文区样式；`npm test` 全绿；`--sample` 不回归。**needs user validation**：分析后的单封邮件原文可完整阅读、可滚动。
+
+### [ ] F5.2 Meetings 点击无详情 + 排序统一（§8#1，P2 交互补全）
+
+- **现象**：会议在 sidebar 正常展示，但点击后 workbench 无任何内容——无法看会议详情、无法跳回 Outlook 看邀请邮件。用户评价"只有 sidebar 展示的话功能太尴尬"。
+- **定位线索**：`workbench-render.ts` 已存在 `wb-mtg-*` 样式（暗示会议详情渲染曾规划或部分存在）；sidebar 会议行 `openItem(entryId)` 走 `openInWorkbench`——排查 workbench 是否为会议构建 reader、id 用的是 meetingId 还是 entryId、路由是否匹配。
+- **做法**：① 点击会议 → workbench 显示会议详情（主题/起止时间/地点/组织者/必选与可选参会人/响应状态/正文摘要）；② 详情带 **Open in Outlook** 按钮——复用现有按 EntryID 打开条目的 VBS（`GetItemFromID` 对 AppointmentItem 同样有效，真机验证）；③ 排序：未响应仍排最前，其余按开始时间**倒序**（用户要求与邮件列表统一；注：升序=最近的会议在前是日历惯例，若用后觉得不顺手可一行改回，Notes 里注明）。
+- **验收**：渲染/路由单测；`npm test` 全绿。**needs user validation**：点击会议出详情；Open in Outlook 能打开对应日历项/邀请；排序符合预期。
+
+### [ ] F5.3 folder picker 进度文案去重（§8#9，P2 文案）
+
+- **现象**：当前通知为 "Loading Outlook folders...: Start Outlook first to significantly speed up folder loading. Loading Outlook and reading mail folders..."——两段 Loading 重复且啰嗦。
+- **做法**：title 保留 `Loading Outlook folders…`，message 只留一句简洁提示（如 `Tip: starting Outlook first makes this faster.`），删除重复的 "Loading Outlook and reading mail folders..."。中英文一致精简。
+- **验收**：`npm test` 全绿。**needs user validation**：运行命令看一眼文案。
+
+### [ ] F5.4 分析结果按 chunk 增量进入分类（用户新确认#2，P2 体验）
+
+- **前提事实（已核实）**：chunk 之间**没有关联**——`app-analysis.ts:404` 每个 chunk 完成即 `mergeAndPersist`（合并+写盘），analysis-result.json 在分析过程中就是逐 chunk 更新的；缺的只是 UI 刷新（sidebar/workbench 只在 busy 结束的 `finally { refresh() }` 里刷一次）。
+- **做法**：每个 chunk `mergeAndPersist` 后触发一次 **sidebar-only** 更新（复用 `refreshCancellationSidebar` 的模式，走 `dashboardProvider.update()`）；**不要**在分析中途 rebuild workbench（避免打断用户阅读/草稿编辑与 flush 往返）。通过 ctx 回调注入，保持 app-analysis 纯函数性。
+- **验收**：单测（chunk 完成回调触发）；`npm test` 全绿。**needs user validation**：分析 20+ 封时，第一个 chunk 完成后 sidebar 分类里即出现部分结果。
+
+### 第三轮验证问答核实记录（2026-07-13）
+
+- **新确认#1（password/secret 邮件被 hard block）**：确认属设计行为。`buildSecuritySettings`（config-utils.ts:173）内置 `hardBlockKeywords: ["password", "api_key", "access_token", "auth_token"]`，命中即 hard block——**没有 Confirm and Analyze 按钮，凭证类内容任何情况下不送模型**（F2.4 明确保留了该语义）；`secret` 不在 hard block 列表里，它属于分级关键词（命中即 3 级 HIGH REGISTERED，走 manual confirm）。该邮件同时含 password（hard block）与 secret（3 级），hard block 优先。注意：hard block 词表当前为**硬编码**，不可配置——若未来需要按公司环境调整，属 R3 安全设置项，暂不立项。
+- **新确认#2（分块结果能否先进分类）**：能，且比想象的更近——chunk 间无关联、每 chunk 完成即独立合并落盘（这就是为什么 chunk 解析失败只跳过该 chunk），缺的只是中途刷新 UI。已立项 F5.4（sidebar-only 增量刷新，不动 workbench）。
+- **§8#2 观察指引（真实邮件无自动草稿，暂不立案）**：sample 正常、真实为空——大概率是模型对这些邮件判断"无需回复"（prompt 明确指示 "Leave draftReply empty when no reply is needed"，且 auto 路由到的 mini 模型可能更保守）。观察期间可自查：analysis-result.json 中这些邮件的 `draftReply` 字段若为**空串**=模型判断不回，属预期；若字段**缺失**或与 UI 不一致=渲染问题，请回传条目。也可以试固定选择 gpt-5.4（非 auto/mini）再分析对比。
+- **§8#8 答疑（Details 对应文件）**：`docs/marketplace-details.md`。手动修改或将来加图片都改这个文件，改完跑 `npm run package:vsix` 重新打包即可生效（打包命令已固定 `--readme-path docs/marketplace-details.md`）；图片需用打进 vsix 的相对路径（如 `media/` 下）或 base64，不能引用外部 URL。GitHub 的 README.md/README_zh.md 与它互相独立。
