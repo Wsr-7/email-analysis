@@ -1217,48 +1217,48 @@ Sub WriteSampleDigest(byVal outputPath, byRef target)
   recordCount = 0
   Dim record
 
-  Set record = BuildSampleRecord(1, "Approve release decision by 16:00 today", "Maya Chen", "maya.chen@example.com", "Inbox/Release", "high", True, False, "The launch window closes today. Please approve or decline the release decision before 16:00.")
+  Set record = BuildSampleRecord(1, "Approve release decision by 16:00 today", "Maya Chen", "maya.chen@example.com", "Inbox/Release", "high", True, False, "The launch window closes today." & vbCrLf & "Please approve or decline the release decision." & vbCrLf & "The deadline is 16:00 today.")
   record("conversationId") = "sample-thread-release"
   record("conversationIndex") = "0001"
   record("attachmentCount") = 1
   record("attachmentNames") = "release-checklist.pdf"
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(2, ChrW(&H98CE) & ChrW(&H9669) & ChrW(&H63D0) & ChrW(&H9192) & ChrW(&HFF1A) & ChrW(&H751F) & ChrW(&H4EA7) & ChrW(&H8BC1) & ChrW(&H4E66) & ChrW(&H5C06) & ChrW(&H5728) & ChrW(&H4ECA) & ChrW(&H5929) & ChrW(&H5230) & ChrW(&H671F), "Security Operations", "security@example.com", "Inbox/Operations", "high", True, False, "The production certificate expires today. Renew it before customer traffic is affected.")
+  Set record = BuildSampleRecord(2, ChrW(&H98CE) & ChrW(&H9669) & ChrW(&H63D0) & ChrW(&H9192) & ChrW(&HFF1A) & ChrW(&H751F) & ChrW(&H4EA7) & ChrW(&H8BC1) & ChrW(&H4E66) & ChrW(&H5C06) & ChrW(&H5728) & ChrW(&H4ECA) & ChrW(&H5929) & ChrW(&H5230) & ChrW(&H671F), "Security Operations", "security@example.com", "Inbox/Operations", "high", True, False, "The production certificate expires today." & vbCrLf & "Renew it before customer traffic is affected." & vbCrLf & "Use the attached runbook if needed.")
   record("attachmentCount") = 1
   record("attachmentNames") = "certificate-renewal-runbook.pdf"
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(3, "Project Atlas launch decision", "Elena Park, CEO", "elena.park@example.com", "Inbox/Leadership", "high", True, False, "Please share the final recommendation for Project Atlas. I need your decision for the executive review.")
+  Set record = BuildSampleRecord(3, "Project Atlas launch decision", "Elena Park, CEO", "elena.park@example.com", "Inbox/Leadership", "high", True, False, "Please share the final recommendation for Project Atlas." & vbCrLf & "I need your decision for the executive review." & vbCrLf & "Please include the main tradeoffs.")
   record("conversationId") = "sample-thread-release"
   record("conversationIndex") = "0002"
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(4, "Re: Project Atlas launch decision", "Daniel Wu", "daniel.wu@example.com", "Inbox/Leadership", "high", True, True, ChrW(&H8BF7) & ChrW(&H5728) & ChrW(&H4ECA) & ChrW(&H5929) & ChrW(&H5341) & ChrW(&H4E03) & ChrW(&H70B9) & ChrW(&H524D) & ChrW(&H786E) & ChrW(&H8BA4) & ChrW(&H9879) & ChrW(&H76EE) & ChrW(&H53D1) & ChrW(&H5E03) & ChrW(&H51B3) & ChrW(&H5B9A) & ChrW(&H3002) & "The regional team is waiting for your response.")
+  Set record = BuildSampleRecord(4, "Re: Project Atlas launch decision", "Daniel Wu", "daniel.wu@example.com", "Inbox/Leadership", "high", True, True, ChrW(&H8BF7) & ChrW(&H5728) & ChrW(&H4ECA) & ChrW(&H5929) & ChrW(&H5341) & ChrW(&H4E03) & ChrW(&H70B9) & ChrW(&H524D) & ChrW(&H786E) & ChrW(&H8BA4) & ChrW(&H9879) & ChrW(&H76EE) & ChrW(&H53D1) & ChrW(&H5E03) & ChrW(&H51B3) & ChrW(&H5B9A) & ChrW(&H3002) & vbCrLf & "The regional team is waiting for your response." & vbCrLf & "Please reply with the final decision.")
   record("conversationId") = "sample-thread-release"
   record("conversationIndex") = "0003"
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(5, "Re: Project Atlas launch decision", "Maya Chen", "maya.chen@example.com", "Inbox/Leadership", "normal", False, False, "If we defer the launch, please confirm the owner for the customer communication plan.")
+  Set record = BuildSampleRecord(5, "Re: Project Atlas launch decision", "Maya Chen", "maya.chen@example.com", "Inbox/Leadership", "normal", False, False, "If we defer the launch, please confirm the owner." & vbCrLf & "The customer communication plan needs a named lead." & vbCrLf & "Please respond before the announcement.")
   record("conversationId") = "sample-thread-release"
   record("conversationIndex") = "0004"
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(6, ChrW(&H7B49) & ChrW(&H5F85) & ChrW(&H60A8) & ChrW(&H786E) & ChrW(&H8BA4) & ChrW(&H4F9B) & ChrW(&H5E94) & ChrW(&H5546) & ChrW(&H62A5) & ChrW(&H4EF7), ChrW(&H91C7) & ChrW(&H8D2D) & ChrW(&H56E2) & ChrW(&H961F), "procurement@example.com", "Inbox/Procurement", "normal", True, False, "Supplier A can hold the quoted price until Friday. Please confirm whether we should proceed.")
+  Set record = BuildSampleRecord(6, ChrW(&H7B49) & ChrW(&H5F85) & ChrW(&H60A8) & ChrW(&H786E) & ChrW(&H8BA4) & ChrW(&H4F9B) & ChrW(&H5E94) & ChrW(&H5546) & ChrW(&H62A5) & ChrW(&H4EF7), ChrW(&H91C7) & ChrW(&H8D2D) & ChrW(&H56E2) & ChrW(&H961F), "procurement@example.com", "Inbox/Procurement", "normal", True, False, "Supplier A can hold the quoted price until Friday." & vbCrLf & "Please confirm whether we should proceed." & vbCrLf & "The quote is attached for review.")
   record("attachmentCount") = 1
   record("attachmentNames") = "supplier-quote.xlsx"
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(7, "Weekly platform maintenance", "Platform Notifications", "no-reply@example.com", "Inbox/Notice", "normal", False, False, "Scheduled maintenance is planned for Sunday 02:00-03:00 UTC. No action is required unless your team has a conflict.")
+  Set record = BuildSampleRecord(7, "Weekly platform maintenance", "Platform Notifications", "no-reply@example.com", "Inbox/Notice", "normal", False, False, "Scheduled maintenance is planned for Sunday 02:00-03:00 UTC." & vbCrLf & "No action is required unless your team has a conflict." & vbCrLf & "Service status will be updated after completion.")
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(8, ChrW(&H5B63) & ChrW(&H5EA6) & ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H7EF4) & ChrW(&H62A4) & ChrW(&H901A) & ChrW(&H77E5), ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H901A) & ChrW(&H77E5), "platform-notify@example.com", "Inbox/Notice", "normal", False, True, ChrW(&H672C) & ChrW(&H5468) & ChrW(&H672B) & ChrW(&H5C06) & ChrW(&H8FDB) & ChrW(&H884C) & ChrW(&H4F8B) & ChrW(&H884C) & ChrW(&H7EF4) & ChrW(&H62A4) & ChrW(&HFF0C) & ChrW(&H5982) & ChrW(&H6709) & ChrW(&H51B2) & ChrW(&H7A81) & ChrW(&H8BF7) & ChrW(&H8054) & ChrW(&H7CFB) & ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H56E2) & ChrW(&H961F) & ChrW(&H3002))
+  Set record = BuildSampleRecord(8, ChrW(&H5B63) & ChrW(&H5EA6) & ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H7EF4) & ChrW(&H62A4) & ChrW(&H901A) & ChrW(&H77E5), ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H901A) & ChrW(&H77E5), "platform-notify@example.com", "Inbox/Notice", "normal", False, True, ChrW(&H672C) & ChrW(&H5468) & ChrW(&H672B) & ChrW(&H5C06) & ChrW(&H8FDB) & ChrW(&H884C) & ChrW(&H4F8B) & ChrW(&H884C) & ChrW(&H7EF4) & ChrW(&H62A4) & ChrW(&HFF0C) & ChrW(&H5982) & ChrW(&H6709) & ChrW(&H51B2) & ChrW(&H7A81) & ChrW(&H8BF7) & ChrW(&H8054) & ChrW(&H7CFB) & ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H56E2) & ChrW(&H961F) & ChrW(&H3002) & vbCrLf & "Please contact the platform team if you have a conflict." & vbCrLf & "The change window is listed above.")
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(9, "FYI: Workspace beta invitation", "Product Research", "research@example.com", "Inbox/Research", "normal", False, False, "You may want to review the beta workspace proposal. It is unclear whether a response is needed this week.")
+  Set record = BuildSampleRecord(9, "FYI: Workspace beta invitation", "Product Research", "research@example.com", "Inbox/Research", "normal", False, False, "You may want to review the beta workspace proposal." & vbCrLf & "It is unclear whether a response is needed this week." & vbCrLf & "Feedback is welcome if you have time.")
   AddRecordToArray records, recordCount, record
 
-  Set record = BuildSampleRecord(10, "HIGHLY RESTRICTED: acquisition diligence", "Legal Counsel", "legal@example.com", "Inbox/Legal", "high", True, False, "Secret board materials for the acquisition diligence review. Do not forward. Please review the attached documents before the confidential meeting.")
+  Set record = BuildSampleRecord(10, "HIGHLY RESTRICTED: acquisition diligence", "Legal Counsel", "legal@example.com", "Inbox/Legal", "high", True, False, "Secret board materials for the acquisition diligence review." & vbCrLf & "Do not forward these materials." & vbCrLf & "Please review the attachments before the confidential meeting.")
   record("attachmentCount") = 2
   record("attachmentNames") = "diligence-summary.pdf; board-notes.docx"
   AddRecordToArray records, recordCount, record

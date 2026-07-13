@@ -41,7 +41,7 @@ function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabe
   const cls = classifications ? classificationFor(item.mailId, classifications) : undefined;
   const clsFromExtra = extra.includes(labels.pending.classification);
   const clsHtml = cls && !clsFromExtra ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(cls))}</div>` : "";
-  return `<div class="wb-detail-card wb-with-body">
+  return `<div class="wb-detail-card wb-with-body wb-mail-with-body">
     <h3>${escapeHtml(item.subject || item.mailId)}</h3>
     <div class="wb-meta-grid">
       <div class="wb-field" title="${escapeAttr(item.from || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.from || "-"))}</div>
@@ -70,7 +70,7 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
   const ccHtml = originalMail?.cc ? `<div class="wb-field" title="${escapeAttr(originalMail.cc)}"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.cc))}</div>` : "";
   const bodyText = originalMail?.bodyExcerpt || "";
   const bodyHtml = bodyText ? `<div class="wb-section wb-original-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(bodyText)}</div></div>` : "";
-  return `<div class="wb-detail-card wb-with-body">
+  return `<div class="wb-detail-card wb-with-body wb-mail-with-body">
     <div class="wb-detail-header">
       <h3>${escapeHtml(item.subject || item.mailId)}</h3>
       <span class="wb-priority">${escapeHtml(priority)}</span>
@@ -302,13 +302,14 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   /* ── Full-width reading pane ── */
   .wb-pane { height: 100%; overflow-y: auto; }
   .wb-reader { display: none; }
-  .wb-reader.active { display: flex; width: 100%; height: 100%; }
+  .wb-reader.active { display: flex; width: 100%; height: 100%; min-height: 0; }
   .wb-reader.active ~ .wb-placeholder { display: none; }
   .wb-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; opacity: 0.3; font-size: 14px; }
 
   /* Detail card styles */
   .wb-detail-card { width: 100%; padding: 24px 28px; }
   .wb-reader.active .wb-with-body { display: flex; flex-direction: column; height: 100%; min-height: 100%; width: 100%; }
+  .wb-reader.active .wb-mail-with-body { flex: 1 1 auto; height: auto; min-height: 0; }
   .wb-detail-card h3 { font-size: 17px; line-height: 1.4; margin-bottom: 4px; font-weight: 600; }
   .wb-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .wb-detail-header h3 { flex: 1; }
@@ -318,7 +319,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-warn { color: var(--vscode-errorForeground, #f48771); }
   .wb-gate-reasons { display: grid; gap: 2px; margin-top: 2px; }
   .wb-section { margin-bottom: 12px; }
-  .wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; width: 100%; }
+  .wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; width: 100%; overflow: hidden; }
   .wb-section-body { font-size: 13px; line-height: 1.6; padding: 4px 0; opacity: 0.9; }
   .wb-body { flex: 1 1 auto; min-height: 0; width: 100%; font-size: 12px; line-height: 1.7; white-space: pre-wrap; padding: 12px 14px; margin: 8px 0; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; border-left: 3px solid var(--vscode-focusBorder, #007fd4); overflow-y: auto; }
   .wb-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); flex-wrap: wrap; }

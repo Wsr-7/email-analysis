@@ -21,3 +21,13 @@ test("recipient type is read before its guarded comparison", () => {
   assert.doesNotMatch(source, /If recipient\.Type = recipientType Then/);
   assert.match(source, /recipientTypeValue = recipient\.Type\r?\n\s*If Err\.Number = 0 And recipientTypeValue = recipientType Then/);
 });
+
+test("sample mail bodies each contain multiple lines", () => {
+  const source = fs.readFileSync(path.join(process.cwd(), "scripts", "collect-outlook-mails.vbs"), "utf8");
+  const sampleDigest = source.match(/Sub WriteSampleDigest[\s\S]*?End Sub/);
+
+  assert.ok(sampleDigest);
+  const records = sampleDigest[0].match(/^  Set record = BuildSampleRecord.*$/gm) || [];
+  assert.equal(records.length, 10);
+  assert.ok(records.every((record) => (record.match(/vbCrLf/g) || []).length >= 2));
+});

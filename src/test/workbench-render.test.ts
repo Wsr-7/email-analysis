@@ -86,7 +86,7 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes('data-id="m1"'));
     assert.ok(html.includes("Hello"));
-    assert.ok(html.includes("wb-detail-card"));
+    assert.ok(html.includes("wb-detail-card wb-with-body wb-mail-with-body"));
   });
 
   it("renders Analyze before Open in Outlook for an allowed unanalysed mail", () => {
@@ -193,7 +193,7 @@ describe("renderWorkbenchHtml", () => {
   it("fills the active reader width for short content", () => {
     const html = renderWorkbenchHtml(stubInput());
 
-    assert.ok(html.includes(".wb-reader.active { display: flex; width: 100%; height: 100%; }"));
+    assert.ok(html.includes(".wb-reader.active { display: flex; width: 100%; height: 100%; min-height: 0; }"));
   });
 
   it("hides the selection placeholder with display none while a reader is active", () => {
@@ -202,11 +202,12 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes(".wb-reader.active ~ .wb-placeholder { display: none; }"));
   });
 
-  it("uses the remaining reader area for full-width original mail content", () => {
+  it("keeps analyzed original mail in the remaining reader area", () => {
     const html = renderWorkbenchHtml(stubInput());
 
-    assert.ok(html.includes(".wb-reader.active .wb-with-body { display: flex; flex-direction: column; height: 100%; min-height: 100%; width: 100%; }"));
-    assert.ok(html.includes(".wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; width: 100%; }"));
+    assert.ok(html.includes(".wb-reader.active { display: flex; width: 100%; height: 100%; min-height: 0; }"));
+    assert.ok(html.includes(".wb-reader.active .wb-mail-with-body { flex: 1 1 auto; height: auto; min-height: 0; }"));
+    assert.ok(html.includes(".wb-original-section { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; width: 100%; overflow: hidden; }"));
     assert.ok(html.includes(".wb-body { flex: 1 1 auto; min-height: 0; width: 100%;"));
     assert.ok(!html.includes("max-height: 400px"));
   });
@@ -535,6 +536,7 @@ describe("renderWorkbenchHtml", () => {
     });
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes("Original body text here"), "analyzed mail should show original body");
+    assert.ok(html.includes('data-id="a1" data-queue="mustHandleToday"><div class="wb-detail-card wb-with-body wb-mail-with-body">'));
   });
 
   it("places Open in Outlook and Ignore above summary in analyzed detail", () => {
