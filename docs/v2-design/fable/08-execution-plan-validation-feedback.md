@@ -526,6 +526,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 ---
 
+- 2026-07-13 · F5.1 已完成，代码提交 `a293b95`：已分析单封原文的 flex 高度链仅作用于邮件卡片，正文可占用剩余空间并内部滚动；sample 全部改为三行正文。真实 VS Code 验证待用户执行。下一步按序 claim F5.2。
+
 ## 6. Handover Log
 
 - **2026-07-11 · Claude Fable 5（规划者）**：创建本计划。核实过程要点：① `FormatRestrictDate` 在 `collect-outlook-mails.vbs:529` 与 `collect-outlook-meetings.vbs:444` 均以 `\` 拼日期（mail 版还带秒），Outlook Restrict 静默返回 0 → recentHours 空result；meetings 循环无下界守卫 + `pruneMeetingStore`（`meeting-store.ts:71`）剪掉过期已响应会议 → 队列空但 store 有数据。② `FolderScanSummary` 在 `src/` 零引用，采集诊断从未到达 UI。③ 草稿保留依赖 webview `getState` 客户端回填，真机失效，F1.3 改扩展侧持久化。④ `importantSenders` 为 prompt 级模型匹配，无代码匹配——Exchange DN 直接拉低命中，F1.6 从采集源 SMTP 化。⑤ `classification.ts:88` 语义下模型漏返邮件应留 Pending，用户实测消失——F1.2 要求真机复现 + 对账兜底双管齐下。无 dirty state。Next: worker 从 F1.1 开始 claim。
@@ -636,6 +638,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 ---
 
+- **2026-07-13 · Codex（F5.1 pre-work checkpoint）**：恢复现场：第三轮验证计划已提交（`e59906e`），工作树干净；HEAD `e59906e`。已重新定位 F4.5 相关 CSS：pending 单封直接以 `.wb-body` 作为 `.wb-with-body` 的 flex 子项；已分析单封的 `.wb-body` 额外嵌在 `.wb-original-section` 内（`workbench-render.ts:38-73`），而 F4.5 为其同时赋予 flex 与 `min-height:0` 后，父级缺少稳定的可用高度链，故其正文可收缩为一行；线程走独立 `.wb-tl-body`，未受影响。边界：只令 analyzed 单封原文区与 pending/线程一致地占满宽度、在剩余高度内滚动，并让 sample 正文改为 3-5 行；不改 F5.2/F5.3/F5.4、store/schema 或打包。
+
+- **2026-07-13 · Codex（F5.1 completion）**：完成 `a293b95`。邮件卡片新增专用 `wb-mail-with-body`，仅 pending/analyzed 路径获得可收缩的 flex 高度链；分析后的 `.wb-original-section` 隐藏外层溢出，内部 `.wb-body` 继续滚动。会议和线程不命中该新选择器。sample 十封正文均为三行。review 无 P0/P1，并补 analyzed 原文路径的精确模板断言。验收：`npm run compile` 零错误、定向 40/40、全量 `npm test` 420/420、`git diff --check`、mail VBS `--help`/`--sample` 均通过。Manual：**needs user validation on real VS Code**，验证 analyzed 单封正文可读/可滚动。Next：claim F5.2。
+
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
 > 前置：安装重新打包后的 `releases/easymail-0.3.0.vsix`（含全部 F 批改动）。结果列填 ✅ / ❌ / ⏭️，❌ 请附现象与相关日志行（日志：globalStorage 下 `logs/easy-mail.log`）。
@@ -683,12 +689,20 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 > 来源：用户回填 §8（#3/#4/#5/#7/#8/#9 主体通过）+ 两条新问题。F5.1 为 F4.5 引入的回归（P1），其余为交互补全与文案打磨。互相独立。
 
-### [ ] F5.1 已分析单封邮件的原文容器被 F4.5 改坏（§8#6，P1 回归）
+### [x] F5.1 已分析单封邮件的原文容器被 F4.5 改坏（§8#6，P1 回归） — `a293b95`
 
 - **现象**：被分析后的单封邮件详情里，原文展示框变得极窄——只能看到一行字的上半截且无法滚动；未分析邮件与线程详情的原文正常；sample 与真实数据均复现。
 - **定位线索**：F4.5（`8f3e9d6`）统一改了 reader/detail 容器与 `.wb-body` 宽高规则，`renderAnalysisDetail` 的原文区（analyzed 路径与 pending 路径用的不是同一段模板）受了牵连。修复后三处（pending 单封 / analyzed 单封 / 线程）原文区行为必须一致：占满可用宽度、高度自适应填充剩余空间、内容超出时内部滚动。
 - **顺带**：sample 邮件正文全部改为多行文本（现在都是单行，掩盖此类布局问题），`WriteSampleDigest` 的 bodyExcerpt 用 `\n`（vbCrLf）写 3-5 行。
 - **验收**：渲染单测覆盖 analyzed 单封原文区样式；`npm test` 全绿；`--sample` 不回归。**needs user validation**：分析后的单封邮件原文可完整阅读、可滚动。
+
+  - Completion Notes（2026-07-13）：
+    - 改动文件：`src/lib/workbench-render.ts`、`scripts/collect-outlook-mails.vbs`、`src/test/workbench-render.test.ts`、`src/test/collector-scripts.test.ts`。
+    - 实现边界：只为 pending/analyzed 邮件卡片增加 `wb-mail-with-body` 高度链，会议保留既有布局、线程未改；sample 十封正文均改为三行 `vbCrLf`。未进入 F5.2-F5.4、未打包。
+    - 验收结果：渲染断言先 RED 后 GREEN；review 建议补 analyzed+originalMail 的精确模板断言，已补。`npm run compile` 零错误、定向 40/40、完整 `npm test` 420/420、`git diff --check`、mail VBS `--help`/`--sample` 均通过；sample 输出 10/10 至少三行正文。
+    - Manual validation：**needs user validation on real VS Code**：分析后单封邮件原文完整可读、内容超出时仅正文内部滚动；pending/线程不回归。
+    - Known issues：未在真实 VS Code webview 中观察布局。
+    - Commit：`a293b95`。
 
 ### [ ] F5.2 Meetings 点击无详情 + 排序统一（§8#1，P2 交互补全）
 
