@@ -325,6 +325,8 @@ export async function analyzeBatchCore(
       const averageChunkMs = completedChunkElapsedMs / index;
       const remainingMinutes = Math.ceil((averageChunkMs * (chunks.length - index)) / 60000);
       ctx.progress?.(`Analyzing chunk ${index + 1}/${chunks.length} (about ${remainingMinutes} ${remainingMinutes === 1 ? "minute" : "minutes"} remaining)`);
+    } else {
+      ctx.progress?.(`Analyzing chunk 1/${chunks.length}…`);
     }
     const chunkStartedAtMs = Date.now();
     const redacted = redactStoredMails(chunk, buildDefaultRedactionPolicy());
