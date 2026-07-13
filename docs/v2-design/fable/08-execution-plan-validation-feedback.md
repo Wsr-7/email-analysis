@@ -473,6 +473,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · **用户完成第二轮验证（结果回填 §7）+ 两条新反馈，规划者核实后产出 F4 批（§2.10，8 个 step）**。两个 P0 根因已本地确证：**F4.1** Meetings 队列空 = `getDashboardHtml` 漏传 `meetingStore`（数据链 6/6 存活、显式传入即渲染，调用点丢字段）；**F4.2** 草稿不自动创建 = F1.3 flush 把空 textarea 写进 Map 遮蔽模型 `draftReply`。其余：F4.3 IsSentFolder 的 VBScript If-条件错误陷阱（全文件夹误判 SentOn）、F4.4 取消态真实环境不可见、F4.5 workbench 布局三处、F4.6 本地 vsix 无 `__metadata` 致 Guide 不弹、F4.7 Details 去外链解耦、F4.8 chunk 进度+预估。§7#3（注入邮件）核实为旧构建测试（日志键 `skippedChunkedMails` ≠ 当前代码），需新 vsix 复测。会议队列产品定位（邀请 vs 日程）与分析提速（并行/草稿按需）入 R3 决策清单。通过项：#4/#5/#6/#7/#9/#10/#14/#15/#16 主体。
 - 2026-07-13 · F4.1 已完成，代码提交 `f2159e9`、`eaa5bf7`：`getDashboardHtml` 不再丢弃 `loadState` 的 `meetingStore`，Sidebar 直接收到该 store；集中 Sidebar 入参构造并用逐字段与端到端回归测试锁定转发链。真实 Outlook/VS Code 验证待用户执行。下一步按序 claim F4.2。
 - 2026-07-13 · F4.2 已完成，代码提交 `897fcbd`：首次空 flush 不再写入草稿 Map，模型 `draftReply` 能正常作为初值显示；用户主动清空仍保持为空。真实 Workbench 验证待用户执行。下一步按序 claim F4.3。
+- 2026-07-13 · F4.3 已完成，代码提交 `c75063d`：`IsSentFolder` 不再在块 If 条件读取 COM 属性；同文件唯一同类 recipient 条件已同步守护。真实 Outlook 验证 Inbox/Sent Items 时间属性待用户执行。下一步按序 claim F4.4。
 
 ---
 
@@ -557,6 +558,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.2 completion）**：完成 `897fcbd`。扩展侧草稿更新仅在文本非空或已有条目时写入 Map，故 flush/input 的首次空值不占位、已输入后清空仍保留空值；Generate/Polish/Refine 不受影响。测试以真实 handler 与 Workbench render 验证首次空 flush 显示模型草稿、主动清空刷新仍空、Generate→Polish 刷新显示最终文本。首轮 review 发现后两项只断言 Map 未验证渲染，已补 HTML 断言并复审通过。验收：`npm run compile` 零错误、定向 11/11、全量 `npm test` 410/410、`git diff --check` 通过。Manual：**needs user validation on real Outlook/VS Code Workbench**，确认自动草稿、Notice Generate Draft 与清空后刷新三种情形。Next：按用户顺序 claim F4.3；不进入 F4.4/R3/R4。
 
 - **2026-07-13 · Codex（F4.3 pre-work checkpoint）**：恢复现场：F4.2 代码与记录已提交（`897fcbd`、`a528d0c`），工作树干净；HEAD `a528d0c`。已重新定位 `IsSentFolder`：在 `On Error Resume Next` 区域内，循环直接把 `SafeString(current.EntryID)` 放进块 If 条件（`collect-outlook-mails.vbs:528-531`）；上溯至没有 `EntryID` 的 COM 对象时错误会落入 Then，导致非 Sent folder 误判。`sentEntryId` 空值已有防线，但 current EntryID 仍未分离读取。边界：仅在此 VBS 的 COM 属性读取守护与同类 If 条件审查范围内修复；不动采集参数、digest/store/schema 或 F4.4。
+
+- **2026-07-13 · Codex（F4.3 completion）**：完成 `c75063d`。`IsSentFolder` 读取 `current.EntryID` 后先检查错误，读取失败即清除并停止上溯，再比较普通变量；同文件唯一同类 `recipient.Type` 条件同步改为变量读取与错误检查。静态回归测试分别在旧写法实际 RED，review 通过。验收：`npm run compile` 零错误、`npm test` 412/412、mail VBS `--help`/`--sample`、`git diff --check` 均通过。Manual：**needs user validation on real Outlook**，确认 Inbox `timeProperty=ReceivedTime` 且 Sent Items 仍为 `SentOn`。Next：claim F4.4。
 
 ---
 
