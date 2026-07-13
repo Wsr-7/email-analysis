@@ -18,6 +18,10 @@
   "analysisRetentionDays": 7,
   "importantSenders": [],
   "ignoredSenders": [],
+  "hardBlockKeywords": ["password", "passwd", "pwd", "api_key", "apikey", "access_token", "auth_token", "secret_key", "private_key", "credential", "credentials", "密码", "口令", "密钥", "私钥", "凭证", "令牌"],
+  "manualConfirmKeywords": [],
+  "classificationLevel3Keywords": ["high registered", "highly restricted", "secret"],
+  "classificationLevel2Keywords": ["registered", "restricted", "confidential", "contract", "budget"],
   "meetingDaysAhead": 2,
   "collectorTimeoutSeconds": 120
 }

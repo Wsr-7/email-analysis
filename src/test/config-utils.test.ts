@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildClassificationKeywords, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
 import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
 
 describe("positiveNumber", () => {
@@ -280,6 +280,27 @@ describe("buildSecuritySettings", () => {
   it("uses parsed max allowed classification level", () => {
     const settings = buildSecuritySettings({ autoAnalyzeMaxClassificationLevel: "REGISTERED" });
     assert.equal(settings.maxAutoClassificationLevel, 2);
+  });
+
+  it("uses custom security keywords and preserves explicit empty arrays", () => {
+    assert.deepEqual(buildSecuritySettings({ hardBlockKeywords: ["vault"], manualConfirmKeywords: ["review"] }).hardBlockKeywords, ["vault"]);
+    assert.deepEqual(buildSecuritySettings({ hardBlockKeywords: [], manualConfirmKeywords: [] }).hardBlockKeywords, []);
+    assert.deepEqual(buildSecuritySettings({ hardBlockKeywords: [], manualConfirmKeywords: [] }).manualConfirmKeywords, []);
+  });
+
+  it("falls back from invalid security and classification keyword settings", () => {
+    assert.ok(buildSecuritySettings({ hardBlockKeywords: "vault" }).hardBlockKeywords?.includes("password"));
+    assert.deepEqual(buildClassificationKeywords({ classificationLevel3Keywords: "secret", classificationLevel2Keywords: 2 }), {
+      3: ["high registered", "highly restricted", "secret"],
+      2: ["registered", "restricted", "confidential", "contract", "budget"]
+    });
+  });
+
+  it("supports custom and explicitly disabled classification levels", () => {
+    assert.deepEqual(buildClassificationKeywords({ classificationLevel3Keywords: ["atlas"], classificationLevel2Keywords: [] }), {
+      3: ["atlas"],
+      2: []
+    });
   });
 });
 

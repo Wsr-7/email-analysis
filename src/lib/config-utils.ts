@@ -3,6 +3,18 @@ import type { RedactionPolicy } from "./redaction";
 
 export type Locale = "zh-CN" | "en-US";
 
+const DEFAULT_HARD_BLOCK_KEYWORDS = [
+  "password", "passwd", "pwd", "api_key", "apikey", "access_token", "auth_token",
+  "secret_key", "private_key", "credential", "credentials", "密码", "口令", "密钥", "私钥", "凭证", "令牌"
+];
+const DEFAULT_CLASSIFICATION_LEVEL_3_KEYWORDS = ["high registered", "highly restricted", "secret"];
+const DEFAULT_CLASSIFICATION_LEVEL_2_KEYWORDS = ["registered", "restricted", "confidential", "contract", "budget"];
+
+export interface ClassificationKeywords {
+  3: string[];
+  2: string[];
+}
+
 export function positiveNumber(value: unknown, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : Number(fallback);
@@ -170,12 +182,23 @@ export function buildSecuritySettings(config: Record<string, unknown>): Security
     autoAnalyzeEnabled: true,
     maxAutoClassificationLevel: parseClassificationLevel(config.autoAnalyzeMaxClassificationLevel, 2),
     maxManualClassificationLevel: 3,
-    hardBlockKeywords: [
-      "password", "passwd", "pwd", "api_key", "apikey", "access_token", "auth_token",
-      "secret_key", "private_key", "credential", "credentials", "密码", "口令", "密钥", "私钥", "凭证", "令牌"
-    ],
-    manualConfirmKeywords: []
+    hardBlockKeywords: keywordArray(config.hardBlockKeywords, DEFAULT_HARD_BLOCK_KEYWORDS),
+    manualConfirmKeywords: keywordArray(config.manualConfirmKeywords, [])
   };
+}
+
+export function buildClassificationKeywords(config: Record<string, unknown>): ClassificationKeywords {
+  return {
+    3: keywordArray(config.classificationLevel3Keywords, DEFAULT_CLASSIFICATION_LEVEL_3_KEYWORDS),
+    2: keywordArray(config.classificationLevel2Keywords, DEFAULT_CLASSIFICATION_LEVEL_2_KEYWORDS)
+  };
+}
+
+function keywordArray(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    return [...fallback];
+  }
+  return value.map((item) => item.trim()).filter(Boolean);
 }
 
 export function formatTodayLine(now: Date = new Date()): string {

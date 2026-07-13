@@ -17,7 +17,7 @@ import { buildThreadReport } from "./lib/report-thread";
 import { CopilotProvider } from "./lib/copilot-provider";
 import { type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./lib/llm-provider";
 import { renderEasyMailGuideHtml } from "./lib/guide-webview";
-import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
+import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, buildClassificationKeywords, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisBatchResult, type AnalysisContext } from "./lib/app-analysis";
@@ -551,7 +551,7 @@ export class EasyMailApp {
     await this.data.writeMailIndex(nextIndex);
     const nextThreadStore = buildThreadStore(prunedStore.items);
     await this.data.writeThreadStore(nextThreadStore);
-    const classificationCache = ensureClassifications(prunedStore.items, await this.data.readClassificationCache());
+    const classificationCache = ensureClassifications(prunedStore.items, await this.data.readClassificationCache(), buildClassificationKeywords(config));
     await this.data.writeClassificationCache(classificationCache);
     await this.collectMeetings(config, forceSample);
     await this.log("pullMail:done", {
@@ -1127,7 +1127,11 @@ export class EasyMailApp {
       analysisRetentionDays: settings.get("analysisRetentionDays", defaults.analysisRetentionDays),
       collectorTimeoutSeconds: settings.get("collectorTimeoutSeconds", defaults.collectorTimeoutSeconds),
       importantSenders: settings.get("importantSenders", defaults.importantSenders),
-      ignoredSenders: settings.get("ignoredSenders", defaults.ignoredSenders)
+      ignoredSenders: settings.get("ignoredSenders", defaults.ignoredSenders),
+      hardBlockKeywords: settings.get("hardBlockKeywords", defaults.hardBlockKeywords),
+      manualConfirmKeywords: settings.get("manualConfirmKeywords", defaults.manualConfirmKeywords),
+      classificationLevel3Keywords: settings.get("classificationLevel3Keywords", defaults.classificationLevel3Keywords),
+      classificationLevel2Keywords: settings.get("classificationLevel2Keywords", defaults.classificationLevel2Keywords)
     };
   }
 
@@ -1243,7 +1247,7 @@ export class EasyMailApp {
     const index = pruneMailIndex(await this.data.readMailIndex(), Number(config.mailIndexRetentionDays || 7));
     await this.data.writeMailIndex(index);
     const threadStore = buildThreadStore(store.items);
-    const classifications = ensureClassifications(store.items, await this.data.readClassificationCache());
+    const classifications = ensureClassifications(store.items, await this.data.readClassificationCache(), buildClassificationKeywords(config));
     await this.data.writeClassificationCache(classifications);
     const securitySettings = buildSecuritySettings(config);
     const securityDecisions = buildMailSecurityDecisionMap(store.items, classifications, securitySettings);

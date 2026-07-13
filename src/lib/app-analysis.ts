@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { normalizeAnalysis, parseAnalysisJson, stripCodeFence, mergeAnalysisResults, pruneAnalysisResult, type AnalysisItem } from "./analysis-schema";
 import { applyAnalysisTranslation, buildAnalysisTranslationPrompt } from "./analysis-translation";
 import { buildQueueState, ensureClassifications, matchesIgnoredSender } from "./classification";
-import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildDefaultRedactionPolicy } from "./config-utils";
+import { type Locale, mergeStringLists, parseFolders, getLocaleFromConfig, buildSecuritySettings, buildClassificationKeywords, buildDefaultRedactionPolicy } from "./config-utils";
 import { getLabels, buildCategoryLabels } from "./dashboard-labels";
 import { latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage } from "./language-contract";
 import { selectConfiguredModel, type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./llm-provider";
@@ -224,7 +224,7 @@ export async function analyzeBatchCore(
     await ctx.log("analyze:noStoreItems", { indexItems: index.items.length });
     throw new Error("No pulled mail exists. Run Pull Mail first.");
   }
-  const classificationCache = ensureClassifications(store.items, await ctx.data.readClassificationCache());
+  const classificationCache = ensureClassifications(store.items, await ctx.data.readClassificationCache(), buildClassificationKeywords(config));
   await ctx.data.writeClassificationCache(classificationCache);
   const currentAnalysis = await ctx.data.readAnalysisResult(() => ctx.readConfig());
   const analysedIds = new Set(currentAnalysis.items.map((item) => item.mailId));
@@ -492,7 +492,7 @@ export async function analyzeThreadCore(
     await ctx.log("threadAnalyze:block", { threadId, reasons: thread.security?.reasons || [] });
     throw new Error("Thread has blocked messages and cannot be analyzed.");
   }
-  const gate = buildThreadGateDecision(thread, ensureClassifications(await ctx.data.readMailStore().then((store) => store.items), await ctx.data.readClassificationCache()).items, buildSecuritySettings(config));
+  const gate = buildThreadGateDecision(thread, ensureClassifications(await ctx.data.readMailStore().then((store) => store.items), await ctx.data.readClassificationCache(), buildClassificationKeywords(config)).items, buildSecuritySettings(config));
   if (gate.decision === "block") {
     await ctx.log("threadAnalyze:block", { threadId, reasons: gate.reasons });
     throw new Error("Thread is blocked by the security gate.");

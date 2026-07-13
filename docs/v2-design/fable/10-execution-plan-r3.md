@@ -49,7 +49,7 @@
 - **验收**：渲染单测（两级分组、计数、折叠态）；`npm test` 全绿。**needs user validation**：邀请置顶平铺、已接受折叠、徽标计数只含未响应。
 - **边界**：采集脚本与 meeting store 不动；详情/按钮不动。
 
-### [ ] G3 安全词表配置化一期（D3，S-M 级）
+### [~] G3 安全词表配置化一期（D3，S-M 级）
 
 - **现状锚点**：`config-utils.ts` `buildSecuritySettings`（~L167-176）硬编码 `hardBlockKeywords`（F6.5 已扩为中英文 17 词）与 `manualConfirmKeywords: []`；`classification.ts` `ensureClassifications` 的分级关键词硬编码（~L62-68：3 级词表与 2 级词表）。
 - **做法**：
@@ -153,3 +153,5 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Manual validation：**needs user validation**，真实会议邀请/已接受日程的视觉分层与展开态需在 VS Code webview 确认。
   - Known issues：插件内仍不提供 Accept/Decline，按计划继续只在 Outlook 响应。
   - Commit：`96723b8`（本地，未 push）。
+
+- **2026-07-14 · Codex（G3 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `6290211`；重新定位确认 `src/lib/config-utils.ts:167-183` 仍硬编码 17 个 hard-block 词且 manual-confirm 为空，`src/lib/classification.ts:37-76` 仍硬编码 3/2 级词表并只补缺失缓存，classification cache 在 `src/lib/app-data.ts:320-332` 持久化，所有 `ensureClassifications` caller 已枚举。设置形态选择两个平级 array（`classificationLevel3Keywords` / `classificationLevel2Keywords`），因为 VS Code Settings UI 可直接增删条目，优于 object 只能手改 JSON；其余两个 setting 为 `hardBlockKeywords` / `manualConfirmKeywords`。边界：仅做子串/大小写不敏感词表配置、非法回落、空数组关闭与分级 hash 失效；不做正则、MIP 或级别变更。Action: claim G3。

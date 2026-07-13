@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildQueueState, ensureClassifications, normalizeClassificationCache } from "../lib/classification";
+import { buildClassificationKeywords } from "../lib/config-utils";
 import type { StoredMail } from "../lib/mail-store";
 
 const mails: StoredMail[] = [
@@ -164,4 +165,32 @@ test("ensureClassifications refreshes old default keyword reasons", () => {
   }));
 
   assert.equal(cache.items.find((item) => item.mailId === "mail-2")?.reason, "keyword match: high registered");
+});
+
+test("custom classification keywords apply and empty arrays disable keyword levels", () => {
+  const atlasMail = { ...mails[0], mailId: "mail-atlas", subject: "Project Atlas" };
+  const custom = ensureClassifications([atlasMail], normalizeClassificationCache({}), buildClassificationKeywords({
+    classificationLevel3Keywords: ["atlas"],
+    classificationLevel2Keywords: []
+  }));
+  const disabled = ensureClassifications([atlasMail], normalizeClassificationCache({}), buildClassificationKeywords({
+    classificationLevel3Keywords: [],
+    classificationLevel2Keywords: []
+  }));
+
+  assert.equal(custom.items[0].level, 3);
+  assert.equal(disabled.items[0].level, 1);
+});
+
+test("classification keyword hash changes trigger a full cache recompute", () => {
+  const atlasMail = { ...mails[0], mailId: "mail-atlas", subject: "Project Atlas" };
+  const initial = ensureClassifications([atlasMail], normalizeClassificationCache({}));
+  const next = ensureClassifications([atlasMail], initial, buildClassificationKeywords({
+    classificationLevel3Keywords: ["atlas"],
+    classificationLevel2Keywords: []
+  }));
+
+  assert.notEqual(next.keywordsHash, initial.keywordsHash);
+  assert.equal(next.items[0].level, 3);
+  assert.equal(next.items[0].reason, "keyword match: atlas");
 });
