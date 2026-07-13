@@ -738,6 +738,7 @@ export class EasyMailApp {
             if (this.busy) {
               this.busy = { ...this.busy, kind: "cancelling", detail: cancellingDetail };
               progress.report({ message: cancellingDetail });
+              if (cancellable) void vscode.window.showInformationMessage("EasyMail: Cancelling… Waiting for the current request to finish.");
               void this.refreshCancellationSidebar(label);
             }
           });

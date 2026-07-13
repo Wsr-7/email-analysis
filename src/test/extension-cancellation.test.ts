@@ -5,6 +5,7 @@ import test from "node:test";
 let cancellationListener: (() => void) | undefined;
 let disposed = 0;
 let cancellationRequested = false;
+const informationMessages: string[] = [];
 const vscodeMock = {
   ProgressLocation: { Notification: 15 },
   LanguageModelChatMessage: { User: (prompt: string) => ({ prompt }) },
@@ -18,7 +19,7 @@ const vscodeMock = {
         return { dispose: () => { disposed += 1; cancellationListener = undefined; } };
       }
     }),
-    showInformationMessage: () => undefined
+    showInformationMessage: (message: string) => { informationMessages.push(message); return undefined; }
   }
 };
 
@@ -50,10 +51,11 @@ async function renderWorkbenchDraft(app: any, draftReply: string): Promise<strin
   return await app.getWorkbenchHtml();
 }
 
-test("runWithBusy cancels through the sidebar only and clears busy state after the task", async () => {
+test("runWithBusy reports cancellation immediately without changing cancellation completion semantics", async () => {
   cancellationListener = undefined;
   disposed = 0;
   cancellationRequested = false;
+  informationMessages.length = 0;
   let resolveTask!: () => void;
   const task = new Promise<void>((resolve) => { resolveTask = resolve; });
   const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
@@ -64,12 +66,13 @@ test("runWithBusy cancels through the sidebar only and clears busy state after t
   (app as any).refresh = async () => { refreshes += 1; };
   (app as any).dashboardProvider.update = async () => { sidebarUpdates += 1; };
 
-  const pending = (app as any).runWithBusy("Analyze", "Running", "analyzeNext", async () => await task, undefined, true, "Cancelling…");
+  const pending = (app as any).runWithBusy("Analyze", "Running", "analyzeNext", async () => await task, () => "Completed.", true, "Cancelling…");
   await new Promise((resolve) => setImmediate(resolve));
   const cancel = cancellationListener as (() => void) | undefined;
   assert.ok(cancel);
   cancellationRequested = true;
   cancel();
+  assert.deepEqual(informationMessages, ["EasyMail: Cancelling… Waiting for the current request to finish."]);
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal((app as any).busy.kind, "cancelling");
@@ -81,6 +84,32 @@ test("runWithBusy cancels through the sidebar only and clears busy state after t
   assert.equal((app as any).busy, null);
   assert.equal(disposed, 1);
   assert.ok(!logs.includes("busy:success"));
+  assert.deepEqual(informationMessages, ["EasyMail: Cancelling… Waiting for the current request to finish."], "a cancelled task must not show its completion toast");
+});
+
+test("runWithBusy does not show cancellation feedback for a non-cancellable task", async () => {
+  cancellationListener = undefined;
+  disposed = 0;
+  cancellationRequested = false;
+  informationMessages.length = 0;
+  let resolveTask!: () => void;
+  const task = new Promise<void>((resolve) => { resolveTask = resolve; });
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  (app as any).log = async () => {};
+  (app as any).refresh = async () => {};
+  (app as any).dashboardProvider.update = async () => {};
+
+  const pending = (app as any).runWithBusy("Analyze", "Running", "analyzeNext", async () => await task);
+  await new Promise((resolve) => setImmediate(resolve));
+  const cancel = cancellationListener as (() => void) | undefined;
+  assert.ok(cancel);
+  cancellationRequested = true;
+  cancel();
+
+  assert.deepEqual(informationMessages, []);
+  resolveTask();
+  await assert.rejects(() => pending, /cancelled/i);
+  assert.equal(disposed, 1);
 });
 
 test("runWithBusy records a failed cancellation sidebar update", async () => {
