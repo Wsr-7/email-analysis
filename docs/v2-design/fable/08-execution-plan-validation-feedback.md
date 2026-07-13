@@ -410,11 +410,19 @@
     - Known issues：本机未运行真实 VS Code webview，视觉布局需用户真机复验。
     - Commit：`8f3e9d6`。
 
-### [ ] F4.6 Guide 重装不弹：本地 vsix 安装无 __metadata（§7#12-2，P2）
+### [x] F4.6 Guide 重装不弹：本地 vsix 安装无 __metadata（§7#12-2，P2） — `6df681c`
 
 - **根因（已核实）**：`__metadata.installedTimestamp` 是 Marketplace 安装注入的元数据，本地 vsix 安装不存在 → F2.6 的 key 回落 version → `guideShown.0.3.0` 已置位 → 重装同版本不弹。
 - **做法**：安装签名改为**扩展安装目录的创建时间**：`fs.stat(context.extensionPath)` 的 `birthtimeMs`（重装重建目录、每次安装必变、同一安装内稳定）；`__metadata.installedTimestamp` 存在时优先（Marketplace 场景语义更准），stat 失败回落 version。单测覆盖三级回落。
 - **验收**：`npm test` 全绿。**needs user validation**：卸载重装同版本 vsix → Guide 再弹；同一安装内重启 VS Code 不重复弹。
+
+  - Completion Notes（2026-07-13）：
+    - 改动文件：`src/extension.ts`、`src/test/extension-cancellation.test.ts`。
+    - 实现边界：Guide key 依次使用非空 Marketplace metadata、扩展目录 `birthtimeMs`、version；未改 Guide 内容、其他 globalState 或打包流程。
+    - 验收结果：三级回落测试先 RED 后 GREEN；`npm run compile` 零错误，定向 12/12，完整 `npm test` 415/415，`git diff --check` 均通过；独立 review 通过。
+    - Manual validation：**needs user validation on real VS Code**：卸载并安装同版本本地 vsix，Guide 应再次弹出；同一安装内重启 VS Code 不重复弹。
+    - Known issues：真实安装目录创建时间行为需用户在本地 VS Code 复验。
+    - Commit：`6df681c`。
 
 ### [ ] F4.7 Marketplace Details 与 README 解耦、去外链（§7#16 用户诉求，P2）
 
@@ -492,6 +500,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F4.3 已完成，代码提交 `c75063d`：`IsSentFolder` 不再在块 If 条件读取 COM 属性；同文件唯一同类 recipient 条件已同步守护。真实 Outlook 验证 Inbox/Sent Items 时间属性待用户执行。下一步按序 claim F4.4。
 - 2026-07-13 · F4.4 已完成，代码提交 `d43062b`：可取消任务在取消瞬间提供独立 toast，Sidebar cancelling 更新保留；真实 VS Code 时序验证待用户执行。下一步按序 claim F4.5。
 - 2026-07-13 · F4.5 已完成，代码提交 `8f3e9d6`：Workbench active reader、detail card 与单封原文容器统一占满可用宽度；active reader 时 placeholder 由 CSS 强制 `display: none`。真实 VS Code 布局验证待用户执行。下一步按序 claim F4.6。
+- 2026-07-13 · F4.6 已完成，代码提交 `6df681c`：Guide key 在本地 vsix 无 metadata 时改用扩展目录创建时间，同安装稳定、重装变更；stat 失败才回落 version。真实卸载重装验证待用户执行。下一步按序 claim F4.7。
 
 ---
 
@@ -586,6 +595,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.5 pre-work checkpoint）**：恢复现场：F4.4 代码与记录已提交（`d43062b`、`1751d66`、`3b97c7c`），工作树干净；HEAD `3b97c7c`。已重新定位：`wb-reader.active` 已为 flex+height 100%，但普通 detail card 未强制可用宽度；placeholder 仅用 `hidden` 属性在 `showReader` 切换，CSS 未在 active reader 存在时强制 `display:none`；单封 `renderAnalysisDetail` 的原文使用 `.wb-body`，需与现有 thread 原文的宽度约束一致。边界：仅 Workbench CSS/渲染与断言；不改草稿、队列或 F4.6。
 
 - **2026-07-13 · Codex（F4.5 completion）**：完成 `8f3e9d6`。active reader、detail card 和单封 `.wb-original-section`/`.wb-body` 均占满可用宽度；placeholder 在 active reader 存在时通过同级 CSS 选择器强制 `display:none`，移除 active 后自然恢复。三项样式渲染断言先 RED 后 GREEN，独立 review 核实 DOM 顺序和全局 `box-sizing:border-box`，无 P0/P1/P2。验收：`npm run compile` 零错误、定向 37/37、全量 `npm test` 415/415、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，确认 sample 短邮件全宽/无残影、单封原文自适应并仅正文滚动。Next：claim F4.6。
+
+- **2026-07-13 · Codex（F4.6 pre-work checkpoint）**：恢复现场：F4.5 代码与记录已提交（`8f3e9d6`、`91bb521`），工作树干净；HEAD `91bb521`。已重新定位：`maybeOpenGuide` 当前仅用 `packageJSON.__metadata.installedTimestamp || version` 构成 globalState key（`src/extension.ts:177-184`）；本地 vsix 没有该 metadata，故同版本重装复用旧 key。现有单测也只覆盖 metadata/version 回落（`src/test/extension-cancellation.test.ts:160-188`）。边界：仅 Guide 安装签名三级回落与单测；不改 Guide 内容、其他 globalState、打包流程或 F4.7。
+
+- **2026-07-13 · Codex（F4.6 completion）**：完成 `6df681c`。Guide 安装签名按非空 metadata → 扩展目录 `birthtimeMs` → version 回落；测试覆盖 metadata 不触发 stat、相同 birthtime 仅一次、不同 birthtime 视为重装、stat 失败回落，mock 由 finally 复原。独立 review 无 P0/P1/P2。验收：`npm run compile` 零错误、定向 12/12、全量 `npm test` 415/415、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，卸载重装同版本 vsix 后 Guide 再弹，同安装重启不重复。Next：claim F4.7。
 
 ---
 
