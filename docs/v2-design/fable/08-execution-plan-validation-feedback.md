@@ -530,6 +530,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - 2026-07-13 · F5.2 已完成，代码提交 `708e4c4`：Workbench 接收 meetingStore，点击会议可按 EntryID 聚焦详情；补参会人字段，未响应优先、余项按开始时间倒序。真实 VS Code/Outlook 验证待用户执行。下一步按序 claim F5.3。
 
+- 2026-07-13 · F5.3 已完成，代码提交 `8037ec3`：folder picker 保留原有 title，进度 message 按界面语言只显示一句简洁的 Outlook 启动提示；中英文均有回归覆盖。真实 VS Code 验证待用户执行。下一步按序 claim F5.4。
+
 ## 6. Handover Log
 
 - **2026-07-11 · Claude Fable 5（规划者）**：创建本计划。核实过程要点：① `FormatRestrictDate` 在 `collect-outlook-mails.vbs:529` 与 `collect-outlook-meetings.vbs:444` 均以 `\` 拼日期（mail 版还带秒），Outlook Restrict 静默返回 0 → recentHours 空result；meetings 循环无下界守卫 + `pruneMeetingStore`（`meeting-store.ts:71`）剪掉过期已响应会议 → 队列空但 store 有数据。② `FolderScanSummary` 在 `src/` 零引用，采集诊断从未到达 UI。③ 草稿保留依赖 webview `getState` 客户端回填，真机失效，F1.3 改扩展侧持久化。④ `importantSenders` 为 prompt 级模型匹配，无代码匹配——Exchange DN 直接拉低命中，F1.6 从采集源 SMTP 化。⑤ `classification.ts:88` 语义下模型漏返邮件应留 Pending，用户实测消失——F1.2 要求真机复现 + 对账兜底双管齐下。无 dirty state。Next: worker 从 F1.1 开始 claim。
@@ -648,6 +650,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 
 - **2026-07-13 · Codex（F5.2 completion）**：完成 `708e4c4`。根因是 `getWorkbenchHtml` 漏传 meetingStore；sidebar 既有 entryId focus 能命中 reader 后即展示详情。详情补齐必选/可选参会人，Open in Outlook 仍走既有 EntryID 路径；sidebar/workbench 同时改为未响应优先、同状态 start 倒序。独立 review 无 P0/P1/P2。验收：`npm run compile` 零错误、定向 135/135、全量 `npm test` 423/423、`git diff --check` 均通过。Manual：**needs user validation on real VS Code/Outlook**，点击会议并打开对应 Outlook 项。Next：claim F5.3。
 
+- **2026-07-13 · Codex（F5.3 pre-work checkpoint）**：恢复现场：F5.2 代码与记录已提交（`708e4c4`、`431983a`），HEAD `431983a`；本 step claim 已写入，除此以外工作树干净。已重新定位 `selectFolders`：Notification title 已是 `Loading Outlook folders…`，但进度 message 同时包含启动提示和第二段 `Loading Outlook and reading mail folders…`，与 title 重复；现有回归测试固化该冗长英文。边界：只将 message 改为按现有 `outputLanguage` 输出的一句简洁提示并更新覆盖中英文的测试；不改枚举、超时、QuickPick、store/schema 或 F5.4。
+
+- **2026-07-13 · Codex（F5.3 completion）**：完成 `8037ec3`。`selectFolders` 的 Notification title 保持 `Loading Outlook folders…`；message 改为 en-US `Tip: starting Outlook first makes this faster.` 或 zh-CN `提示：先启动 Outlook 可加快加载。`，不再重复 Loading。回归测试分别锁定两种语言各仅一条提示。验收：`npm run compile` 零错误、定向 15/15、完整 `npm test` 424/424、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，运行 folder picker，确认通知为 title 加单句本地化提示。Known issues：无新增；真实通知排版待真机确认。Next：claim F5.4。
+
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
 > 前置：安装重新打包后的 `releases/easymail-0.3.0.vsix`（含全部 F 批改动）。结果列填 ✅ / ❌ / ⏭️，❌ 请附现象与相关日志行（日志：globalStorage 下 `logs/easy-mail.log`）。
@@ -725,11 +731,19 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
     - Known issues：真实 Outlook AppointmentItem 的 `GetItemFromID` 打开行为尚待用户验证。
     - Commit：`708e4c4`。
 
-### [ ] F5.3 folder picker 进度文案去重（§8#9，P2 文案）
+### [x] F5.3 folder picker 进度文案去重（§8#9，P2 文案）
 
 - **现象**：当前通知为 "Loading Outlook folders...: Start Outlook first to significantly speed up folder loading. Loading Outlook and reading mail folders..."——两段 Loading 重复且啰嗦。
 - **做法**：title 保留 `Loading Outlook folders…`，message 只留一句简洁提示（如 `Tip: starting Outlook first makes this faster.`），删除重复的 "Loading Outlook and reading mail folders..."。中英文一致精简。
 - **验收**：`npm test` 全绿。**needs user validation**：运行命令看一眼文案。
+
+- Completion Notes（2026-07-13）：
+  - 改动文件：`src/extension.ts`、`src/test/extension-cancellation.test.ts`。
+  - 实现边界：仅替换 folder picker 的进度 message，并沿用既有 `outputLanguage` 输出简洁中英文提示；title、枚举、超时和 QuickPick 均未改动。
+  - 验收结果：`npm run compile` 零错误、定向 15/15、完整 `npm test` 424/424、`git diff --check` 均通过。
+  - Manual validation：**needs user validation on real VS Code**：执行 Select Outlook Folders，确认通知显示 `Loading Outlook folders…` 加一条简洁本地化提示，且没有第二段 Loading。
+  - Known issues：真实 VS Code Notification 的视觉换行尚待用户确认。
+  - Commit：`8037ec3`。
 
 ### [ ] F5.4 分析结果按 chunk 增量进入分类（用户新确认#2，P2 体验）
 
