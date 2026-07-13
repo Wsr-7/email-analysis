@@ -35,6 +35,14 @@ function renderGateReasons(title: string, reasons: string[]): string {
   return `<div class="wb-field wb-warn"><strong>${escapeHtml(title)}:</strong><div class="wb-gate-reasons">${items.map((reason) => `<div class="wb-gate-reason">${escapeHtml(reason)}</div>`).join("")}</div></div>`;
 }
 
+function renderAttachments(item: StoredMail | undefined, labels: DashboardLabels): string {
+  const count = Number(item?.attachmentCount || 0);
+  if (!Number.isFinite(count) || count <= 0) return "";
+  const names = (item?.attachmentNames || []).filter(Boolean);
+  const suffix = names.length ? ` (${names.join("; ")})` : "";
+  return `<div class="wb-field"><strong>${escapeHtml(labels.threads.attachments)}:</strong> ${escapeHtml(`${count}${suffix}`)}</div>`;
+}
+
 function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabels, extra: string, extraActions = "", classifications?: ReturnType<typeof normalizeClassificationCache>): string {
   const toHtml = item.to ? `<div class="wb-field" title="${escapeAttr(item.to)}"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(recipientDisplayNames(item.to))}</div>` : "";
   const ccHtml = item.cc ? `<div class="wb-field" title="${escapeAttr(item.cc)}"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(recipientDisplayNames(item.cc))}</div>` : "";
@@ -48,6 +56,7 @@ function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabe
       ${toHtml}
       ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
+      ${renderAttachments(item, labels)}
       ${clsHtml}
       ${extra}
     </div>
@@ -81,6 +90,7 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
       ${toHtml}
       ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
+      ${renderAttachments(originalMail, labels)}
       ${dueHtml}
       ${clsHtml}
     </div>

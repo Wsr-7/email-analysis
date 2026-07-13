@@ -183,9 +183,15 @@ export function redactStoredMails(items: StoredMail[], policy: RedactionPolicy):
     items: items.map((item) => {
       const bodyExcerpt = redactText(item.bodyExcerpt, policy);
       totalReplacements += bodyExcerpt.stats.totalReplacements;
+      const attachmentNames = (item.attachmentNames || []).map((name) => {
+        const redactedName = redactText(name, policy);
+        totalReplacements += redactedName.stats.totalReplacements;
+        return redactedName.text;
+      });
       return {
         ...item,
-        bodyExcerpt: bodyExcerpt.text
+        bodyExcerpt: bodyExcerpt.text,
+        attachmentNames
       };
     }),
     totalReplacements

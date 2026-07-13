@@ -529,6 +529,20 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("2024-01-01 14:30:45"), "second line should show the full time");
   });
 
+  it("shows an attachment icon with count and file names on mail rows", () => {
+    const pending = stubMail({ mailId: "m1", attachmentCount: 2, attachmentNames: ["contract.pdf", "budget.xlsx"] });
+    const analyzed = stubMail({ mailId: "a1", attachmentCount: 1, attachmentNames: ["notes.txt"] });
+    const html = renderSidebarHtml(stubInput({
+      queue: { pending: [pending], blocked: [], analysed: [], allowed: [pending], ignoredPending: [] },
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" })] }]),
+      store: { generatedAt: "", lastPullAt: "", items: [pending, analyzed] }
+    }));
+
+    assert.ok(html.includes('title="2: contract.pdf; budget.xlsx"'));
+    assert.ok(html.includes('title="1: notes.txt"'));
+    assert.equal((html.match(/>📎<\/span>/g) || []).length, 2);
+  });
+
   it("renders analysis rows with sender and priority on second line", () => {
     const input = stubInput({
       state: stubState({}, [

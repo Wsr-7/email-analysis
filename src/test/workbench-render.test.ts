@@ -199,6 +199,23 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(!withoutDue.includes("Due:</strong>"));
   });
 
+  it("shows attachment metadata for pending and analyzed mails only when present", () => {
+    const pending = stubMail({ mailId: "pending-attachment", attachmentCount: 2, attachmentNames: ["contract.pdf", "budget.xlsx"] });
+    const analyzed = stubMail({ mailId: "a1", attachmentCount: 1, attachmentNames: ["notes.txt"] });
+    const withAttachments = renderWorkbenchHtml(stubInput({
+      queue: { pending: [pending], blocked: [], analysed: [], allowed: [pending], ignoredPending: [] },
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" })] }]),
+      store: { generatedAt: "", lastPullAt: "", items: [pending, analyzed] }
+    }));
+    const withoutAttachments = renderWorkbenchHtml(stubInput({
+      queue: { pending: [stubMail()], blocked: [], analysed: [], allowed: [stubMail()], ignoredPending: [] }
+    }));
+
+    assert.ok(withAttachments.includes("Attachments:</strong> 2 (contract.pdf; budget.xlsx)"));
+    assert.ok(withAttachments.includes("Attachments:</strong> 1 (notes.txt)"));
+    assert.ok(!withoutAttachments.includes("Attachments:</strong>"));
+  });
+
   it("does not show a thread internal id in an analyzed mail reader", () => {
     const input = stubInput({
       state: stubState({}, [

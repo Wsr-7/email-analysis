@@ -91,7 +91,7 @@
 - **边界**：不做 workbench 侧键盘导航；不做其他快捷键。
 - **顺序约束**：建议在 G2 完成后再做（G2 会新增会议折叠分组，先做 G6 会漏测该场景；若确要并行，后完成的一方负责联测两个折叠分组的跳过逻辑并在 Notes 写明）。
 
-### [ ] G7 附件可见性（09 §7 C 组核实产出，S 级）
+### [~] G7 附件可见性（09 §7 C 组核实产出，S 级）
 
 - **现状锚点（已核实）**：attachmentCount/attachmentNames 已采集入 store（`mail-store.ts:196-197`）；但 ① sidebar 邮件行不显示；② workbench 单封详情（pending 与 analyzed 两个模板）不显示；③ **单封批量分析 prompt 不含附件字段**（`mail-store.ts` `buildBatchDigestMarkdown` ~L283-299 无 Attachment 行；线程 prompt 已含，`thread-prompt-builder.ts:60-61`）。
 - **做法**：
@@ -205,3 +205,5 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Manual validation：**needs user validation**，真实 Webview 的焦点获得、折叠跳过、滚动与 Workbench 联动需手动确认。
   - Known issues：到达队列首尾时保持当前项，不循环；这是本轮裁剪边界内的 no-op 行为。
   - Commit：`5d48d65`（本地，未 push）。
+
+- **2026-07-14 · Codex（G7 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `ff4f82a`；重新定位确认 store 已规范化 `attachmentCount`/`attachmentNames`，线程 prompt 已带附件元数据，但 `buildBatchDigestMarkdown` 无附件行；Sidebar 的 stored/analyzed mail row 与 Workbench 的 pending/analyzed metadata 均未渲染附件。确认 `redactStoredMails` 目前只处理 `bodyExcerpt`，明确保留 `attachmentNames`，因此附件名尚未脱敏。边界：只补单封邮件列表/详情附件可见性、batch prompt 元数据、附件名脱敏与防幻觉指令；不改 digest 文件格式，不下载/预览/读取附件内容，不改线程附件展示。Action: claim G7。

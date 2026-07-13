@@ -75,6 +75,14 @@ function classificationBadge(mailId: string, classifications: ClassificationCach
   return `<span class="sb-cls-badge">${escapeHtml(label)}</span>`;
 }
 
+function attachmentBadge(item?: Pick<StoredMail, "attachmentCount" | "attachmentNames">): string {
+  const count = Number(item?.attachmentCount || 0);
+  if (!Number.isFinite(count) || count <= 0) return "";
+  const names = (item?.attachmentNames || []).filter(Boolean);
+  const title = `${count}${names.length ? `: ${names.join("; ")}` : ""}`;
+  return `<span class="sb-attachment" title="${escapeAttr(title)}">📎</span>`;
+}
+
 function renderCompactMailRow(item: StoredMail, queue: string, classifications: ClassificationCache): string {
   const time = item.receivedTime || "";
   const sender = item.from || "";
@@ -82,7 +90,7 @@ function renderCompactMailRow(item: StoredMail, queue: string, classifications: 
   const title = [sender, time].filter(Boolean).join(" · ");
   return `<div class="sb-row" data-action="openItem" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}</div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${attachmentBadge(item)}${classificationBadge(item.mailId, classifications)}</div>
   </div>`;
 }
 
@@ -102,7 +110,7 @@ function renderPendingFolderGroups(items: StoredMail[], folders: string[], class
   </section>`).join("");
 }
 
-function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ClassificationCache): string {
+function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ClassificationCache, originalMail?: StoredMail): string {
   const time = item.receivedTime || "";
   const sender = item.sender || "";
   const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
@@ -114,7 +122,7 @@ function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: 
     : "";
   return `<div class="sb-row" data-action="openItem" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${dueBadge}${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${attachmentBadge(originalMail)}${dueBadge}${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
   </div>`;
 }
 
@@ -224,11 +232,12 @@ export function renderSidebarHtml(input: DashboardRenderInput, nonce: string): s
   }).filter(Boolean).join("");
 
   const classifications = input.classifications || normalizeClassificationCache({});
+  const mailById = new Map(store.items.map((item) => [item.mailId, item]));
 
   const pendingRows = renderPendingFolderGroups(queue.allowed, configuredFolders, classifications);
   const blockedRows = queue.blocked.map((item) => renderCompactMailRow(item, "blocked", classifications)).join("");
   const analysisRows = state.categories.map((cat) =>
-    cat.items.map((item) => renderCompactAnalysisRow(item, cat.id, labels, classifications)).join("")
+    cat.items.map((item) => renderCompactAnalysisRow(item, cat.id, labels, classifications, mailById.get(item.mailId))).join("")
   ).join("");
   const ignoredPendingRows = (queue.ignoredPending || []).map((item) => renderCompactMailRow(item, "ignored", classifications)).join("");
   const ignoredThreadRows = [...ignoredThreads].sort((a, b) =>
@@ -424,6 +433,7 @@ export function renderSidebarHtml(input: DashboardRenderInput, nonce: string): s
   .sb-cls-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; opacity: 0.8; border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.35)); color: var(--vscode-foreground, #ccc); }
   .sb-due-badge { font-size: 10px; white-space: nowrap; flex-shrink: 0; color: var(--vscode-descriptionForeground, #aaa); }
   .sb-due-urgent { color: var(--vscode-errorForeground, #f48771); font-weight: 600; }
+  .sb-attachment { font-size: 11px; flex-shrink: 0; }
 
   .sb-row-dim { opacity: 0.45; }
   .sb-action-status { cursor: pointer; font-size: 10px; padding: 1px 6px; border-radius: 8px; border: none; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); }

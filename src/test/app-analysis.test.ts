@@ -1071,6 +1071,7 @@ describe("analyzeBatchCore", () => {
       const today = new Date();
       const expectedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       assert.match(provider.prompts[0], new RegExp(`Today is ${expectedDate} \\(.+\\)\\.`));
+      assert.match(provider.prompts[0], /attachment contents are not available/i);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }
