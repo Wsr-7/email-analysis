@@ -397,10 +397,18 @@
   - Known issues：真实宿主未在本机运行，无法验证 toast 的视觉时序。
   - Commit：`d43062b`。
 
-### [ ] F4.5 Workbench 布局三处修复（§7#11 残留，P2）
+### [x] F4.5 Workbench 布局三处修复（§7#11 残留，P2） — `8f3e9d6`
 
 - ① 短内容（如 sample 邮件）时 reader 区收缩到内容宽度，不占满 workbench——容器改为始终占满可用宽度；② `Select an item from sidebar to read` placeholder 在已打开邮件时仍固定占位、可能叠在正文中间——active reader 存在时必须彻底隐藏（display:none 级别），不能只视觉遮盖；③ 单封邮件原文容器宽度仍写死——与 F2.3 线程原文同一处理（填满可用宽度，仅超出滚动）。
 - **验收**：渲染单测（placeholder 隐藏断言、容器样式）；`npm test` 全绿。**needs user validation**：sample 短邮件 reader 占满宽度、无 placeholder 残影；单封原文宽度自适应。
+
+  - Completion Notes（2026-07-13）：
+    - 改动文件：`src/lib/workbench-render.ts`、`src/test/workbench-render.test.ts`。
+    - 实现边界：active reader、detail card 与单封原文容器均明确 `width: 100%`；active reader 后的 placeholder 用 CSS `display: none` 强制隐藏。未改草稿、队列、数据结构或 F4.6。
+    - 验收结果：先新增三项渲染断言并确认 RED；`npm run compile` 零错误，定向 `workbench-render` 37/37，完整 `npm test` 415/415，`git diff --check` 均通过；独立 review 通过。
+    - Manual validation：**needs user validation on real VS Code**：打开 sample 短邮件确认 reader 占满 workbench 且无 placeholder 残影；打开单封已分析邮件，确认原文随窗口宽度自适应且仅正文区域滚动。
+    - Known issues：本机未运行真实 VS Code webview，视觉布局需用户真机复验。
+    - Commit：`8f3e9d6`。
 
 ### [ ] F4.6 Guide 重装不弹：本地 vsix 安装无 __metadata（§7#12-2，P2）
 
@@ -483,6 +491,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F4.2 已完成，代码提交 `897fcbd`：首次空 flush 不再写入草稿 Map，模型 `draftReply` 能正常作为初值显示；用户主动清空仍保持为空。真实 Workbench 验证待用户执行。下一步按序 claim F4.3。
 - 2026-07-13 · F4.3 已完成，代码提交 `c75063d`：`IsSentFolder` 不再在块 If 条件读取 COM 属性；同文件唯一同类 recipient 条件已同步守护。真实 Outlook 验证 Inbox/Sent Items 时间属性待用户执行。下一步按序 claim F4.4。
 - 2026-07-13 · F4.4 已完成，代码提交 `d43062b`：可取消任务在取消瞬间提供独立 toast，Sidebar cancelling 更新保留；真实 VS Code 时序验证待用户执行。下一步按序 claim F4.5。
+- 2026-07-13 · F4.5 已完成，代码提交 `8f3e9d6`：Workbench active reader、detail card 与单封原文容器统一占满可用宽度；active reader 时 placeholder 由 CSS 强制 `display: none`。真实 VS Code 布局验证待用户执行。下一步按序 claim F4.6。
 
 ---
 
@@ -573,6 +582,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.4 pre-work checkpoint）**：恢复现场：F4.3 代码与补全记录已提交（`c75063d`、`49ff7a2`、`b24e633`），工作树干净；HEAD `b24e633`。已重新定位现有链路：取消回调已把 busy 切为 `cancelling`、更新 progress，并仅调用 `dashboardProvider.update()`（`extension.ts:737-742`、`771-777`）；Sidebar 已映射 cancelling 文案（`sidebar-render.ts:234-236`），单测只验证 update 被调用。真机仍不可见，故按计划保留现有 sidebar 路径并在取消瞬间增加独立即时反馈，避免依赖 webview 重渲染。边界：仅 F4.4 取消反馈与回归测试；不改取消 token、分析逻辑、store/schema 或 F4.5。
 
 - **2026-07-13 · Codex（F4.4 completion）**：完成 `d43062b`。可取消任务的取消回调在 progress/sidebar 更新同时同步显示独立 cancelling toast；不可取消任务不会误提示。review 发现并关闭不可取消任务的 P1。验收：`npm run compile` 零错误、定向 12/12、全量 `npm test` 413/413、`git diff --check` 通过。Manual：**needs user validation on real VS Code**，分析中点取消后 ≤1s 确认 toast，且不出现成功 toast。Next：claim F4.5。
+
+- **2026-07-13 · Codex（F4.5 pre-work checkpoint）**：恢复现场：F4.4 代码与记录已提交（`d43062b`、`1751d66`、`3b97c7c`），工作树干净；HEAD `3b97c7c`。已重新定位：`wb-reader.active` 已为 flex+height 100%，但普通 detail card 未强制可用宽度；placeholder 仅用 `hidden` 属性在 `showReader` 切换，CSS 未在 active reader 存在时强制 `display:none`；单封 `renderAnalysisDetail` 的原文使用 `.wb-body`，需与现有 thread 原文的宽度约束一致。边界：仅 Workbench CSS/渲染与断言；不改草稿、队列或 F4.6。
+
+- **2026-07-13 · Codex（F4.5 completion）**：完成 `8f3e9d6`。active reader、detail card 和单封 `.wb-original-section`/`.wb-body` 均占满可用宽度；placeholder 在 active reader 存在时通过同级 CSS 选择器强制 `display:none`，移除 active 后自然恢复。三项样式渲染断言先 RED 后 GREEN，独立 review 核实 DOM 顺序和全局 `box-sizing:border-box`，无 P0/P1/P2。验收：`npm run compile` 零错误、定向 37/37、全量 `npm test` 415/415、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，确认 sample 短邮件全宽/无残影、单封原文自适应并仅正文滚动。Next：claim F4.6。
 
 ---
 
