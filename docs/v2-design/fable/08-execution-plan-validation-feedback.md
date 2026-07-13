@@ -533,6 +533,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F5.3 已完成，代码提交 `722ecb3`：folder picker 保留原有 title，进度 message 按界面语言只显示一句简洁的 Outlook 启动提示；中英文均有回归覆盖。真实 VS Code 验证待用户执行。下一步按序 claim F5.4。
 
 - 2026-07-13 · F5.4 已完成，代码提交 `e08be3e`：每个分析 chunk 写盘后立即 sidebar-only 更新，workbench 仍只在任务结束时刷新，避免中途打断阅读与草稿。真实 VS Code 验证待用户执行。F5 全部完成。
+- 2026-07-14 · F6.4 已完成，代码提交 `d02bb1d`：批量分析在总量提示后立即报告 `Analyzing chunk 1/N…`，后续 chunk 继续显示剩余时间预估。下一步 claim F6.5。
 
 - 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
 
@@ -671,6 +672,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-14 · Codex（F6.3 pre-work checkpoint）**：恢复现场：F6.1/F6.2 代码与记录已提交（`0a44b9b`、`8e6d851`），工作树干净；HEAD `8e6d851`。已重新定位 `renderMeetingDetail`：`wb-meta-grid` 后先渲染正文、再渲染 `openMeetingInOutlook` actions，故按钮在底部；F6.2 已使 actions 自带前后单线，移动到 metadata 后即可与邮件一致。边界：仅重排既有会议详情模板与回归断言；不改 EntryID/VBS、meeting store/schema 或 F6.4/F6.5。
 
 - **2026-07-14 · Codex（F6.3 completion）**：完成 `bd5cba7`。会议模板只将既有 `wb-actions` 从正文后移至 metadata 后，继续使用同一 `openMeetingInOutlook` EntryID 按钮和 F6.2 统一样式；正文内容与数据路径不变。验收：`npm run compile` 零错误、Workbench 定向 40/40、完整 `npm test` 426/426、`git diff --check` 通过。Manual：**needs user validation on real VS Code/Outlook**，打开会议详情确认按钮在 metadata 下方，并确认原 EntryID 项仍能打开。Known issues：真实 Outlook 打开行为仍依赖既有 F5.2 真机验证。Next：claim F6.4。
+
+- **2026-07-14 · Codex（F6.4 pre-work checkpoint）**：恢复现场：F6.3 代码与记录已提交（`bd5cba7`、`1230e9d`，文档引用校正为 `15c7313`），工作树干净；HEAD `15c7313`。已重新定位 `analyzeBatchCore`：开工总量进度后，仅 `if (index)` 才输出 `Analyzing chunk i/N`，所以首个 chunk 没有序号；现有双 chunk 测试已锁定第二块的预估消息。边界：只令首块也发序号消息（无预估），后续保留预估格式；不改 chunk 切分、持久化、sidebar 刷新或用户新增的单封/线程文案优化。
+
+- **2026-07-14 · Codex（F6.4 completion）**：完成 `d02bb1d`。`analyzeBatchCore` 现于首个 chunk 开始时发送 `Analyzing chunk 1/N…`，而第二块起的剩余时间预估格式不变。验收：定向 `app-analysis` 27/27、`npm run compile` 零错误、完整 `npm test` 426/426、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，多 chunk Sidebar Analyze 时确认完整序列。Known issues：无新增。Next：claim F6.5。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -834,10 +839,18 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - Known issues：真实 Outlook 打开行为仍待既有真机验证。
   - Commit：`bd5cba7`。
 
-### [ ] F6.4 chunk 进度序列补首块（用户反馈#3，P2）
+### [x] F6.4 chunk 进度序列补首块（用户反馈#3，P2）（commit `d02bb1d`）
 
 - **现状**：F4.8 的 `if (index)` 使首个 chunk 不报 `i/N`，用户只看到 `Analyzing 2 chunks` → `Analyzing 2/2 chunk`。
 - **做法**：每个 chunk 开始时都报 `Analyzing chunk i/N…`（首块不带预估，后续带 `about X minutes remaining`）；开工前的总量信息并入第一条或保留一瞬均可。验收：单测覆盖 1/N 首块消息；`npm test` 全绿。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/app-analysis.ts`、`src/test/app-analysis.test.ts`。
+  - 实现边界：保留批量分析的总量提示；首个 chunk 也上报 `Analyzing chunk 1/N…` 且不带预估，后续 chunk 继续沿用既有剩余时间预估。未改 chunk 切分、持久化、sidebar 刷新，亦未触及单封/线程分析文案。
+  - 验收结果：定向 `app-analysis` 27/27 通过；`npm run compile` 零错误；完整 `npm test` 426/426 通过；`git diff --check` 通过。
+  - Manual validation：**needs user validation on real VS Code**。对足以分成多个 chunk 的邮件执行 Sidebar Analyze，确认先显示总量，再显示 `Analyzing chunk 1/N…`，后续显示带剩余时间预估的 chunk 消息。
+  - Known issues：无新增。
+  - Commit：`d02bb1d`。
 
 ### [ ] F6.5 hardBlockKeywords 扩充（用户反馈#1 短期项，P2）
 
