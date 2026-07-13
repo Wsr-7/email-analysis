@@ -84,7 +84,7 @@
 - **验收**：单测——三个页面输出含 CSP meta、script 带 nonce、两次渲染 nonce 不同、**输出 HTML 中不再含任何 `onclick=` 内联属性**；`npm test` 全绿。**needs user validation**：三个页面全功能回归（每个按钮/输入/折叠/QuickPick 入口点一遍）——CSP 配错或迁移遗漏的典型症状是局部按钮点了没反应。
 - **边界**：不引入外部资源；不改页面功能与视觉；改动量因 onclick 迁移比原估大（S-M → M），如单人完成压力大可拆两个 commit（迁移 / CSP）但同一 step 内完成。
 
-### [~] G6 Sidebar 上下方向键导航（D6 裁剪版，S 级）
+### [x] G6 Sidebar 上下方向键导航（D6 裁剪版，S 级）— `5d48d65`
 
 - **做法**：sidebar 列表获得焦点时，↑/↓ 在**当前可见队列**的条目间移动选中（跳过折叠分组内隐藏项与组头），选中行高亮 + 滚动入视野 + 触发与点击相同的 `openItem`（workbench 自动跟随——现有行为，点击即打开）。仅此一个动作，不做 Enter/其他快捷键。注意与 F3.4 pending 折叠分组、G2 会议折叠分组的可见性判定兼容。
 - **验收**：webview 脚本单测（断言键盘 handler 与可见性过滤逻辑存在于输出 HTML）；`npm test` 全绿。**needs user validation**：↑/↓ 切换流畅、workbench 跟随、折叠组内隐藏项被跳过。
@@ -124,6 +124,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G3 已完成（`789799b`）：hard-block/manual-confirm 与 3/2 级分类词表均可在 Settings 编辑，空数组关闭，非法值回落，分级词表 hash 变化触发全量重算。全量测试 443 pass。Next: claim G4。
 - 2026-07-14 · G4 已完成（`b6a6ead`）：分析输出新增合法 `YYYY-MM-DD` dueDate，两个行动桶按期限优先排序，Sidebar/Workbench 显示期限且过期或今日到期标红，翻译保持日期不变。全量测试 447 pass。Next: claim G5。
 - 2026-07-14 · G5 已完成（`4c8cce3`）：Sidebar 23 处内联 click handler 迁入统一事件委托，三个 Webview 由 extension caller 传入独立随机 nonce，全部启用严格 CSP 且 script 带 nonce。全量测试 450 pass。Next: claim G6。
+- 2026-07-14 · G6 已完成（`5d48d65`）：Sidebar 列表可聚焦，ArrowUp/ArrowDown 仅遍历当前真实可见 `.sb-row`，跳过两类折叠组隐藏项与组头，复用 openItem 并滚动入视野。全量测试 451 pass。Next: claim G7。
 
 ---
 
@@ -194,3 +195,13 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Commit：`4c8cce3`（本地，未 push）。
 
 - **2026-07-14 · Codex（G6 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `1f4bb9c`；重新定位确认 Sidebar `#itemList` 尚不可聚焦，所有可导航实体均为 `.sb-row[data-action="openItem"]`，`applyQueue` 用 row/group `hidden` 切换队列，pending 与 accepted schedule 的子容器另以 `hidden` 控制折叠，`openItem`/`setActiveRow` 已统一点击与高亮路径。边界：只让 Sidebar 列表可聚焦并处理 ArrowUp/ArrowDown，按真实可见性过滤 `.sb-row`、滚动入视野并复用 `openItem`；不做 Enter/循环导航/Workbench 快捷键或其他按键。Action: claim G6。
+
+- **2026-07-14 · Codex（G6 completion）**：Action: 为 `#itemList` 增加焦点入口，点击行后保持列表焦点，并在 ArrowUp/ArrowDown 时从 `offsetParent !== null` 的可见 `.sb-row` 中选择相邻项，复用 `openItem` 高亮/打开且 `scrollIntoView`。Validated: `npm run compile` 通过；`node --test out/test/sidebar-render.test.js` 46 pass；`npm test` 451 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——分别在普通队列、pending folder 折叠组与 accepted schedule 折叠组中用上下键切换，确认 Workbench 跟随、滚动平滑且隐藏项/组头被跳过。Next: G7。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/test/sidebar-render.test.ts`、本计划。
+  - 实现边界：只处理 Sidebar 列表焦点与 ArrowUp/ArrowDown；未加入 Enter、循环、其他快捷键或 Workbench 键盘导航。
+  - 验收结果：输出脚本覆盖按键门控、真实可见性过滤、统一 openItem 与滚动入视野；G2 两级会议折叠与既有 pending 折叠共用祖先可见性判定；全量 451 pass。
+  - Manual validation：**needs user validation**，真实 Webview 的焦点获得、折叠跳过、滚动与 Workbench 联动需手动确认。
+  - Known issues：到达队列首尾时保持当前项，不循环；这是本轮裁剪边界内的 no-op 行为。
+  - Commit：`5d48d65`（本地，未 push）。
