@@ -771,3 +771,44 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **新确认#2（分块结果能否先进分类）**：能，且比想象的更近——chunk 间无关联、每 chunk 完成即独立合并落盘（这就是为什么 chunk 解析失败只跳过该 chunk），缺的只是中途刷新 UI。已立项 F5.4（sidebar-only 增量刷新，不动 workbench）。
 - **§8#2 观察指引（真实邮件无自动草稿，暂不立案）**：sample 正常、真实为空——大概率是模型对这些邮件判断"无需回复"（prompt 明确指示 "Leave draftReply empty when no reply is needed"，且 auto 路由到的 mini 模型可能更保守）。观察期间可自查：analysis-result.json 中这些邮件的 `draftReply` 字段若为**空串**=模型判断不回，属预期；若字段**缺失**或与 UI 不一致=渲染问题，请回传条目。也可以试固定选择 gpt-5.4（非 auto/mini）再分析对比。
 - **§8#8 答疑（Details 对应文件）**：`docs/marketplace-details.md`。手动修改或将来加图片都改这个文件，改完跑 `npm run package:vsix` 重新打包即可生效（打包命令已固定 `--readme-path docs/marketplace-details.md`）；图片需用打进 vsix 的相对路径（如 `media/` 下）或 base64，不能引用外部 URL。GitHub 的 README.md/README_zh.md 与它互相独立。
+
+---
+
+## 10. Milestone F6 — 第四轮验证反馈批（2026-07-13，F5 复验 + 新反馈；F6.1 为规划者直接给出 CSS 处方的三修）
+
+> F5 复验结论：F5.2/F5.3/F5.4 通过（F5.2 留一个按钮位置小优化）；**F5.1 第三次失败且更严重**。规划者已通读 workbench-render 全部布局代码，F6.1 不再让 worker 自行设计方案——按处方照改，并且必须在 Extension Development Host 目视验证三种视图后才允许标记完成。
+
+### [ ] F6.1 已分析邮件原文区（三修，P1，处方式修复）
+
+- **失败根因（规划者定位，两轮修复都在错误模型上加码）**：`.wb-reader.active .wb-with-body` 同时设了 `height: 100%; min-height: 100%`——卡片被**钳死在视口高度**。pending 单封的固定内容少、弹性只有正文，看起来正常；analyzed 卡片固定内容（标题+meta+按钮+summary/reason/action 三区+草稿框）本身超过一屏，`.wb-original-section { flex: 1 1 auto; min-height: 0 }` 的原文区被 flex 压缩到近零，F5.1 又补了 `overflow: hidden`，于是"只剩 body 标签上半截"。
+- **处方（照改，不要再发明新模型）**：
+  1. `.wb-reader.active .wb-with-body`：**删除 `height: 100%`**，保留 `min-height: 100%`（内容短时撑满、内容长时自然生长、由 `.wb-pane` 滚动）。
+  2. `.wb-original-section`：改为 `display: flex; flex-direction: column; flex: 1 0 auto; width: 100%;`——**删除 `min-height: 0` 与 `overflow: hidden`**。
+  3. `.wb-body`：改为 `flex: 1 0 auto; min-height: 140px;`——**grow 不 shrink**（内容短时吃掉卡片剩余空间，内容长时保持自然高度随页面滚动）；**删除 `overflow-y: auto` 与 `min-height: 0`**，滚动交给 `.wb-pane`。
+  4. F5.1 加的 `.wb-mail-with-body { flex: 1 1 auto; height: auto; min-height: 0 }` 整行删除（新模型下无用）。
+- **完成门槛（缺一不可）**：① 布局单测更新；② `npm test` 全绿；③ **worker 在 Extension Development Host 加载 sample 数据，逐一打开"未分析单封 / 已分析单封 / 线程"三种详情，确认原文完整可读、短内容撑满、长内容随面板滚动，并把三种视图的观察结果写进 Completion Notes**——仅凭单测通过不得标记完成。
+
+### [ ] F6.2 Workbench 详情区结构统一（用户反馈#5，P2；与 F6.1 同文件，允许同 worker 合并 claim）
+
+- **现状**：详情区出现双横线且顺序混乱（metadata → 横线 → 横线 → 按钮 → 正文框；线程更甚：metadata → 横线 → 横线 → 按钮 → 横线 → Timeline）。来源：`.wb-meta-grid` 底部边线与 `.wb-actions { border-top }` 叠加、各 section 边线不统一。
+- **目标结构（所有详情视图统一）**：标题+metadata → **单横线** → 按钮区 → **单横线** → 内容区（analyzed：summary/reason/action/草稿/`原文:` 标签+正文框；pending：`原文:` 标签+正文框；线程：Timeline(n)…）。pending 单封的正文框上方补 `原文:`/`Body:` 标签与 analyzed 一致。
+- **验收**：渲染单测断言无相邻双横线结构；`npm test` 全绿。**needs user validation**：三种视图结构目视符合上述顺序。
+
+### [ ] F6.3 会议详情 Open in Outlook 按钮位置（用户反馈#2，P2）
+
+- 会议详情的 `Open in Outlook` 从底部移到 metadata 下方的按钮区（与邮件详情一致的位置与样式）。验收：单测 + `npm test` 全绿。
+
+### [ ] F6.4 chunk 进度序列补首块（用户反馈#3，P2）
+
+- **现状**：F4.8 的 `if (index)` 使首个 chunk 不报 `i/N`，用户只看到 `Analyzing 2 chunks` → `Analyzing 2/2 chunk`。
+- **做法**：每个 chunk 开始时都报 `Analyzing chunk i/N…`（首块不带预估，后续带 `about X minutes remaining`）；开工前的总量信息并入第一条或保留一瞬均可。验收：单测覆盖 1/N 首块消息；`npm test` 全绿。
+
+### [ ] F6.5 hardBlockKeywords 扩充（用户反馈#1 短期项，P2）
+
+- **背景**：现词表 `["password", "api_key", "access_token", "auth_token"]` 是对邮件**原文（主题+正文）的字面子串匹配**（`security-gate.ts:88` `matchKeywords(mailText(input), ...)`），不是语义识别——覆盖天然不全，它只是快速止损层，主防线是分级门控。
+- **做法**：硬编码词表扩充为：`password, passwd, pwd, api_key, apikey, access_token, auth_token, secret_key, private_key, credential, credentials, 密码, 口令, 密钥, 私钥, 凭证, 令牌`；保持子串匹配语义与大小写不敏感现状；单测覆盖中文命中。**可配置化（用户自定义词表 + 正则）列入 R3 安全设置决策**，本 step 不做。
+- **验收**：单测 + `npm test` 全绿。**needs user validation**：含"密码"的中文邮件被 hard block。
+
+### 第四轮验证问答核实记录（2026-07-13）
+
+- **新反馈#1（hardBlockKeywords 是扫描什么）**：是对**邮件原文（主题+正文摘录）的字面子串匹配**，不是模型分析、也不是我拍脑袋总结——命中列表中任一词即 hard block。用户的覆盖性担忧成立：字面匹配防不住变体与语义表达（如"登录凭据是 xxx"），它的定位是**零成本快速止损层**，真正的主防线是分级门控（manual confirm）。短期扩词表（F6.5），可配置化 + 正则模式入 R3 安全设置决策。
