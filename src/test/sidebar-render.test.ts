@@ -312,6 +312,25 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes(".sb-row.active"));
   });
 
+  it("uses the unique next-action id to select actions from the same thread", () => {
+    const input = stubInput({
+      nextActionsStore: {
+        items: [
+          { id: "thread:t1:review", sourceType: "thread", sourceId: "t1", sourceMailId: "m1", sourceTime: "", owner: "", task: "Review", deadline: "", status: "open", createdAt: "", updatedAt: "" },
+          { id: "thread:t1:reply", sourceType: "thread", sourceId: "t1", sourceMailId: "m2", sourceTime: "", owner: "", task: "Reply", deadline: "", status: "open", createdAt: "", updatedAt: "" }
+        ]
+      }
+    });
+
+    const html = renderSidebarHtml(input);
+
+    assert.ok(html.includes('data-next-action-id="thread:t1:review"'));
+    assert.ok(html.includes('data-next-action-id="thread:t1:reply"'));
+    assert.ok(html.includes("onclick=\"openItem('t1', 'thread:t1:review')\""));
+    assert.ok(html.includes("onclick=\"openItem('t1', 'thread:t1:reply')\""));
+    assert.ok(html.includes("row.getAttribute('data-next-action-id') === id"));
+  });
+
   it("renders compact rows for ignored items without action buttons", () => {
     const input = stubInput({
       state: stubState({}, [

@@ -144,7 +144,7 @@ function renderCompactNextActionRow(item: NextActionItem, labels: DashboardLabel
   const statusBtn = item.status === "open"
     ? `<button class="sb-badge sb-action-status" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="done" onclick="event.stopPropagation();post('markNextAction',{actionId:'${escapeAttr(item.id)}',status:'done'})">${escapeHtml(labels.nextActions.markDone)}</button>`
     : `<button class="sb-badge sb-action-status sb-mtg-dim" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="open" onclick="event.stopPropagation();post('markNextAction',{actionId:'${escapeAttr(item.id)}',status:'open'})">${escapeHtml(labels.nextActions.reopen)}</button>`;
-  return `<div class="sb-row${item.status !== "open" ? " sb-row-dim" : ""}" data-queue="nextActions" data-thread-id="${escapeAttr(item.sourceId)}" onclick="openItem('${escapeAttr(item.sourceId)}')">
+  return `<div class="sb-row${item.status !== "open" ? " sb-row-dim" : ""}" data-queue="nextActions" data-thread-id="${escapeAttr(item.sourceId)}" data-next-action-id="${escapeAttr(item.id)}" onclick="openItem('${escapeAttr(item.sourceId)}', '${escapeAttr(item.id)}')">
     <div class="sb-subject" title="${escapeAttr(item.task)}">${escapeHtml(item.task)}</div>
     <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${statusBtn}</div>
   </div>`;
@@ -639,14 +639,14 @@ function togglePendingFolder(button) {
   vscode.setState(Object.assign({}, state, { pendingFolders: expanded }));
 }
 
-function openItem(id) {
-  setActiveRow(id);
+function openItem(id, activeId) {
+  setActiveRow(activeId || id);
   post('openInWorkbench', { mailId: id });
 }
 
 function setActiveRow(id) {
   for (var row of document.querySelectorAll('.sb-row')) {
-    var match = row.getAttribute('data-mail-id') === id || row.getAttribute('data-thread-id') === id || row.getAttribute('data-meeting-id') === id;
+    var match = row.getAttribute('data-mail-id') === id || row.getAttribute('data-thread-id') === id || row.getAttribute('data-meeting-id') === id || row.getAttribute('data-next-action-id') === id;
     row.classList.toggle('active', match);
   }
   vscode.setState(Object.assign({}, vscode.getState() || {}, { currentItemId: id }));
