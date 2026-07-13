@@ -538,6 +538,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-14 · F6.6 已完成，代码提交 `3a39356`：Workbench 单封与线程分析通知分别使用 `Analyzing 1 email`、`Analyzing 1 thread`，单封不再被 batch chunk 消息覆盖；Sidebar 批量进度保持原样。F6 全部完成，下一步重新打包 VSIX 并推送。
 - 2026-07-14 · F7.1 已完成，代码提交 `eb07267`：Sidebar 批量分析首条进度合并实际邮件数、chunk 数和开始首块，避免同步通知覆盖；不增加等待。下一步 claim F7.2。
 - 2026-07-14 · F7.2 已完成，代码提交 `1adf263`：同线程 Next Action 行以唯一 action id 高亮，点击仍按 sourceId 路由至 Workbench。真实 VS Code 验证待用户执行。下一步 claim F7.3。
+- 2026-07-14 · F7.3 已完成，代码提交 `e857db4`：hard block 决策已参与队列分流，低密级命中词的邮件显示在既有“需手动确认”队列，详情保留安全阻断原因且无分析入口。真实 VS Code 验证待用户执行。F7 全部完成。
 
 - 2026-07-14 · F6.1/F6.2 已完成，代码提交 `0a44b9b`：已分析原文改由整个 Workbench 滚动，详情统一为按钮区前后各一条分隔线，pending 补原文标签；新增 24 行长 sample 并已在 Extension Development Host 目视验证。下一步可 claim F6.3/F6.4/F6.5。
 
@@ -696,6 +697,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-14 · Codex（F7.2 pre-work checkpoint）**：恢复现场：F7.1 的代码与记录已提交（`eb07267`、`31d40c3`），工作树仅有本 step 的 `[~]` claim，branch `v3...origin/v3 [ahead 2]`；HEAD `31d40c3`。已重新定位：`renderCompactNextActionRow` 以共享的 `sourceId` 写入 `data-thread-id`，点击也把该 id 交给 `openItem`；`setActiveRow` 据 `data-thread-id` 匹配，故同一线程的多个 Next Action 同时 active。边界：仅给 Next Action 行添加唯一 action id 作为选中键，Workbench 路由继续使用 sourceId；不改邮件、线程、会议的选择逻辑、Next Actions store/schema 或 F7.3 安全门禁。
 
 - **2026-07-14 · Codex（F7.2 completion）**：完成 `1adf263`。每条 Next Action 行保留 `data-thread-id` 供 Workbench 路由，并添加唯一的 `data-next-action-id` 供选中态；`openItem` 以 sourceId 打开详情、以 action id 设置 active，邮件/线程/会议原有单参数调用不变。验收：回归先 RED（43 项中新增断言失败）后 GREEN；定向 sidebar render 43/43、`npm run compile` 零错误、完整 `npm test` 430/430、`git diff --check` 均通过。Manual：**needs user validation on real VS Code**，同一线程有两条 Next Actions 时依次点击，始终仅当前项高亮且详情仍正确打开。Known issues：无新增。Next：claim F7.3。
+
+- **2026-07-14 · Codex（F7.3 pre-work checkpoint）**：恢复现场：F7.2 的代码与记录已提交（`1adf263`、`1d477a3`），工作树干净，branch `v3...origin/v3 [ahead 4]`；HEAD `1d477a3`。重新定位根因：`loadState` 与 `analyzeBatchCore` 均先建立 `securityDecisions`，但随后 `buildQueueState` 仅以 classification level 填充 `allowed`/`blocked`，未消费 hard block 决策；低密级但命中 hard block 关键词的邮件遂显示为 allowed，点击后才由 `canAnalyzeMail` 拒绝并报无可分析邮件。Workbench 对既有 `queue.blocked` 已能以“安全阻断”及原因显示 hard block，且不渲染 Confirm Analyze。边界：仅将 hard block 决策传入队列分流；不改词表、`canAnalyzeMail`、manual-confirm 语义、store/schema 或模型调用。
+
+- **2026-07-14 · Codex（F7.3 completion）**：完成 `e857db4`。`loadState` 与 `analyzeBatchCore` 均把既有 security decision map 传给 `buildQueueState`；仅 `decision === "block"` 的低密级邮件由 allowed 改入 blocked，manual-confirm 和既有门禁保持原语义。详情现有“安全阻断 + 原因、无 Confirm Analyze”分支继续复用，入口安全拒绝不变。验收：队列分流断言先 RED（新增参数尚不存在）后 GREEN；定向 classification/workbench/app-analysis 76/76、`npm run compile` 零错误、完整 `npm test` 432/432、`git diff --check` 均通过。Manual：**needs user validation on real Outlook/VS Code**，拉取含“密码”的低密级测试邮件，确认在“需手动确认”队列显示“安全阻断”原因，且无 Analyze/Confirm Analyze；验证日志/模型请求均不产生。Known issues：队列标题仍同时承载 manual-confirm 与 hard block，沿用既有文案。Next：F7 全部完成，等待用户决定是否打包/推送。
 
 ## 7. 人工验证清单（第二轮，2026-07-12 规划者汇总，用户填写）
 
@@ -932,11 +937,19 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
   - Known issues：无新增。
   - Commit：`1adf263`。
 
-### [ ] F7.3 hard block 邮件可见性与提示（P1）
+### [x] F7.3 hard block 邮件可见性与提示（P1）（commit `e857db4`）
 
 - **现状**：含 hard block 关键词的邮件不会进入任何可见分类，点击单封 Analyze 后只出现“no email available”类提示。
 - **做法**：重新定位 security gate → queue → Workbench 路由；保留 hard block 不送模型的安全语义，将邮件显示在既有 Blocked 队列/详情并给出明确 hard block 原因，不得回退为 Confirm Analyze 或修改词表。
 - **验收**：单测覆盖 hard block 邮件在 Blocked 队列可见、详情显示原因且单封 Analyze 不调用模型；`npm test` 全绿。**needs user validation**：真实含“密码”的邮件出现在 Blocked，可读到原因，且不能送入模型。
+
+- **Completion Notes**：
+  - 改动文件：`src/lib/classification.ts`、`src/lib/app-analysis.ts`、`src/extension.ts`、`src/test/classification.test.ts`、`src/test/workbench-render.test.ts`、`src/test/app-analysis.test.ts`。
+  - 实现边界：队列构建接收已有 security decision map，仅将 hard block 从 allowed 前置分流到 blocked；manual-confirm、词表、`canAnalyzeMail`、store/schema 与模型调用均未修改。
+  - 验收结果：队列回归先 RED（函数尚未接收安全决策）后 GREEN；定向 classification/workbench/app-analysis 76/76 通过；`npm run compile` 零错误；完整 `npm test` 432/432 通过；`git diff --check` 通过。
+  - Manual validation：**needs user validation on real Outlook/VS Code**。拉取正文含“密码”的低密级邮件，确认它显示在“需手动确认”队列，详情显示“安全阻断”与命中原因、没有 Analyze/Confirm Analyze；确认不产生模型调用。
+  - Known issues：队列标题“需手动确认”仍同时包含 manual-confirm 和 hard block，沿用既有 UI 文案。
+  - Commit：`e857db4`。
 
 ### 第四轮验证问答核实记录（2026-07-13）
 
