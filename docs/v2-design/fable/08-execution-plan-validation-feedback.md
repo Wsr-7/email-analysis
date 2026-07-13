@@ -341,11 +341,19 @@
 
 > 来源：用户完成第二轮验证（结果已回填 §7）并新增两条反馈（分析耗时、草稿不自动创建）。规划者对全部失败项做了代码级根因定位，其中 F4.1/F4.2 已本地确证（非猜测）。按优先级排序，互相独立。
 
-### [ ] F4.1 Meetings 队列空：getDashboardHtml 漏传 meetingStore（§7#2/#13，P0，根因已本地确证）
+### [x] F4.1 Meetings 队列空：getDashboardHtml 漏传 meetingStore（§7#2/#13，P0，commits `f2159e9`, `eaa5bf7`）
 
 - **根因（已确证）**：规划者本地复现——sample meeting digest 经 `parseMeetingDigest → mergeMeetingDigestIntoStore → pruneMeetingStore` 6 条全存活，`renderSidebarHtml` 显式传入 `meetingStore` 时 6 行全部渲染。但 `extension.ts` `getDashboardHtml`（~L1317-1332）构造 render 入参时**没有传 `meetingStore`**（~L1304 的 `extendedState` 类型都没声明它），而 `loadState`（~L1242）明明已挂上 `state.meetingStore`——调用点丢失，sidebar 永远 fallback 到 `emptyMeetingStore()`。这同时解释 sample 与真实、digest/store 有数据而队列恒空。
 - **做法**：`extendedState` 类型补 `meetingStore?: MeetingStore`；render 入参补 `meetingStore: extendedState.meetingStore || emptyMeetingStore()`。防回归：加一条测试断言 `loadState` 附加的每个扩展字段都被 `getDashboardHtml` 转发（本次漏传正是"类型断言 + 手抄字段清单"模式的固有风险，可考虑把入参构造提为可单测纯函数）。
 - **验收**：`npm test` 全绿 + 防回归测试；本地 sample 流程 Meetings 队列可见 6 条。**needs user validation**：真实 Outlook 拉取后 Meetings 队列出现今天/未来实例与未响应邀请。
+
+- **Completion Notes**：
+  - 改动文件：`src/extension.ts`、`src/test/extension-cancellation.test.ts`。
+  - 实现边界：仅把 `loadState` 已附加的 `meetingStore` 声明进 `getDashboardHtml` 的扩展状态并传给 `renderSidebarHtml`，缺省继续使用 `emptyMeetingStore()`；未改 meetings 采集、digest/store/schema 或会议队列产品语义。
+  - 验收结果：先以唯一会议标题建立端到端 RED 测试（修复前 sidebar HTML 不含该标题），再以逐字段转发测试验证纯入参构造缺失时实际 RED；最小修复后 GREEN。`npm run compile` 零错误，定向 `extension-cancellation` 8/8 通过，`npm test` 407/407 通过，`git diff --check` 通过。`collect-outlook-meetings.vbs --help` 通过，`--sample` digest 计数 6 条会议记录。
+  - Manual validation：**needs user validation on real Outlook/VS Code Sidebar**。执行 Fetch 后打开 Meetings，确认今天/未来日程与未响应邀请出现；同时确认 sample 会议在 Sidebar Meetings 队列中可见。
+  - Known issues：无。
+  - Commits：`f2159e9`、`eaa5bf7`。
 
 ### [ ] F4.2 草稿自动创建回归：flush 空 textarea 遮蔽模型 draftReply（新反馈#2，P0，根因已确证）
 
@@ -440,6 +448,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-12 · F3.5 已完成，代码提交 `6cc45d5`：ignoredSenders 确定性分流未分析邮件，线程 prompt 也排除命中消息。F3 全部完成。
 - 2026-07-13 · **规划者复审 F3 批通过**（diff `f7490fc..08f6b33`，独立复核 `npm test` 405/405 全绿、VBS `--help` 通过、`run-sample-validation.ps1` 端到端通过）：F3.1 超时降级 + requestId 防串号正确（两条竞态测试齐备）；F3.2 核实 enum 在 F2.1 注册时就已不存在（用户笔记引用的是旧版安装包 manifest），worker 只补 description 属诚实的最小处理；F3.3 双 README 结构完整（Overview/Features/Quick Start/Usage/Configuration/FAQ/Known Limitations/Author，5 个中文截图占位）；F3.4 分组渲染含 0 计数与历史目录兜底、展开态存 webview state；F3.5 `matchesIgnoredSender` 大小写不敏感子串匹配、`ignoredPending` 双来源合并、线程 prompt 过滤含全忽略保护。vsix 已重新打包含 F3 全部改动。§7 验证表已追加 F3 行（14-16）。**08 计划全部 19 个 step 完成，等待用户第二轮人工验证。**
 - 2026-07-13 · **用户完成第二轮验证（结果回填 §7）+ 两条新反馈，规划者核实后产出 F4 批（§2.10，8 个 step）**。两个 P0 根因已本地确证：**F4.1** Meetings 队列空 = `getDashboardHtml` 漏传 `meetingStore`（数据链 6/6 存活、显式传入即渲染，调用点丢字段）；**F4.2** 草稿不自动创建 = F1.3 flush 把空 textarea 写进 Map 遮蔽模型 `draftReply`。其余：F4.3 IsSentFolder 的 VBScript If-条件错误陷阱（全文件夹误判 SentOn）、F4.4 取消态真实环境不可见、F4.5 workbench 布局三处、F4.6 本地 vsix 无 `__metadata` 致 Guide 不弹、F4.7 Details 去外链解耦、F4.8 chunk 进度+预估。§7#3（注入邮件）核实为旧构建测试（日志键 `skippedChunkedMails` ≠ 当前代码），需新 vsix 复测。会议队列产品定位（邀请 vs 日程）与分析提速（并行/草稿按需）入 R3 决策清单。通过项：#4/#5/#6/#7/#9/#10/#14/#15/#16 主体。
+- 2026-07-13 · F4.1 已完成，代码提交 `f2159e9`、`eaa5bf7`：`getDashboardHtml` 不再丢弃 `loadState` 的 `meetingStore`，Sidebar 直接收到该 store；集中 Sidebar 入参构造并用逐字段与端到端回归测试锁定转发链。真实 Outlook/VS Code 验证待用户执行。下一步按序 claim F4.2。
 
 ---
 
@@ -514,6 +523,10 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 ---
 
 - **2026-07-13 · Claude Fable 5（规划者核实第二轮验证结果，产出 F4 批）**：用户回填 §7 十六项：通过 #4/#5/#6/#7/#9/#10/#14/#15/#16 主体；失败/残留项全部完成根因定位并立项 F4.1-F4.8（§2.10）。两个 P0 为本地确证而非推测：F4.1 用 sample 数据复现整条 TS 链（parse→merge→prune 6/6 存活、`renderSidebarHtml` 显式传 meetingStore 即出 6 行），锁定 `getDashboardHtml`（extension.ts ~L1317）漏传字段；F4.2 锁定 flush 空 textarea 经 `workingDraftsFlushed` 写空串进 Map，使 `workingDrafts.get(id) ?? item.draftReply` 的 fallback 失效。F4.3 定位到 VBScript 块 If 条件出错时 Resume Next 直接进入 Then 块的语义陷阱（IsSentFolder 全文件夹误判 SentOn）。§7#3 注入邮件测试经日志键比对确认跑在旧构建（`skippedChunkedMails` vs 当前 `skippedChunks`/`omittedMails`），列入第三轮复测。会议队列产品定位与分析提速两个方向记入 §3 R3 决策输入。Next: worker 按序 claim F4.1（P0）→ F4.2（P0）→ F4.3/F4.4 → F4.5-F4.8；全部完成后重新打包 vsix，用户做第三轮复测（重点：Meetings 队列、自动草稿、注入邮件新构建复测、取消提示、SentOn）。
+
+- **2026-07-13 · Codex（F4.1 pre-work checkpoint）**：恢复现场：工作树干净，branch `v3...origin/v3`；HEAD `6ab66a1`。已通读 08 新增 F4 批与既有协议，并重新定位根因：`loadState` 已将 `meetingStore` 附加到 state（`src/extension.ts:1220-1243`），`getDashboardHtml` 的 `extendedState` 类型与 `renderSidebarHtml` 入参却漏掉该字段（`1302-1332`），因此 sidebar 回退空 store；renderer 在显式传入 meetingStore 时已有会议行单测。边界：仅补齐 sidebar state 转发及防回归测试，不改 meetings 采集、digest/store/schema 或会议队列产品语义，不进入 F4.2。
+
+- **2026-07-13 · Codex（F4.1 completion）**：完成 `f2159e9`、`eaa5bf7`。`getDashboardHtml` 的扩展状态与 Sidebar render 入参均补齐 `meetingStore`，无数据时保持空 store 回退；集中入参构造后以逐字段断言锁住所有 Sidebar 扩展字段，端到端测试仍断言唯一会议标题进入最终 HTML，两个新增测试均在相应实现前实际 RED。独立复审通过，无 P0/P1/P2。验收：`npm run compile` 零错误、定向 8/8 与全量 `npm test` 407/407 通过、`git diff --check` 通过；meetings VBS `--help` 通过，`--sample` digest 验证 6 条会议。Manual：**needs user validation on real Outlook/VS Code Sidebar**，Fetch 后确认 Meetings 中显示今天/未来实例和未响应邀请。Next：按用户顺序 claim F4.2；不改会议产品语义、不进入 F4.3/R3/R4。
 
 ---
 
