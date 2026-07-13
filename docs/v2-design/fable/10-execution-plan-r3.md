@@ -49,7 +49,7 @@
 - **验收**：渲染单测（两级分组、计数、折叠态）；`npm test` 全绿。**needs user validation**：邀请置顶平铺、已接受折叠、徽标计数只含未响应。
 - **边界**：采集脚本与 meeting store 不动；详情/按钮不动。
 
-### [~] G3 安全词表配置化一期（D3，S-M 级）
+### [x] G3 安全词表配置化一期（D3，S-M 级）— `789799b`
 
 - **现状锚点**：`config-utils.ts` `buildSecuritySettings`（~L167-176）硬编码 `hardBlockKeywords`（F6.5 已扩为中英文 17 词）与 `manualConfirmKeywords: []`；`classification.ts` `ensureClassifications` 的分级关键词硬编码（~L62-68：3 级词表与 2 级词表）。
 - **做法**：
@@ -121,6 +121,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · 计划创建（依据 09 §7 拍板）。G1-G7 全部 `[ ]` 待 claim。
 - 2026-07-14 · G1 已完成（`f3dd065`）：单封分析 chunk 以并发度 2 补位执行，合并落盘串行化；新增 `draftGeneration=auto|onDemand`，全量测试 437 pass。Next: claim G2。
 - 2026-07-14 · G2 已完成（`96723b8`）：会议队列更名为会议邀请，未响应邀请平铺，未来已接受/暂定/组织者日程默认折叠，徽标仅计未响应。全量测试 438 pass。Next: claim G3。
+- 2026-07-14 · G3 已完成（`789799b`）：hard-block/manual-confirm 与 3/2 级分类词表均可在 Settings 编辑，空数组关闭，非法值回落，分级词表 hash 变化触发全量重算。全量测试 443 pass。Next: claim G4。
 
 ---
 
@@ -155,3 +156,13 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Commit：`96723b8`（本地，未 push）。
 
 - **2026-07-14 · Codex（G3 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `6290211`；重新定位确认 `src/lib/config-utils.ts:167-183` 仍硬编码 17 个 hard-block 词且 manual-confirm 为空，`src/lib/classification.ts:37-76` 仍硬编码 3/2 级词表并只补缺失缓存，classification cache 在 `src/lib/app-data.ts:320-332` 持久化，所有 `ensureClassifications` caller 已枚举。设置形态选择两个平级 array（`classificationLevel3Keywords` / `classificationLevel2Keywords`），因为 VS Code Settings UI 可直接增删条目，优于 object 只能手改 JSON；其余两个 setting 为 `hardBlockKeywords` / `manualConfirmKeywords`。边界：仅做子串/大小写不敏感词表配置、非法回落、空数组关闭与分级 hash 失效；不做正则、MIP 或级别变更。Action: claim G3。
+
+- **2026-07-14 · Codex（G3 completion）**：Action: 注册并读取四个平级 array settings，将 security gate 与 classification 词表改为配置驱动，并在 classification cache 保存 SHA-256 词表 hash、变更时全量重算。Validated: `npm run compile` 通过；`node --test out/test/config-utils.test.js out/test/classification.test.js out/test/security-gate.test.js` 61 pass；`npm test` 443 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——在 Settings 改 hard-block 与 3/2 级词表后刷新 Sidebar，核对已拉取邮件无需重新 Fetch 即更新分级/阻断；再用空数组确认对应层关闭。Next: G4。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/config-utils.ts`、`src/lib/classification.ts`、`src/lib/app-analysis.ts`、`src/extension.ts`、`package.json`、`default-config.json`、`src/test/config-utils.test.ts`、`src/test/classification.test.ts`、本计划。
+  - 实现边界：采用两个平级分类数组以获得更好的 Settings UI 编辑体验；保持原子串、大小写不敏感语义及 0-3 级结构。
+  - 验收结果：自定义、空数组、非法回落及 hash 触发全量重算均有自动化覆盖；默认词表与原硬编码一致；全量 443 pass。
+  - Manual validation：**needs user validation**，真实 Settings 修改后的 Sidebar 分级与 hard block 实时变化需在扩展宿主确认。
+  - Known issues：空 `hardBlockKeywords` 会显式关闭该安全层，风险已在 setting description 说明；未实现正则或 MIP。
+  - Commit：`789799b`（本地，未 push）。
