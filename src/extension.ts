@@ -1310,6 +1310,7 @@ export class EasyMailApp {
       promptConfig?: PromptConfig;
       threadStore?: ThreadStore;
       threadAnalysis?: ThreadAnalysisResult;
+      meetingStore?: MeetingStore;
       ignoredIds?: Set<string>;
     };
     const availableModels = await this.data.readCachedAvailableModels(this.availableModelsCache, (event, d) => this.log(event, d));
@@ -1324,6 +1325,7 @@ export class EasyMailApp {
       promptConfig: extendedState.promptConfig || normalizePromptConfig({}),
       threadStore: extendedState.threadStore || emptyThreadStore(),
       threadAnalysis: extendedState.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+      meetingStore: extendedState.meetingStore || emptyMeetingStore(),
       ignoredIds: extendedState.ignoredIds,
       nextActionsStore,
       availableModels,

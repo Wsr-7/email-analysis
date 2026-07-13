@@ -138,6 +138,40 @@ test("maybeOpenGuide keys first-run state by install timestamp and falls back to
   assert.equal(opened, 4, "the same install timestamp opens the guide only once");
 });
 
+test("getDashboardHtml forwards the meeting store attached by loadState", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  (app as any).loadState = async () => ({
+    config: { rangeMode: "recentHours", recentHours: 24, outputLanguage: "en-US", folders: [] },
+    digestMetadata: { generatedAt: "", rangeMode: "", recentHours: 0, maxItems: 0, folders: [] },
+    overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 },
+    categories: [],
+    store: { generatedAt: "", lastPullAt: "", items: [] },
+    index: { generatedAt: "", items: [] },
+    queue: { pending: [], blocked: [], analysed: [], allowed: [] },
+    classifications: { items: [] },
+    securityDecisions: new Map(),
+    promptConfig: { categories: [], importantSenders: [] },
+    threadStore: { generatedAt: "", lastBuiltAt: "", items: [] },
+    threadAnalysis: { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    meetingStore: {
+      generatedAt: "", lastPullAt: "", items: [{
+        meetingId: "meeting-1", entryId: "entry-1", subject: "F4.1 Meeting",
+        organizer: "Alice", start: "2026-07-13 09:00", end: "2026-07-13 09:30",
+        location: "", isAllDay: false, isRecurring: false, requiredAttendees: "",
+        optionalAttendees: "", responseStatus: "notResponded", meetingSource: "calendar",
+        importance: "Normal", bodyExcerpt: "", pulledAt: "2026-07-13"
+      }]
+    },
+    ignoredIds: new Set()
+  });
+  ((app as any).data as any).readCachedAvailableModels = async () => [];
+  ((app as any).data as any).readNextActions = async () => ({ items: [] });
+
+  const html = await (app as any).getDashboardHtml();
+
+  assert.ok(html.includes("F4.1 Meeting"));
+});
+
 test("flushWorkbenchDrafts times out a missing webview response and permits the next flush", async () => {
   const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
   let requests = 0;
