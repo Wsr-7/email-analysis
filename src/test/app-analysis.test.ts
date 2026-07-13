@@ -763,6 +763,7 @@ describe("analyzeBatchCore", () => {
       };
 
       const progressMessages: string[] = [];
+      const persistedResults: string[] = [];
       const context = {
         data,
         llmProvider: provider,
@@ -774,7 +775,10 @@ describe("analyzeBatchCore", () => {
         }),
         log: async () => {},
         availableModelsCache: null,
-        progress: (message: string) => { progressMessages.push(message); }
+        progress: (message: string) => { progressMessages.push(message); },
+        onChunkPersisted: async () => {
+          persistedResults.push(await fs.readFile(data.getAnalysisPath(), "utf8"));
+        }
       };
       const originalDateNow = Date.now;
       Date.now = () => now;
@@ -791,6 +795,8 @@ describe("analyzeBatchCore", () => {
         "Analyzing 2 chunks…",
         "Analyzing chunk 2/2 (about 1 minute remaining)"
       ]);
+      assert.equal(persistedResults.length, 2, "each completed chunk notifies after its merged result is written");
+      assert.ok(persistedResults.every((result) => result.includes('"items"')), "the notification observes a persisted analysis result");
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

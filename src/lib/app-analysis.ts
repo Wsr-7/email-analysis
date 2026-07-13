@@ -30,6 +30,7 @@ export interface AnalysisContext {
   availableModelsCache: AvailableModel[] | null;
   cancellationToken?: CancellationTokenLike;
   progress?: (message: string) => void;
+  onChunkPersisted?: () => Promise<void>;
   retryDelaysMs?: number[];
 }
 
@@ -302,6 +303,7 @@ export async function analyzeBatchCore(
     );
     await fs.promises.writeFile(ctx.data.getAnalysisPath(), `${JSON.stringify(merged, null, 2)}\n`, "utf8");
     await fs.promises.writeFile(ctx.data.getSummaryPath(), buildSummaryMarkdown(merged, summaryLabels), "utf8");
+    await ctx.onChunkPersisted?.();
   };
   const persistSkippedChunk = async (chunk: StoredMail[], chunkIndex: number): Promise<void> => {
     omittedMails += chunk.length;

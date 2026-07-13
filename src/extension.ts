@@ -645,7 +645,7 @@ export class EasyMailApp {
         labels.progress.analyze,
         labels.progress.detail,
         kind,
-        async (token, reportProgress) => await this.analyzeBatchCore(selection, token, reportProgress),
+        async (token, reportProgress) => await this.analyzeBatchCore(selection, token, reportProgress, () => this.refreshCancellationSidebar(labels.progress.analyze)),
         (analysis) => `EasyMail analysis completed for ${analysis.batchSize} mail(s).`,
         true,
         labels.progress.cancelling
@@ -667,7 +667,7 @@ export class EasyMailApp {
     }
   }
 
-  private analysisContext(cancellationToken?: CancellationTokenLike, progress?: (message: string) => void): AnalysisContext {
+  private analysisContext(cancellationToken?: CancellationTokenLike, progress?: (message: string) => void, onChunkPersisted?: () => Promise<void>): AnalysisContext {
     return {
       data: this.data,
       llmProvider: this.llmProvider,
@@ -676,12 +676,13 @@ export class EasyMailApp {
       log: (event, data) => this.log(event, data),
       availableModelsCache: this.availableModelsCache,
       cancellationToken,
-      progress
+      progress,
+      onChunkPersisted
     };
   }
 
-  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike, progress?: (message: string) => void): Promise<AnalysisBatchResult> {
-    return analyzeBatchCoreImpl(this.analysisContext(cancellationToken, progress), selection);
+  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike, progress?: (message: string) => void, onChunkPersisted?: () => Promise<void>): Promise<AnalysisBatchResult> {
+    return analyzeBatchCoreImpl(this.analysisContext(cancellationToken, progress, onChunkPersisted), selection);
   }
 
   public async analyzeThread(threadId: string): Promise<void> {
