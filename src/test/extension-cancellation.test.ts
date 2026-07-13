@@ -32,6 +32,24 @@ const { EasyMailApp, buildSidebarRenderInput } = require("../extension") as {
 const { CopilotProvider } = require("../lib/copilot-provider") as { CopilotProvider: new () => { listModels: () => Promise<unknown[]>; sendPrompt: (prompt: string, options: unknown) => Promise<{ rawText: string }> } };
 internalModule._load = originalLoad;
 
+async function renderWorkbenchDraft(app: any, draftReply: string): Promise<string> {
+  app.loadState = async () => ({
+    config: { outputLanguage: "en-US" },
+    digestMetadata: { generatedAt: "", rangeMode: "", recentHours: 0, maxItems: 0, folders: [] },
+    overview: { totalMails: 1, mustHandleToday: 1, risks: 0, waitingForMe: 0, notices: 0 },
+    categories: [{
+      id: "mustHandleToday",
+      items: [{
+        mailId: "m1", category: "mustHandleToday", priority: "P0", subject: "Test", sender: "sender@test.com",
+        receivedTime: "", summary: "", reason: "", suggestedAction: "", draftReply, confidence: 1,
+        needsOriginalMailCheck: false
+      }]
+    }]
+  });
+  app.data.readCachedAvailableModels = async () => [];
+  return await app.getWorkbenchHtml();
+}
+
 test("runWithBusy cancels through the sidebar only and clears busy state after the task", async () => {
   cancellationListener = undefined;
   disposed = 0;
@@ -204,6 +222,56 @@ test("buildSidebarRenderInput forwards every render field attached by loadState"
   assert.equal(input.threadAnalysis, threadAnalysis);
   assert.equal(input.meetingStore, meetingStore);
   assert.equal(input.ignoredIds, ignoredIds);
+});
+
+test("a flush with an untouched empty textarea does not create a working draft", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+
+  await (app as any).handleMessage({
+    type: "workingDraftsFlushed",
+    requestId: "1",
+    drafts: [{ itemId: "mail:m1", draftText: "" }]
+  });
+
+  assert.equal((app as any).workingDrafts.has("mail:m1"), false, "the model draft fallback must remain available");
+  assert.ok((await renderWorkbenchDraft(app, "Model draft")).includes("Model draft"));
+});
+
+test("a user-cleared working draft remains an explicit empty value", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+
+  await (app as any).handleMessage({ type: "updateWorkingDraft", itemId: "mail:m1", draftText: "Typed draft" });
+  await (app as any).handleMessage({ type: "updateWorkingDraft", itemId: "mail:m1", draftText: "" });
+
+  assert.equal((app as any).workingDrafts.has("mail:m1"), true);
+  assert.equal((app as any).workingDrafts.get("mail:m1"), "");
+  const html = await renderWorkbenchDraft(app, "Model draft");
+  assert.ok(html.includes('<textarea class="draft-textarea"></textarea>'));
+  assert.ok(!html.includes('<textarea class="draft-textarea">Model draft</textarea>'));
+});
+
+test("Generate and Polish keep their non-empty working drafts", async () => {
+  cancellationRequested = false;
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  const warnings: string[] = [];
+  (vscodeMock.window as any).showWarningMessage = (message: string) => { warnings.push(message); };
+  (app as any).log = async () => {};
+  (app as any).readConfig = async () => ({ modelFamily: "test" });
+  ((app as any).data as any).readCachedAvailableModels = async () => [{ id: "test", family: "test", name: "Test", vendor: "test" }];
+  ((app as any).data as any).writeModelInfo = async () => {};
+  (app as any).buildDraftGenerationPrompt = async () => "draft prompt";
+  const model = { id: "test", family: "test", name: "Test", vendor: "test" };
+  (app as any).llmProvider = { sendPrompt: async () => ({ rawText: '{"draftReply":"Generated draft"}', model, usedFallback: false }) };
+
+  await (app as any).generateDraft("mail:m1", "m1");
+  assert.deepEqual(warnings, []);
+  assert.equal((app as any).workingDrafts.get("mail:m1"), "Generated draft");
+
+  (app as any).llmProvider = { sendPrompt: async () => ({ rawText: " Polished draft ", model, usedFallback: false }) };
+  await (app as any).polishDraft("Generated draft", "mail:m1");
+  assert.deepEqual(warnings, []);
+  assert.equal((app as any).workingDrafts.get("mail:m1"), "Polished draft");
+  assert.ok((await renderWorkbenchDraft(app, "Model draft")).includes('<textarea class="draft-textarea">Polished draft</textarea>'));
 });
 
 test("flushWorkbenchDrafts times out a missing webview response and permits the next flush", async () => {

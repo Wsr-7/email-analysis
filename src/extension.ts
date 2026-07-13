@@ -1311,7 +1311,9 @@ export class EasyMailApp {
       openPromptConfig: () => this.openPromptConfig(),
       clearLocalCache: () => this.clearLocalCache(),
       openWorkbench: (focusId) => this.openWorkbench(focusId),
-      updateWorkingDraft: (itemId, draftText) => { this.workingDrafts.set(itemId, draftText); },
+      updateWorkingDraft: (itemId, draftText) => {
+        if (draftText || this.workingDrafts.has(itemId)) this.workingDrafts.set(itemId, draftText);
+      },
       completeWorkingDraftFlush: (requestId) => this.completeWorkbenchDraftFlush(requestId),
       generateDraft: (itemId, sourceId) => this.generateDraft(itemId, sourceId),
       polishDraft: (draftText, itemId) => this.polishDraft(draftText, itemId),
