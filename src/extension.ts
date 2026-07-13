@@ -640,12 +640,13 @@ export class EasyMailApp {
   private async runAnalysisWithBusy(kind: string, selection?: "allAllowed" | string[] | number): Promise<void> {
     const locale = await this.readLocale();
     const labels = getLabels(locale);
+    const isSingleMail = Array.isArray(selection) && selection.length === 1;
     try {
       const result = await this.runWithBusy(
         labels.progress.analyze,
-        labels.progress.detail,
+        isSingleMail ? "Analyzing 1 email" : labels.progress.detail,
         kind,
-        async (token, reportProgress) => await this.analyzeBatchCore(selection, token, reportProgress, () => this.refreshCancellationSidebar(labels.progress.analyze)),
+        async (token, reportProgress) => await this.analyzeBatchCore(selection, token, isSingleMail ? undefined : reportProgress, () => this.refreshCancellationSidebar(labels.progress.analyze)),
         (analysis) => `EasyMail analysis completed for ${analysis.batchSize} mail(s).`,
         true,
         labels.progress.cancelling
@@ -690,7 +691,7 @@ export class EasyMailApp {
     const labels = getLabels(locale);
     await this.runWithBusy(
       labels.progress.analyze,
-      labels.progress.detail,
+      "Analyzing 1 thread",
       "analyzeThread",
       async (token) => await this.analyzeThreadCore(threadId, token),
       (result) => `Thread analysis completed for ${result.subject}.`,

@@ -183,6 +183,41 @@ test("runWithBusy records a failed cancellation sidebar update", async () => {
   assert.ok(logs.includes("busy:cancelSidebarError"));
 });
 
+test("single-mail analysis uses its own progress text without batch chunk updates", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  let busyArgs: any[] = [];
+  let receivedProgress: unknown;
+  (app as any).readLocale = async () => "en-US";
+  (app as any).analyzeBatchCore = async (_selection: unknown, _token: unknown, progress: unknown) => {
+    receivedProgress = progress;
+    return { batchSize: 1 };
+  };
+  (app as any).runWithBusy = async (...args: any[]) => {
+    busyArgs = args;
+    return await args[3]({}, () => {});
+  };
+
+  await (app as any).analyzeSelected(["mail-1"]);
+
+  assert.equal(busyArgs[1], "Analyzing 1 email");
+  assert.equal(receivedProgress, undefined);
+});
+
+test("thread analysis uses its own progress text", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  let busyArgs: any[] = [];
+  (app as any).readLocale = async () => "en-US";
+  (app as any).analyzeThreadCore = async () => ({ subject: "Thread subject" });
+  (app as any).runWithBusy = async (...args: any[]) => {
+    busyArgs = args;
+    return await args[3]({});
+  };
+
+  await (app as any).analyzeThread("thread-1");
+
+  assert.equal(busyArgs[1], "Analyzing 1 thread");
+});
+
 test("CopilotProvider passes the same cancellation token to sendRequest and streaming response", async () => {
   let receivedToken: unknown;
   const token = { isCancellationRequested: false };
