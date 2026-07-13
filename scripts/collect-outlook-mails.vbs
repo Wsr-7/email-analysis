@@ -527,7 +527,13 @@ Function IsSentFolder(byRef ns, byRef folder)
     If current Is Nothing Then
       Exit For
     End If
-    If SafeString(current.EntryID) = sentEntryId Then
+    Dim currentEntryId
+    currentEntryId = SafeString(current.EntryID)
+    If Err.Number <> 0 Then
+      Err.Clear
+      Exit For
+    End If
+    If currentEntryId = sentEntryId Then
       IsSentFolder = True
       Exit For
     End If
@@ -854,7 +860,9 @@ Function SafeRecipientsByType(byRef mail, byVal recipientType)
     Err.Clear
     Set recipient = recipients.Item(i)
     If Err.Number = 0 And Not recipient Is Nothing Then
-      If recipient.Type = recipientType Then
+      Dim recipientTypeValue
+      recipientTypeValue = recipient.Type
+      If Err.Number = 0 And recipientTypeValue = recipientType Then
         Dim address
         address = SafeString(recipient.Address)
         Dim addressEntry
