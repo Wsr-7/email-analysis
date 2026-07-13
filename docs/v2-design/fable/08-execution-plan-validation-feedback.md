@@ -482,6 +482,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F4.1 已完成，代码提交 `f2159e9`、`eaa5bf7`：`getDashboardHtml` 不再丢弃 `loadState` 的 `meetingStore`，Sidebar 直接收到该 store；集中 Sidebar 入参构造并用逐字段与端到端回归测试锁定转发链。真实 Outlook/VS Code 验证待用户执行。下一步按序 claim F4.2。
 - 2026-07-13 · F4.2 已完成，代码提交 `897fcbd`：首次空 flush 不再写入草稿 Map，模型 `draftReply` 能正常作为初值显示；用户主动清空仍保持为空。真实 Workbench 验证待用户执行。下一步按序 claim F4.3。
 - 2026-07-13 · F4.3 已完成，代码提交 `c75063d`：`IsSentFolder` 不再在块 If 条件读取 COM 属性；同文件唯一同类 recipient 条件已同步守护。真实 Outlook 验证 Inbox/Sent Items 时间属性待用户执行。下一步按序 claim F4.4。
+- 2026-07-13 · F4.4 已完成，代码提交 `d43062b`：可取消任务在取消瞬间提供独立 toast，Sidebar cancelling 更新保留；真实 VS Code 时序验证待用户执行。下一步按序 claim F4.5。
 
 ---
 
@@ -570,6 +571,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.3 completion）**：完成 `c75063d`。`IsSentFolder` 读取 `current.EntryID` 后先检查错误，读取失败即清除并停止上溯，再比较普通变量；同文件唯一同类 `recipient.Type` 条件同步改为变量读取与错误检查。静态回归测试分别在旧写法实际 RED，review 通过。验收：`npm run compile` 零错误、`npm test` 412/412、mail VBS `--help`/`--sample`、`git diff --check` 均通过。Manual：**needs user validation on real Outlook**，确认 Inbox `timeProperty=ReceivedTime` 且 Sent Items 仍为 `SentOn`。Next：claim F4.4。
 
 - **2026-07-13 · Codex（F4.4 pre-work checkpoint）**：恢复现场：F4.3 代码与补全记录已提交（`c75063d`、`49ff7a2`、`b24e633`），工作树干净；HEAD `b24e633`。已重新定位现有链路：取消回调已把 busy 切为 `cancelling`、更新 progress，并仅调用 `dashboardProvider.update()`（`extension.ts:737-742`、`771-777`）；Sidebar 已映射 cancelling 文案（`sidebar-render.ts:234-236`），单测只验证 update 被调用。真机仍不可见，故按计划保留现有 sidebar 路径并在取消瞬间增加独立即时反馈，避免依赖 webview 重渲染。边界：仅 F4.4 取消反馈与回归测试；不改取消 token、分析逻辑、store/schema 或 F4.5。
+
+- **2026-07-13 · Codex（F4.4 completion）**：完成 `d43062b`。可取消任务的取消回调在 progress/sidebar 更新同时同步显示独立 cancelling toast；不可取消任务不会误提示。review 发现并关闭不可取消任务的 P1。验收：`npm run compile` 零错误、定向 12/12、全量 `npm test` 413/413、`git diff --check` 通过。Manual：**needs user validation on real VS Code**，分析中点取消后 ≤1s 确认 toast，且不出现成功 toast。Next：claim F4.5。
 
 ---
 
