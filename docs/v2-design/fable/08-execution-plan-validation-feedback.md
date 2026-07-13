@@ -355,7 +355,7 @@
   - Known issues：无。
   - Commits：`f2159e9`、`eaa5bf7`。
 
-### [ ] F4.2 草稿自动创建回归：flush 空 textarea 遮蔽模型 draftReply（新反馈#2，P0，根因已确证）
+### [~] F4.2 草稿自动创建回归：flush 空 textarea 遮蔽模型 draftReply（新反馈#2，P0，根因已确证）
 
 - **根因（已核实）**：模型一直在生成 `draftReply`（output-schema 未变），渲染 fallback 链 `workingDrafts.get(id) ?? item.draftReply` 也正确。但 F1.3 的 flush 协议把**所有** `.draft-box-editable` 的 textarea 值无条件上报（`workbench-render.ts:465-470`，含空值），`workingDraftsFlushed` 处理器把空串写进 Map——此后 `get(id)` 返回 `""` 而非 `undefined`，`??` 不触发，模型草稿被永久遮蔽。典型触发序列：邮件在 workbench 打开过 → 分析 → busy finally 触发 refresh → flush 把旧 HTML 里的空草稿框写成 `""` → 新渲染丢弃刚生成的 draftReply。
 - **做法**：区分"用户清空"与"从未编辑"——`updateWorkingDraft`（含 flush 批量路径与 input debounce 路径）收到**空文本**时仅当 Map 已存在该 id 条目才写入（清空要尊重），否则跳过（不得用空串占位）。单测：① flush 上报空 textarea 不遮蔽 `draftReply`；② 用户输入后清空 → 刷新后仍为空；③ Generate/Polish 写入后正常显示。
@@ -395,6 +395,12 @@
 - **做法**：① analyze 的 progress 按 chunk 更新：`正在分析 chunk i/N（约剩 X 分钟）`——预估 = 已完成 chunk 的平均耗时 × 剩余数，首 chunk 前显示总 chunk 数；② Select Outlook Folders 的 progress 文案开头即提示"先启动 Outlook 可显著加快加载"（不等失败才说）。真正提速的两个方向（chunk 并行、draftReply 按需生成砍输出）涉及产品权衡，已列入 §3 R3 决策输入，不在本 step 做。
 - **验收**：`npm test` 全绿。**needs user validation**：分析多 chunk 时能看到进度与预估；picker 一开始就有 Outlook 提示。
 
+### [ ] F4.9 模型分类为 ignored 的邮件掉进渲染黑洞（§7#3 消失之谜的真正根因，P0，已确证）
+
+- **根因（已确证，2026-07-13 用户新构建复测 + 规划者代码定位）**：用户复测注入邮件，日志全绿（无漏返无孤儿、id 匹配、`mergedItems:1`），analysis-result.json 显示模型将其分类为 `category: "ignored"`（判断合理：test 邮件无业务内容；**注入防御成功**——模型未被劫持，输出规范 JSON 并把注入文本引为 evidence）。但 `dashboard-state.ts:49-53` 构建分类桶时，`ignored` 桶被特殊处理为**仅含 `ignoredIds`（手动 ignore）命中的分析项**，其他桶又只收 `item.category === 自身` 的项——**模型分类为 ignored 且未被手动 ignore 的邮件不属于任何桶**，UI 上凭空消失。两轮"注入邮件消失"（07 §8#8 与本文件 §7#3）的真正根因即此，与注入无关。
+- **做法**：`dashboard-state.ts` 的 ignored 桶改为**并集**：`ignoredIds` 命中的分析项 ∪ `category === "ignored"` 的分析项（按 mailId 去重）。核对 `sidebar-render.ts:200` 的 `queueCounts["ignored"]` 与渲染行随分类桶补齐后自动可见、计数不重不漏。单测：① 模型返回 category=ignored 且不在 ignoredIds → 出现在 ignored 桶且计数正确；② 同一邮件既被手动 ignore 又被模型分类 ignored → 只出现一次。
+- **验收**：`npm test` 全绿。**needs user validation**：重析注入测试邮件 → 出现在 Ignored 队列（含 summary/evidence）；手动 ignore 其他邮件不回归。
+
 ---
 
 ## 3. 核实后接受不修 / 直接回答的记录
@@ -414,6 +420,7 @@
 
 - **§7#2 追问（Meetings 队列的采集逻辑与产品定位）**：当前逻辑两路采集（`collect-outlook-meetings.vbs`）：① 日历今天起 `meetingDaysAhead`（默认 2）天内、非拒绝的全部实例（含周期展开）；② Inbox 近 7 天未响应的会议邀请（`IPM.Schedule.Meeting.Request`）。合并去重 → digest → store（merge + prune：过期且已响应的剪掉）→ sidebar 队列（未响应排前、其余按开始时间）。**定位是"近期日程 + 待响应邀请"混合视图，不是纯会议邀请**。用户观点（已接受的会议 Outlook 日历自有提醒，插件增量价值在待响应邀请）成立——建议方向：队列改名"会议邀请/Meeting Invites"、默认只显示 notResponded，已接受/组织的未来会议折叠为次级或移除。**列入 R3 决策清单**；F4.1 先修显示 bug 不动语义，用户实际用一段时间后再拍板。
 - **§7#3 复测说明（注入邮件）**：用户 09:12 测试日志的 `analyze:done` 键为 `skippedChunkedMails`，与当前代码的 `skippedChunks`/`omittedMails`（09:39 日志已是新键）不一致——**该测试跑在旧构建上，F1.2 的对账兜底未生效**，结果不作数。需在新 vsix 上复测；若仍消失，回传日志中 `analyze:omittedItems`/`analyze:orphanItems` 行与 analysis-result.json 对应条目即可精确定位。
+- **§7#3 复测结论（2026-07-13 已定案）**：用户新构建复测——日志全绿、analysis-result.json 显示模型分类为 `ignored` 且分析内容完整规范（**注入防御成功**，模型未被劫持）。消失根因 = 模型分类 ignored 的渲染黑洞，已立项 **F4.9**。至此两轮"注入邮件消失"完全闭环：防御链无问题，是 `dashboard-state` 分类桶的遗留缺陷。
 - **新反馈#1（分析耗时）**：121s/20 封 = 2 chunk 串行、各 45-76s，耗时几乎全在模型输出生成（1.7 万字符 JSON，其中每封的 draftReply 是大头）。即时改善 = F4.8 的 chunk 进度 + 预估。真正提速两个方向均属产品权衡、入 R3 决策：① chunk 并行（受 Copilot 配额/限流约束，对应既有"并行分析"占位）；② draftReply 按需生成（分析时不产草稿、点击再生成，可砍约一半输出耗时——但与"自动草稿"体验相反，需用户取舍）。
 - **Q8（bodyExcerptChars 截断，已核实代码）**：是既有设计，`easyMail.bodyExcerptChars` 可在 Settings 配置（默认 1500，最小 100）。语义：**单封邮件各自截断**，且发生在采集时（`BuildMailRecord` 对完整 `.Body` 取前 N 字符，vbs:719）——即"先截断、后去引用"。由于回复的新内容在正文顶部、引用历史在底部，前 1500 字符天然优先保住新内容，去引用只是把截断后残余的历史再剪掉；只有单封邮件**自身新增内容超过 1500 字**时才会丢内容。对分析的影响：存在偏差可能（模型每封最多看 1500 字），超长邮件的结论可能不完整——F2.3 已加 Content truncated 标注提示用户，需要完整分析时可调大设置或用 Open in Outlook 看原文。"先去引用、后截断"的改造需把去引用逻辑前移到 VBS 或采集加倍回传，成本收益不成比例，不立项；若 R3 的 C-3（digest NDJSON 化）重做采集格式，届时一并考虑。
 
@@ -527,6 +534,8 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - **2026-07-13 · Codex（F4.1 pre-work checkpoint）**：恢复现场：工作树干净，branch `v3...origin/v3`；HEAD `6ab66a1`。已通读 08 新增 F4 批与既有协议，并重新定位根因：`loadState` 已将 `meetingStore` 附加到 state（`src/extension.ts:1220-1243`），`getDashboardHtml` 的 `extendedState` 类型与 `renderSidebarHtml` 入参却漏掉该字段（`1302-1332`），因此 sidebar 回退空 store；renderer 在显式传入 meetingStore 时已有会议行单测。边界：仅补齐 sidebar state 转发及防回归测试，不改 meetings 采集、digest/store/schema 或会议队列产品语义，不进入 F4.2。
 
 - **2026-07-13 · Codex（F4.1 completion）**：完成 `f2159e9`、`eaa5bf7`。`getDashboardHtml` 的扩展状态与 Sidebar render 入参均补齐 `meetingStore`，无数据时保持空 store 回退；集中入参构造后以逐字段断言锁住所有 Sidebar 扩展字段，端到端测试仍断言唯一会议标题进入最终 HTML，两个新增测试均在相应实现前实际 RED。独立复审通过，无 P0/P1/P2。验收：`npm run compile` 零错误、定向 8/8 与全量 `npm test` 407/407 通过、`git diff --check` 通过；meetings VBS `--help` 通过，`--sample` digest 验证 6 条会议。Manual：**needs user validation on real Outlook/VS Code Sidebar**，Fetch 后确认 Meetings 中显示今天/未来实例和未响应邀请。Next：按用户顺序 claim F4.2；不改会议产品语义、不进入 F4.3/R3/R4。
+
+- **2026-07-13 · Codex（F4.2 pre-work checkpoint）**：恢复现场：F4.1 代码与记录已提交（`f2159e9`、`eaa5bf7`、`4192abf`），工作树干净；HEAD `4192abf`。已重新定位根因：webview flush 无条件枚举所有 `.draft-box-editable` 并上报空 `draftText`（`workbench-render.ts:462-470`），message handler 再无条件调用 `updateWorkingDraft`（`message-handler.ts:81-94`）；extension context 当前直接 `Map.set`（`extension.ts:1314`），所以空框会建立空值条目并遮蔽 `workingDrafts.get(id) ?? item.draftReply` fallback。Generate/Polish/Refine 已直接写 Map。边界：仅让扩展侧草稿更新区分首次空值与用户主动清空，并补三组回归测试；不改 webview flush 协议、digest/store/schema 或 F4.3。
 
 ---
 
