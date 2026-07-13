@@ -264,6 +264,9 @@ describe("renderSidebarHtml", () => {
     assert.equal(properties["easyMail.modelFamily"].enum, undefined);
     assert.equal(properties["easyMail.modelFamily"].enumItemLabels, undefined);
     assert.match(properties["easyMail.modelFamily"].description, /Load Copilot Models.*dashboard.*Settings.*fallback/i);
+    assert.equal(properties["easyMail.folders"].order, 4);
+    assert.equal(properties["easyMail.importantSenders"].order, 4.1);
+    assert.equal(properties["easyMail.ignoredSenders"].order, 4.2);
     assert.ok(properties["easyMail.collectorTimeoutSeconds"].order < properties["easyMail.modelFamily"].order);
     assert.ok(properties["easyMail.modelFamily"].order < properties["easyMail.outputLanguage"].order);
     assert.ok(properties["easyMail.outputLanguage"].order < properties["easyMail.autoAnalyzeMaxClassificationLevel"].order);
