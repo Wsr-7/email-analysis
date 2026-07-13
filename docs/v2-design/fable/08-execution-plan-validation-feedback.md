@@ -522,6 +522,7 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 - 2026-07-13 · F4.7 已完成，代码提交 `9b2b434`：Marketplace Details 已与 GitHub README 解耦，重新打包的 VSIX Details 与 manifest 均无外链。下一步按序 claim F4.8。
 - 2026-07-13 · F4.8 已完成，代码提交 `f27ce88`：分析按 chunk 报告总数与基于已完成 chunk 的剩余预估，Folder picker 立即提示先启动 Outlook。F4.1-F4.8 均已完成，等待用户真机验证。
 - 2026-07-13 · F4.9 已完成，代码提交 `3f71ea8`：模型分类为 ignored 的邮件与手动 ignored 邮件共同进入 Ignored 队列并按 mailId 去重；Sidebar 计数/行可见。F4 批全部完成，等待用户真机验证；按用户要求未刷新 F4.8 后的 VSIX。
+- 2026-07-13 · **规划者复审 F4 批全部通过**（diff `15da7ef..c3de0fb`，独立复核 `npm test` 419/419 全绿、双 VBS `--help` 通过、`run-sample-validation.ps1` 端到端通过）。逐项确认与方案一致：F4.1 类型+转发双补齐并带防字段遗漏测试；F4.2 空文本仅写已有条目；F4.3 修 IsSentFolder 并按方案顺带修了 `SafeRecipientsByType` 同类陷阱；F4.4 取消瞬间 toast+progress+sidebar 三路反馈；F4.5/F4.6/F4.8 与方案一致；F4.7 删除 `repository` 字段与 README 打包（与"无外链"诉求一致）；F4.9 并集+去重正确。**vsix 已拆包验证**：`releases/easymail-0.3.0.vsix`（commit `c3de0fb`）内含 F4.9 的 ignored 并集代码、内置 readme 为零外链的 marketplace-details——worker 已打包推送，内容与 HEAD 一致。已知小边界（接受）：F4.2 语义下"从未编辑过的模型草稿被一次性清空"在刷新后会复原（Map 无条目则跳过空写入），属可接受取舍。第三轮人工验证清单见 §8。
 
 ---
 
@@ -657,3 +658,21 @@ F1.1（root cause 已给足，改动小收益最大）→ F1.4 / F1.2 / F1.3（�
 | 14 | Pending 文件夹分组（F3.4） | 打开 Sidebar 的 Pending 队列 | 按已配置 folder 分组显示 `文件夹名 (N)`（含 0 封的显示 (0)），点组头展开/收起邮件列表，切换队列后再回来展开状态仍在 | 正常 |
 | 15 | ignoredSenders（F3.5） | Settings 里 `easyMail.ignoredSenders` 加一个真实 no-reply 地址，刷新/Fetch | 该发件人所有未分析邮件移入 Ignored 队列（不再出现在 Pending）；从设置删除该条目后恢复回 Pending | 正常 |
 | 16 | 其他小项（F3.2/F3.3） | ① Settings 页看 `easyMail.modelFamily`；② VS Code 扩展详情页看 Details | ① 是自由文本框（无下拉），从 dashboard 选任意模型写回后不标非法；② Details 结构完整（README 渲染正常，5 处截图占位待你补图） | 正常。但是details如果是对应 readme 的话，其实我不打算让用户可以在详情页有超链接跳转，它不需要跳转这个外部链接。这个details能否跟 readme 是独立的，而不是相关联的？或者可以做本地版 |
+
+---
+
+## 8. 人工验证清单（第三轮，2026-07-13 规划者汇总，用户填写）
+
+> 前置：安装 commit `c3de0fb` 的 `releases/easymail-0.3.0.vsix`（已拆包验证含 F4 全部改动）。结果列填 ✅ / ❌ / ⏭️，❌ 请附现象与日志行。
+
+| # | 验证点（来源） | 操作方法 | 预期结果 | 结果 |
+|---|---|---|---|---|
+| 1 | **Meetings 队列（F4.1，重点）** | 先 Generate Sample Digest 看队列，再真实 Outlook 拉取 | sample 显示 6 条会议（未响应排前）；真实拉取显示今天/未来实例与未响应邀请 | |
+| 2 | **自动草稿（F4.2，重点）** | 分析一批含需回复邮件；再对一封已在 workbench 打开过的邮件做分析 | 需回复邮件草稿框自动带模型草稿（两种场景都不丢）；Notice 类留空显示 Generate Draft | |
+| 3 | **注入邮件（F4.9，重点）** | 重析注入测试邮件（或直接刷新查看） | 出现在 Ignored 队列，带完整 summary/evidence；手动 ignore 其他邮件不回归 | |
+| 4 | Inbox 时间属性（F4.3） | Fetch 后看日志 FolderScan 行 | Inbox 行 `timeProperty=ReceivedTime`；Sent Items 行仍 `SentOn` | |
+| 5 | 取消反馈（F4.4） | 分析进行中点取消 | ≤1s 出现 "Cancelling…" toast 与进度文案变化，无成功 toast，结束后复原 | |
+| 6 | Workbench 布局（F4.5） | 用 sample 短邮件打开单封与线程详情 | reader 占满 workbench 宽度；无 placeholder 残影叠字；单封原文容器自适应 | |
+| 7 | Guide 重装（F4.6） | 卸载后重装同版本 vsix 并激活 | Guide 再次弹出；同一安装内重启 VS Code 不重复弹 | |
+| 8 | Details 无外链（F4.7） | 看扩展详情页 Details | 内容来自本地版（无 GitHub/releases 等超链接可点） | |
+| 9 | 分析进度（F4.8） | 分析 20+ 封（多 chunk） | 进度显示 `chunk i/N（约剩 X 分钟）`；folder picker 一打开就有"先启动 Outlook"提示 | |
