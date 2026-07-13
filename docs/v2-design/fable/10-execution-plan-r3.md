@@ -25,7 +25,7 @@
 
 ## 1. Milestone G — R3 批次（按建议顺序排列，互相独立可并行 claim；G1 最大，建议单独一人做）
 
-### [~] G1 分析提速：chunk 并行度 2 + draftGeneration 开关（D1，M 级，最高优先）
+### [x] G1 分析提速：chunk 并行度 2 + draftGeneration 开关（D1，M 级，最高优先）— `f3dd065`
 
 - **现状锚点**：`app-analysis.ts` `analyzeBatchCore` 的 chunk for 循环串行 await（~L300-410）；每 chunk `mergeAndPersist` 独立落盘 + F1.2 对账 + F5.4 chunk 完成后 sidebar 刷新回调；取消检查在循环头；进度回调 `ctx.progress`。
 - **做法**：
@@ -119,6 +119,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 ## 3. Current Snapshot
 
 - 2026-07-14 · 计划创建（依据 09 §7 拍板）。G1-G7 全部 `[ ]` 待 claim。
+- 2026-07-14 · G1 已完成（`f3dd065`）：单封分析 chunk 以并发度 2 补位执行，合并落盘串行化；新增 `draftGeneration=auto|onDemand`，全量测试 437 pass。Next: claim G2。
 
 ---
 
@@ -129,3 +130,13 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **2026-07-14 · Claude Fable 5（规划者开工前自审，修订 5 处）**：① **G5 补最大的坑**——三个模板存在大量 `onclick=` 内联事件属性，nonce 型 CSP 不放行内联 handler，必须先迁移事件委托再加 CSP（两步顺序不可颠倒，级别 S-M 上调为 M）；② **G3 补分类缓存失效机制**——classification cache 持久化导致词表变更后已分类邮件不重算，需词表 hash 变更触发全量重算，否则验收必失败；③ **G4 修正排序锚点**——分类内顺序来自 `dashboard-state.ts` 分桶（非 sidebar-render），改法明确为分桶后仅对两个目标桶做桶内重排；④ G1 补单 chunk 失败隔离与 `applyReplyTemplateToAnalysis` 空 parts no-op 确认项、G7 补 `redactStoredMails` 是否覆盖附件名的确认项；⑤ §0.1 补"新增设置三件套模式"、G6 补与 G2 的顺序约束。自审后判定：任务/做法/验收/边界达到可开工标准。
 
 - **2026-07-14 · Codex（G1 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `fc062db`；重新定位确认 `src/lib/app-analysis.ts:213-408` 仍是串行 chunk 循环，`mergeAndPersist`/`persistSkippedChunk`/取消检查/进度回调锚点均成立，`src/lib/prompt-config.ts:118` 为单封 prompt 组装入口，`src/lib/reply-template.ts:36` 为模板应用入口，设置三件套仍落在 `package.json`、`default-config.json`、`src/extension.ts readConfig`。边界：仅实现并发度 2、串行合并落盘、失败/取消/进度语义与 `draftGeneration`；不改 chunk 划分/token 预算，不做并发度设置，不动线程分析。基线 `npm test`：432 pass / 0 fail。Action: claim G1。
+
+- **2026-07-14 · Codex（G1 completion）**：Action: 完成并发度 2 的补位式 chunk worker、按完成顺序串行合并落盘、失败隔离、取消后停止补位、完成计数进度，以及 `draftGeneration` 三件套与 on-demand prompt；未改线程分析、chunk 划分和 token 预算。Validated: `npm run compile` 通过；`node --test out/test/app-analysis.test.js` 31 pass；`npm test` 437 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——用约 20 封邮件分别在 `auto` 与 `onDemand` 下分析，核对总耗时、完成计数进度、空草稿的 Generate Draft 与生成后操作。Next: G2。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/app-analysis.ts`、`src/lib/prompt-config.ts`、`src/extension.ts`、`package.json`、`default-config.json`、`src/test/app-analysis.test.ts`、`src/test/prompt-config.test.ts`、`src/test/reply-template.test.ts`、本计划。
+  - 实现边界：只覆盖 G1 明定的单封批量分析并发与草稿开关；未新增依赖或设置化并发度。
+  - 验收结果：并发上限/乱序完成串行合并/失败隔离/取消不补位/onDemand prompt/空草稿 no-op 均有自动化覆盖；全量 437 pass。
+  - Manual validation：**needs user validation**，真实 Copilot 的 20 封耗时、进度文案及 Generate Draft 链路仍需实机确认。
+  - Known issues：本机测试无法证明真实模型吞吐约减半；未发现新的代码级已知问题。
+  - Commit：`f3dd065`（本地，未 push）。
