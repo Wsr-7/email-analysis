@@ -91,7 +91,7 @@
 - **边界**：不做 workbench 侧键盘导航；不做其他快捷键。
 - **顺序约束**：建议在 G2 完成后再做（G2 会新增会议折叠分组，先做 G6 会漏测该场景；若确要并行，后完成的一方负责联测两个折叠分组的跳过逻辑并在 Notes 写明）。
 
-### [~] G7 附件可见性（09 §7 C 组核实产出，S 级）
+### [x] G7 附件可见性（09 §7 C 组核实产出，S 级）— `e323af6`
 
 - **现状锚点（已核实）**：attachmentCount/attachmentNames 已采集入 store（`mail-store.ts:196-197`）；但 ① sidebar 邮件行不显示；② workbench 单封详情（pending 与 analyzed 两个模板）不显示；③ **单封批量分析 prompt 不含附件字段**（`mail-store.ts` `buildBatchDigestMarkdown` ~L283-299 无 Attachment 行；线程 prompt 已含，`thread-prompt-builder.ts:60-61`）。
 - **做法**：
@@ -125,6 +125,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G4 已完成（`b6a6ead`）：分析输出新增合法 `YYYY-MM-DD` dueDate，两个行动桶按期限优先排序，Sidebar/Workbench 显示期限且过期或今日到期标红，翻译保持日期不变。全量测试 447 pass。Next: claim G5。
 - 2026-07-14 · G5 已完成（`4c8cce3`）：Sidebar 23 处内联 click handler 迁入统一事件委托，三个 Webview 由 extension caller 传入独立随机 nonce，全部启用严格 CSP 且 script 带 nonce。全量测试 450 pass。Next: claim G6。
 - 2026-07-14 · G6 已完成（`5d48d65`）：Sidebar 列表可聚焦，ArrowUp/ArrowDown 仅遍历当前真实可见 `.sb-row`，跳过两类折叠组隐藏项与组头，复用 openItem 并滚动入视野。全量测试 451 pass。Next: claim G7。
+- 2026-07-14 · G7 已完成（`e323af6`）：pending/analyzed 单封邮件在 Sidebar 与 Workbench 显示附件元数据，batch prompt 含 count/name 且附件名先脱敏，实际 system prompt 明确禁止声称读取附件内容。全量测试 454 pass。Next: 全量收口复验。
 
 ---
 
@@ -207,3 +208,13 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Commit：`5d48d65`（本地，未 push）。
 
 - **2026-07-14 · Codex（G7 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `ff4f82a`；重新定位确认 store 已规范化 `attachmentCount`/`attachmentNames`，线程 prompt 已带附件元数据，但 `buildBatchDigestMarkdown` 无附件行；Sidebar 的 stored/analyzed mail row 与 Workbench 的 pending/analyzed metadata 均未渲染附件。确认 `redactStoredMails` 目前只处理 `bodyExcerpt`，明确保留 `attachmentNames`，因此附件名尚未脱敏。边界：只补单封邮件列表/详情附件可见性、batch prompt 元数据、附件名脱敏与防幻觉指令；不改 digest 文件格式，不下载/预览/读取附件内容，不改线程附件展示。Action: claim G7。
+
+- **2026-07-14 · Codex（G7 completion）**：Action: 为 stored/analyzed mail row 增加 📎 tooltip，为 pending/analyzed Workbench metadata 增加附件数与文件名；batch digest 每封写 `AttachmentCount`，有名称时才写 `AttachmentNames`；`redactStoredMails` 对每个附件名走同一 `redactText` 并计入 replacement；在指南文件及实际加载的 `base-system.md` 加入禁止假装读取内容的约束。Validated: `npm run compile` 通过；相关五个测试文件 142 pass；`npm test` 454 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——Fetch 一封真实带附件邮件，核对 pending 与 analyzed 的 Sidebar 📎 tooltip、Workbench 附件行，并分析正文提及附件/漏附的邮件，确认结果只依据 count/name 且不声称读取内容。Next: 全量收口复验。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/lib/workbench-render.ts`、`src/lib/mail-store.ts`、`src/lib/redaction.ts`、`prompts/analysis-prompt.md`、`prompts/base-system.md`、对应测试、本计划。
+  - 实现边界：只暴露并传递已有附件元数据；未改 collector/digest 文件格式，未下载、预览或读取附件内容，也未新增线程 UI。
+  - 验收结果：pending/analyzed 两条 UI 路径、带/不带附件的 batch digest、实际 prompt 防幻觉约束及附件名脱敏均有自动化覆盖；全量 454 pass。
+  - Manual validation：**needs user validation**，真实 Outlook 附件采集值、Webview tooltip/metadata 与真实模型对附件存在/漏附的判断需实机确认。
+  - Known issues：确认项结论为旧 `redactStoredMails` **不覆盖** attachmentNames，本 step 已补齐；模型仍只能看到 count/name，无法验证附件内容。
+  - Commit：`e323af6`（本地，未 push）。
