@@ -281,6 +281,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：本轮未执行 UI 自动控制；真实 Webview 焦点链仍以用户手动结果为最终依据。
   - Commit：`f59eedf`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8.3 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `ac52f37`；重新定位确认点击 Next Action 时 `openItem` 先用唯一 `data-next-action-id` 高亮，但 Workbench `showReader(threadId)` 随即回传 `focusSidebarItem(threadId)`，现有 `setActiveRow` 又以共享 `data-thread-id` 匹配同线程全部 action，覆盖唯一高亮。按钮文案锚点在 `dashboard-labels.ts` 的 `nextActions.markDone`。边界：保留当前 action 的唯一 id 选择，线程回传时不扩散到同线程兄弟 action；同步中英文按钮文案；不改 NextActionsStore、状态协议或排序。Action: claim G8.3。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -308,7 +310,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **要求**：必须在 Extension Development Host 实测复现 → 修复 → 再实测 ↑/↓ 全流程（含折叠跳过），把观察写进 Completion Notes——G6 的教训是单测过了不等于真机可用。
 - **验收**：`npm test` 全绿 + dev host 实测记录。**needs user validation**：点击邮件后直接 ↑/↓ 可切换且 workbench 跟随。
 
-### [ ] G8.3 Next Actions 多项高亮回归 + 按钮改名（额外反馈#1，P2）
+### [~] G8.3 Next Actions 多项高亮回归 + 按钮改名（额外反馈#1，P2）
 
 - 用 sample 线程数据复现"多个 action 同时高亮"（F7.2 修过一次，线程来源的 action 疑似再破）；修复并补覆盖线程场景的单测。按钮 label：`Done/完成` → `Mark Done/标记已完成`（中英文）。
 - **验收**：单测 + `npm test` 全绿。**needs user validation**：sample 线程下单选高亮正确。
