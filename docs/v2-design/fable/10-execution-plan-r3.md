@@ -164,6 +164,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G8.2 已完成（`f59eedf`）：Sidebar 发起的 Workbench 首次打开与后续 reveal 均保留 Sidebar 焦点，使既有上下键 handler 可继续接收按键。全量测试 456 pass。Next: claim G8.3。
 - 2026-07-14 · G8.3 已完成（`1dac69c`）：Workbench 回传线程 id 时保留唯一 Next Action 选择，不再高亮同线程全部 action；按钮改为“标记已完成 / Mark Done”。全量测试 457 pass。Next: claim G8.4。
 - 2026-07-14 · G8.4 已完成（`c807e46`）：批量分析初始 toast 恢复邮件数与 chunk 数，初始/进行中文案均按 zh-CN/en-US 本地化；代码级并发测试继续通过。全量测试 458 pass。Next: claim G8.5。
+- 2026-07-14 · G8.5 已完成（`01843d5`）：两类折叠组头统一使用更亮的 section header 前景、700 字重和轻微字距/垂直 padding，字号保持 11px。全量测试 459 pass。Next: claim G8.6。
 
 ---
 
@@ -309,6 +310,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.5 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `57aca42`；重新定位确认 pending folder 与“已接受的日程”共用 `.sb-pending-folder-header`，当前为 11px/600、普通 `sideBar-foreground`、6px 垂直 padding，因此可用一个 CSS 规则同步增强。边界：只将字重提高到 700、改用 `sideBarSectionHeader-foreground` 并轻调 padding/letter-spacing；不改字号、DOM、折叠行为或其他 Sidebar 元素。Action: claim G8.5。
 
+- **2026-07-14 · Codex（G8.5 completion）**：Action: 共享组头规则改用 `--vscode-sideBarSectionHeader-foreground`（带 foreground fallback）、700 字重、0.02em 字距和 7px 垂直 padding，字号仍为 11px。Validated: TDD RED 锁定共享样式；fresh `npm test` 459 pass / 0 fail（含 compile）；`git diff --check` 通过。Manual: **needs user validation**——目视 pending folder 与“已接受的日程”组头更清晰但不突兀，且字号未变大。Next: G8.6。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/test/sidebar-render.test.ts`、本计划。
+  - 实现边界：只改两类折叠组共享 CSS；未改 DOM、字号、折叠状态或点击行为。
+  - 验收结果：颜色变量、700 字重、字距及字号约束有 render 输出测试；全量 459 pass。
+  - Manual validation：**needs user validation**，最终视觉权重由用户在实际 VS Code 主题下确认。
+  - Known issues：不同 VS Code 主题对 `sideBarSectionHeader-foreground` 的对比度定义不同，已保留通用 foreground fallback。
+  - Commit：`01843d5`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -347,7 +358,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **并发实效核查（用户反馈提速无感）**：在日志中对比同一次分析里两个 chunk 的 `analyze:chunkStart`/`analyze:response` 时间戳是否重叠——若 vscode.lm 对同会话请求内部串行化导致并发无效，如实记入 Completion Notes 的 Known issues（属平台限制，不强行绕），并在 §7 汇报给规划者。
 - **验收**：单测锁初始文案；`npm test` 全绿。**needs user validation**：初始 toast 含邮件数与 chunk 数。
 
-### [~] G8.5 折叠组头视觉强化（额外反馈#3，P2）
+### [x] G8.5 折叠组头视觉强化（额外反馈#3，P2）— `01843d5`
 
 - pending folder 组头与会议"已接受的日程"组头字体存在感不足：font-weight 提到 700、颜色用更亮的前景变量（如 `--vscode-sideBarSectionHeader-foreground`），可加少量 letter-spacing/上下 padding；不加大字号。两处组头样式统一。
 - **验收**：`npm test` 全绿。**needs user validation**：目视组头明显但不突兀。
