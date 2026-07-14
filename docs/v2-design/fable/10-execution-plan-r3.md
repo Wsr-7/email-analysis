@@ -161,6 +161,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G7 已完成（`e323af6`）：pending/analyzed 单封邮件在 Sidebar 与 Workbench 显示附件元数据，batch prompt 含 count/name 且附件名先脱敏，实际 system prompt 明确禁止声称读取附件内容。全量测试 454 pass。Next: 全量收口复验。
 - 2026-07-14 · R3 G 批次收口完成：G1-G7 全部 `[x]`，整体 diff 复核未发现 Critical/Important 问题；最终 `npm run compile`、454 项全量测试与 `git diff --check` 均通过。14 个本地 commit，未 push。
 - 2026-07-14 · G8.1 已完成（`5683136`）：keyword 型 `manual_confirm` 不再落入 Pending，而是进入 Manual Confirm Required；显式确认分析仍可用，两个关键词设置的机制差异已写清。全量测试 455 pass。Next: claim G8.2。
+- 2026-07-14 · G8.2 已完成（`f59eedf`）：Sidebar 发起的 Workbench 首次打开与后续 reveal 均保留 Sidebar 焦点，使既有上下键 handler 可继续接收按键。全量测试 456 pass。Next: claim G8.3。
 
 ---
 
@@ -270,6 +271,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.2 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `6261038`；重新定位确认 Sidebar 点击 `openItem` 前已显式聚焦 `#itemList`，键盘 handler 也会按真实可见性过滤行；焦点随后被 `openWorkbench` 的既有 panel `reveal(ViewColumn.One)` 或首次 `createWebviewPanel(..., ViewColumn.One, ...)` 抢走。边界：只让 Sidebar 发起的 Workbench 打开/跟随保留 Sidebar 焦点，并补 caller 级回归断言；不改键位、循环规则、队列过滤或 Workbench 内部焦点行为。Action: claim G8.2。
 
+- **2026-07-14 · Codex（G8.2 completion）**：Action: 为已有 Workbench panel 的 `reveal` 传入 `preserveFocus=true`，首次创建 panel 时使用同等 showOptions；保留 Sidebar 既有显式列表聚焦、可见行过滤和 openItem 路径。Validated: TDD RED 锁定两个焦点保留 caller；`npm run compile` 通过；sidebar/message-handler 相关测试 89 pass；fresh `npm test` 456 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——点击任意邮件后直接按 ↑/↓，确认 Workbench 跟随切换；在 pending folder 与已接受日程折叠组中确认跳过隐藏项和组头。Next: G8.3。
+
+  **Completion Notes**
+  - 改动文件：`src/extension.ts`、`src/test/sidebar-render.test.ts`、本计划。
+  - 实现边界：只改变 Sidebar 发起的 Workbench 首开/reveal 焦点策略；未改变命令直接打开 Workbench 时的 toggle 语义、键位、循环或队列筛选。
+  - 验收结果：首次创建和既有 panel reveal 两条路径都有 caller 级回归断言；既有可见行导航测试继续通过；全量 456 pass。
+  - Manual validation：**needs user validation**，按用户要求由用户在 Extension Development Host 手动验证普通队列与两类折叠组的 ↑/↓ 全流程。
+  - Known issues：本轮未执行 UI 自动控制；真实 Webview 焦点链仍以用户手动结果为最终依据。
+  - Commit：`f59eedf`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -290,7 +301,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **做法**：`allowed` 过滤改为排除 `decision === "block" || decision === "manual_confirm"`；确认 blocked 队列的 UI 文案/确认按钮对 keyword 型 manual_confirm 与 level 型行为一致（workbench 的 Confirm and Analyze 应可用）。顺带回答用户 M04 的疑问——在两个设置的 description 中写清差异：`classificationLevel3Keywords` 改变邮件**分级**（影响徽标显示与阈值比较，调高 `autoAnalyzeMaxClassificationLevel` 到 3 后可自动分析）；`manualConfirmKeywords` **无视分级强制人工确认**（任何阈值下都要确认）。两者在默认阈值下效果相似但机制不同，不是重复配置。
 - **验收**：单测——keyword 命中进 blocked 队列、Confirm and Analyze 可分析、与 level 型行为一致；`npm test` 全绿。**needs user validation**：manualConfirmKeywords 加词后邮件进入 Manual Confirm Required 队列且可确认分析。
 
-### [~] G8.2 方向键导航真机无反应（M10/M11，P1，高概率根因已定位）
+### [x] G8.2 方向键导航真机无反应（M10/M11，P1，高概率根因已定位）— `f59eedf`
 
 - **现状**：G6 实现存在（`#itemList` tabindex=0 + keydown 监听，sidebar-render.ts ~L567/L742），单测通过但真机零反应。
 - **首要假设**：点击邮件行触发 `openInWorkbench` → workbench panel `reveal()` **抢走焦点** → sidebar webview 失焦，方向键从此进不来。修法：workbench reveal 加 `preserveFocus: true`（sidebar 发起的打开/跟随不抢焦点；用户主动点 workbench 时焦点自然过去）。次要排查点：VS Code webview 中点击非聚焦子元素是否真的把焦点给到 tabindex 容器（必要时在行 mousedown 里显式 `itemList.focus()`）。
