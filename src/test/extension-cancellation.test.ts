@@ -490,6 +490,22 @@ test("Generate and Polish keep their non-empty working drafts", async () => {
   assert.ok((await renderWorkbenchDraft(app, "Model draft")).includes('<textarea class="draft-textarea">Polished draft</textarea>'));
 });
 
+test("Generate Draft always asks for a draft when the user explicitly requests one", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  ((app as any).data as any).readMailStore = async () => ({ items: [{ mailId: "m1", subject: "Status", from: "alice@example.com", bodyExcerpt: "No action needed." }] });
+  ((app as any).data as any).readAnalysisResult = async () => ({ items: [] });
+
+  const prompt = await (app as any).buildDraftGenerationPrompt(
+    "mail:m1",
+    "m1",
+    "en",
+    "{{GREETING}}\n{{MAIN_MESSAGE}}\n{{REQUESTED_ACTION}}\n{{CLOSING}}"
+  );
+
+  assert.match(prompt, /Generate a draft even when no reply appears necessary/i);
+  assert.doesNotMatch(prompt, /If no reply is appropriate/i);
+});
+
 test("flushWorkbenchDrafts times out a missing webview response and permits the next flush", async () => {
   const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
   let requests = 0;
