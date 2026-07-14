@@ -40,6 +40,11 @@ describe("getLabels", () => {
     assert.equal(getLabels("en-US").meetings.title, "Meeting Invites");
     assert.equal(getLabels("en-US").meetings.acceptedSchedule, "Accepted schedule");
   });
+
+  it("uses explicit mark-done action labels", () => {
+    assert.equal(getLabels("zh-CN").nextActions.markDone, "标记已完成");
+    assert.equal(getLabels("en-US").nextActions.markDone, "Mark Done");
+  });
 });
 
 describe("buildCategoryLabels", () => {

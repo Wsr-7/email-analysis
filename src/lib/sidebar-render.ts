@@ -694,11 +694,22 @@ function rowItemId(row) {
 }
 
 function setActiveRow(id) {
+  var preservedNextActionId = '';
+  for (var activeRow of document.querySelectorAll('.sb-row.active[data-next-action-id]')) {
+    if (activeRow.getAttribute('data-thread-id') === id) {
+      preservedNextActionId = activeRow.getAttribute('data-next-action-id') || '';
+      break;
+    }
+  }
+  var selectionId = preservedNextActionId || id;
   for (var row of document.querySelectorAll('.sb-row')) {
-    var match = row.getAttribute('data-mail-id') === id || row.getAttribute('data-thread-id') === id || row.getAttribute('data-meeting-id') === id || row.getAttribute('data-next-action-id') === id;
+    var rowNextActionId = row.getAttribute('data-next-action-id') || '';
+    var match = rowNextActionId
+      ? rowNextActionId === selectionId
+      : row.getAttribute('data-mail-id') === selectionId || row.getAttribute('data-thread-id') === selectionId || row.getAttribute('data-meeting-id') === selectionId;
     row.classList.toggle('active', match);
   }
-  vscode.setState(Object.assign({}, vscode.getState() || {}, { currentItemId: id }));
+  vscode.setState(Object.assign({}, vscode.getState() || {}, { currentItemId: selectionId }));
 }
 
 function toggleSettings() {

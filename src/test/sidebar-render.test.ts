@@ -362,7 +362,8 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('data-next-action-id="thread:t1:reply"'));
     assert.ok(html.includes("openItem(id, target.getAttribute('data-next-action-id') || '')"));
     assert.ok(html.includes("row.getAttribute('data-thread-id')"));
-    assert.ok(html.includes("row.getAttribute('data-next-action-id') === id"));
+    assert.ok(html.includes("var preservedNextActionId = ''"));
+    assert.ok(html.includes("? rowNextActionId === selectionId"));
   });
 
   it("renders compact rows for ignored items without action buttons", () => {
