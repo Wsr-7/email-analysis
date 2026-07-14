@@ -307,6 +307,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：自动化 MockProvider 可证明代码同时发起两个 transport，但不能证明 `vscode.lm` 服务端实际并行；若真实日志显示第二个 `chunkStart` 在首个 `response` 前而总耗时仍近似串行，应视为平台内部排队，不在本 step 强行绕过。
   - Commit：`c807e46`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8.5 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `57aca42`；重新定位确认 pending folder 与“已接受的日程”共用 `.sb-pending-folder-header`，当前为 11px/600、普通 `sideBar-foreground`、6px 垂直 padding，因此可用一个 CSS 规则同步增强。边界：只将字重提高到 700、改用 `sideBarSectionHeader-foreground` 并轻调 padding/letter-spacing；不改字号、DOM、折叠行为或其他 Sidebar 元素。Action: claim G8.5。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -345,7 +347,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **并发实效核查（用户反馈提速无感）**：在日志中对比同一次分析里两个 chunk 的 `analyze:chunkStart`/`analyze:response` 时间戳是否重叠——若 vscode.lm 对同会话请求内部串行化导致并发无效，如实记入 Completion Notes 的 Known issues（属平台限制，不强行绕），并在 §7 汇报给规划者。
 - **验收**：单测锁初始文案；`npm test` 全绿。**needs user validation**：初始 toast 含邮件数与 chunk 数。
 
-### [ ] G8.5 折叠组头视觉强化（额外反馈#3，P2）
+### [~] G8.5 折叠组头视觉强化（额外反馈#3，P2）
 
 - pending folder 组头与会议"已接受的日程"组头字体存在感不足：font-weight 提到 700、颜色用更亮的前景变量（如 `--vscode-sideBarSectionHeader-foreground`），可加少量 letter-spacing/上下 padding；不加大字号。两处组头样式统一。
 - **验收**：`npm test` 全绿。**needs user validation**：目视组头明显但不突兀。
