@@ -1,119 +1,40 @@
-# POC 验收标准
+# Acceptance Matrix
 
-## 目标
+Use this matrix for a release candidate built from the current repository state.
 
-交付一个可在另一台 `Windows + classic Outlook + VS Code + GitHub Copilot` 机器上安装和测试的 POC，完成以下链路：
+## Automated checks
 
-```text
-Pull Mail -> 生成 digest -> Analyze -> 生成 JSON / Summary -> Dashboard 展示 -> Copy Draft
-```
+| Check | Command | Expected result |
+| --- | --- | --- |
+| Compile | `npm run compile` | TypeScript exits successfully. |
+| Unit tests | `npm test` | All Node tests pass. |
+| Sample flow | `npm run validate:sample` | Sample digest pipeline succeeds without Outlook or Copilot. |
+| Package | `npm run package:vsix` | A VSIX is written under `releases/`. |
+| Package contents | `npx vsce ls --readme-path docs/marketplace-details.md` | Runtime files are present; tests, archives, agent files, and development scripts are absent. |
+| Diff hygiene | `git diff --check` | No whitespace errors. |
 
-## 验收范围
+## Installed VSIX smoke test
 
-### 1. 仓库与发布
+Install the newly built VSIX in VS Code, then:
 
-- 仓库包含完整 POC 源码，不仅是设计文档。
-- 远端仓库为 `Wsr-7/easy-mail`。
-- `main` 分支包含最新实现。
+1. Confirm EasyMail activates and its Activity Bar icon is visible in both common light and dark themes.
+2. Open the Sidebar and Workbench.
+3. Run **Generate Sample Digest** and open mail, thread, and meeting details.
+4. Open **EasyMail: Open User Guide**.
+5. Confirm the Sidebar range/model settings save and that a configuration-dependent action uses the latest visible value.
+6. Confirm the Workbench timeline control switches ascending and descending order.
 
-### 2. 邮件采集器
+## Real Outlook and Copilot checks
 
-- 存在 `scripts/collect-outlook-mails.vbs`。
-- 支持以下参数：
-  - `--max-items`
-  - `--recent-hours`
-  - `--folders`
-  - `--body-chars`
-  - `--output`
-  - `--sample`
-- 默认通过 classic Outlook COM 读取邮件。
-- `--sample` 模式下无需 Outlook 即可生成有效的 `mail-digest.md`。
-- 输出 Markdown 包含：
-  - 生成时间
-  - 采集范围
-  - 文件夹列表
-  - 每封邮件的主题、发件人、时间、文件夹、未读状态、重要性、正文截断
+Run these only on Windows with classic Outlook and an approved Copilot account:
 
-### 3. VS Code 插件
+1. Fetch new mail from each configured Outlook folder and use More History once.
+2. Validate sender/recipient direction with a CC-only message.
+3. Collect meetings, including a recurring series when available.
+4. Open a mail and meeting in Outlook.
+5. Open reply, reply-all, and forward compose windows; confirm no action sends mail automatically.
+6. Exercise an allowed item, a manual-confirm item, and a blocked item through the analysis gate.
+7. Run single-mail, batch, and thread analysis using an available Copilot model.
+8. Generate a draft, polish/refine it, and confirm the resulting Outlook compose window contains the expected text.
 
-- 插件目录包含可安装的 VS Code 扩展清单和入口。
-- 提供命令：
-  - `Easy Mail: Pull Mail`
-  - `Easy Mail: Analyze with Copilot`
-  - `Easy Mail: Open Digest`
-  - `Easy Mail: Open Summary`
-  - `Easy Mail: Open Settings`
-  - `Easy Mail: Generate Sample Digest`
-- 提供 Activity Bar 入口和 Sidebar / Webview 看板。
-- 插件运行时将数据写入本地 `data` 目录或 `globalStorage` 目录。
-
-### 4. AI 分析链路
-
-- 支持读取 `mail-digest.md` 并调用 VS Code Language Model API。
-- 优先选择 `vendor: copilot`。
-- 如果没有可用模型，明确报错。
-- 模型输出被解析为结构化 JSON。
-- JSON 字段至少包含：
-  - `generatedAt`
-  - `overview`
-  - `items`
-- 每个 item 至少包含：
-  - `mailId`
-  - `category`
-  - `priority`
-  - `subject`
-  - `summary`
-  - `reason`
-  - `suggestedAction`
-  - `draftReply`
-- 同步生成 `mail-summary.md`。
-
-### 5. Dashboard
-
-- 看板显示统计卡片：
-  - `Must Handle Today`
-  - `Risk`
-  - `Waiting`
-  - `Notice`
-- 看板按分类渲染邮件卡片。
-- 每张卡片至少显示：
-  - 标题
-  - 发件人
-  - 时间
-  - 优先级
-  - AI 摘要
-  - 原因
-  - 建议动作
-- 支持交互：
-  - `Copy Draft`
-  - `Ignore`
-  - `Open Digest`
-  - `Open Summary`
-
-### 6. 配置
-
-- 存在默认配置文件。
-- 支持配置：
-  - 最近 N 封
-  - 最近 N 小时
-  - 扫描文件夹
-  - 正文截断长度
-  - 是否使用 sample 模式
-
-### 7. 本地验证
-
-- 存在无需 Outlook / Copilot 即可运行的自动化验证。
-- 至少覆盖：
-  - digest 解析
-  - AI JSON 解析与校验
-  - Markdown summary 生成
-  - dashboard 数据分组
-- 存在一条本地可运行的 sample 流程验证命令。
-
-### 8. 交付物
-
-- 代码已提交并推送。
-- 文档包含使用说明。
-- 如果能打包 `.vsix`，仓库包含打包命令或产物说明。
-- 如果当前环境不能打包 `.vsix`，必须说明原因，并保证另一台机器可按文档直接打包或调试运行。
-
+Record environment-specific failures separately. Sample mode and unit tests do not establish real Outlook COM, Exchange, recurring-calendar, or Copilot-policy compatibility.

@@ -102,6 +102,14 @@ Sidebar 只提供少量常用控件，VS Code Settings 始终是唯一生效源�
 
 查看[用户指南](./docs/user-guide.md)。贡献或本地开发可参阅[开发说明](./docs/development.md)与项目结构说明 [AGENTS.md](./AGENTS.md)。
 
+## 文档
+
+- [用户指南](./docs/user-guide.md)：命令、Sidebar、Workbench 与设置。
+- [开发说明](./docs/development.md)：构建、测试、sample 验证与打包。
+- [架构](./docs/architecture.md)：运行链路、模块边界与持久化。
+- [安全](./docs/security.md)：本地、Copilot、分级与脱敏边界。
+- [验收](./docs/acceptance.md)：自动化、已安装 VSIX 与真实 Outlook 检查。
+
 ## Known Limitations
 
 - EasyMail 依赖 Windows Script Host 与 Outlook COM 自动化，因此仅支持 Windows。

@@ -102,6 +102,14 @@ The mail may be pending, not yet selected, or above `easyMail.autoAnalyzeMaxClas
 
 Read the [User Guide](./docs/user-guide.md). Contributors can use [Development](./docs/development.md) and the project map in [AGENTS.md](./AGENTS.md).
 
+## Documentation
+
+- [User Guide](./docs/user-guide.md) — commands, Sidebar, Workbench, and settings.
+- [Development](./docs/development.md) — build, test, sample validation, and packaging.
+- [Architecture](./docs/architecture.md) — runtime flow, module boundaries, and persistence.
+- [Security](./docs/security.md) — local, Copilot, classification, and redaction boundaries.
+- [Acceptance](./docs/acceptance.md) — automated, installed-VSIX, and real-Outlook checks.
+
 ## Known Limitations
 
 - EasyMail is Windows-only because its collectors use Windows Script Host and Outlook COM automation.
