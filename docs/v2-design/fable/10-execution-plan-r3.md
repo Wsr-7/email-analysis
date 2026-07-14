@@ -255,6 +255,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（R3 G 批次 final verification）**：Action: 对 `fc062db..b499ac9` 的 34 个改动文件、G1-G7 状态/边界及 commit 链做整体复核，无 Critical/Important 发现；未越界改 VBS、collector 或 digest 文件格式。Validated: fresh `npm run compile` 通过；fresh `npm test` 454 pass / 0 fail（69 suites）；`git diff --check` 通过；G1-G7 均 `[x]` 且附实现 commit。Manual: 仍按各 step Completion Notes 的 **needs user validation** 清单进入真实 VS Code/Copilot/Outlook 验证轮。Next: 规划者全量复审与重打 VSIX；当前 worker 不 push。
 
+- **2026-07-14 · Codex（G8.1 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `73897c5`；基线 `npm test` 454 pass / 0 fail。重新定位确认 `src/lib/security-gate.ts:89-106` 已正确生成 keyword 型 `manual_confirm`，设置读取链完整；根因仍在 `src/lib/classification.ts:111-114` 的 allowed filter 只排除 `block`，因此低 level 的 keyword 命中邮件仍落入 Pending。`src/lib/workbench-render.ts:26` 已对任意 `manual_confirm` 渲染 Confirm and Analyze，现有 level 型测试路径可复用。边界：只修共享队列归属、补 keyword 型回归测试并澄清两个 setting description；不改 security gate 判定、阈值语义或其他 G8 step。Action: claim G8.1。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -269,7 +271,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 > 验证结果已由用户回填至 §2.2 语境（通过：M01-M04/M06-M09/M12-M14；失败：M05 manualConfirm 词表、M10/M11 方向键）。规划者已定位两个失败项根因。协议同 §0。
 
-### [ ] G8.1 manualConfirm 关键词命中不进 Manual Confirm 队列（M05，P1，根因已确证）
+### [~] G8.1 manualConfirm 关键词命中不进 Manual Confirm 队列（M05，P1，根因已确证）
 
 - **根因（已确证）**：`security-gate.ts` 的 `decideMail` 对 manualConfirmKeywords 的判定正确（L104-106），设置接线也完整；坏在队列归属——F7.3（`e857db4`）给 `buildQueueState` 的 `allowed` 过滤只加了 `securityDecisions.get(id)?.decision !== "block"`，**漏排 `manual_confirm`**。关键词命中的邮件 level 未超标 → 仍留在 allowed/Pending，永远进不了 blocked（Manual Confirm Required）队列。hardBlock 正常正是因为被排除了。
 - **做法**：`allowed` 过滤改为排除 `decision === "block" || decision === "manual_confirm"`；确认 blocked 队列的 UI 文案/确认按钮对 keyword 型 manual_confirm 与 level 型行为一致（workbench 的 Confirm and Analyze 应可用）。顺带回答用户 M04 的疑问——在两个设置的 description 中写清差异：`classificationLevel3Keywords` 改变邮件**分级**（影响徽标显示与阈值比较，调高 `autoAnalyzeMaxClassificationLevel` 到 3 后可自动分析）；`manualConfirmKeywords` **无视分级强制人工确认**（任何阈值下都要确认）。两者在默认阈值下效果相似但机制不同，不是重复配置。
