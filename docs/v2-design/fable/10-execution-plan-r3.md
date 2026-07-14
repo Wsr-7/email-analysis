@@ -168,6 +168,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G8.6 已完成（`5087a8a`）：saveConfig 到达即登记设置写入链，后续读 config 的 webview 动作只等待该写入，不等待 refresh，也不把长动作彼此串行。全量测试 461 pass。Next: claim G8.7。
 - 2026-07-14 · G8.7 已完成（`1890870`）：draftGeneration 的 auto label 从“Automatic”统一为“Auto”，并检查所有 enum/enumItemLabels 数量一致。全量测试 462 pass。Next: claim G8.8。
 - 2026-07-14 · G8.8 已完成（`f9899df`）：VBS 通过 PR_ATTACHMENT_HIDDEN 过滤隐藏内嵌附件，属性/对象读取失败时保守计入；sample 输出不变。全量测试 463 pass。Next: claim G8.9。
+- 2026-07-14 · G8.9 已完成（`08ce54c`）：Polish/Refine/Compose/Generate 任一草稿动作都会先立即收起全部已打开的 Outlook Actions 菜单。全量测试 464 pass。Next: G8 全批次收口复验。
 
 ---
 
@@ -361,6 +362,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.9 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `d569c1e`；重新定位确认 compose 按钮只收起自身最近的 `.draft-outlook-actions`，Polish/Refine/Generate 均不主动收起，因此任务开始到重渲染前菜单保持展开。边界：新增统一 helper，任一草稿动作点击后立即收起所有打开的 `details.draft-outlook-actions`，再沿用原 post 逻辑；不改草稿内容、按钮状态、消息协议或其他 details。Action: claim G8.9。
 
+- **2026-07-14 · Codex（G8.9 completion）**：Action: 新增 `closeDraftOutlookActions`，统一枚举 `details.draft-outlook-actions[open]` 并移除 open；Polish/Refine/Compose/Generate 在 post 前调用。Validated: TDD RED 锁定 helper、选择器与四类动作；workbench 44 pass；fresh `npm test` 464 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——展开 Outlook Actions 后点击 Polish 或 Refine，菜单应在任务开始瞬间收起；Compose/Generate 同样收起。Next: G8 全批次收口复验。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/workbench-render.ts`、`src/test/workbench-render.test.ts`、本计划。
+  - 实现边界：只收起 class 精确匹配的 Outlook draft details；未改草稿文本、按钮状态、消息 payload 或其他 details。
+  - 验收结果：四类草稿动作共用同一即时收起路径，原 compose 局部收起逻辑已去重；全量 464 pass。
+  - Manual validation：**needs user validation**，真实 Webview 中点击瞬间的视觉反馈由用户手动确认。
+  - Known issues：无新的代码级已知问题。
+  - Commit：`08ce54c`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -422,7 +433,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **做法**：VBS `SafeAttachmentCount`/`SafeAttachmentNames` 过滤隐藏/内嵌附件——用 `Attachment.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")`（PR_ATTACHMENT_HIDDEN）为 True 的跳过；读取失败时保守保留（宁可多算不可漏算真附件）；On Error 守护齐全。sample 不受影响。
 - **验收**：VBS `--help`/`--sample` 通过；`npm test` 全绿。**needs user validation**：带签名图片的普通邮件不再显示 📎，真附件仍显示。
 
-### [~] G8.9 草稿动作时收起 Outlook Actions 下拉（额外反馈#8，P3）
+### [x] G8.9 草稿动作时收起 Outlook Actions 下拉（额外反馈#8，P3）— `08ce54c`
 
 - workbench 点击 Polish/Refine（或任何草稿动作）时，立即关闭处于展开态的 `details.draft-outlook-actions`（`document.querySelectorAll('details[open]')` 收起），不等任务结束由重渲染关闭。
 - **验收**：单测断言收起逻辑存在；`npm test` 全绿。**needs user validation**：点 Polish 瞬间下拉收起。
