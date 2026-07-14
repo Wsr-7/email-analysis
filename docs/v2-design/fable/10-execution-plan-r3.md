@@ -162,6 +162,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · R3 G 批次收口完成：G1-G7 全部 `[x]`，整体 diff 复核未发现 Critical/Important 问题；最终 `npm run compile`、454 项全量测试与 `git diff --check` 均通过。14 个本地 commit，未 push。
 - 2026-07-14 · G8.1 已完成（`5683136`）：keyword 型 `manual_confirm` 不再落入 Pending，而是进入 Manual Confirm Required；显式确认分析仍可用，两个关键词设置的机制差异已写清。全量测试 455 pass。Next: claim G8.2。
 - 2026-07-14 · G8.2 已完成（`f59eedf`）：Sidebar 发起的 Workbench 首次打开与后续 reveal 均保留 Sidebar 焦点，使既有上下键 handler 可继续接收按键。全量测试 456 pass。Next: claim G8.3。
+- 2026-07-14 · G8.3 已完成（`1dac69c`）：Workbench 回传线程 id 时保留唯一 Next Action 选择，不再高亮同线程全部 action；按钮改为“标记已完成 / Mark Done”。全量测试 457 pass。Next: claim G8.4。
 
 ---
 
@@ -283,6 +284,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.3 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `ac52f37`；重新定位确认点击 Next Action 时 `openItem` 先用唯一 `data-next-action-id` 高亮，但 Workbench `showReader(threadId)` 随即回传 `focusSidebarItem(threadId)`，现有 `setActiveRow` 又以共享 `data-thread-id` 匹配同线程全部 action，覆盖唯一高亮。按钮文案锚点在 `dashboard-labels.ts` 的 `nextActions.markDone`。边界：保留当前 action 的唯一 id 选择，线程回传时不扩散到同线程兄弟 action；同步中英文按钮文案；不改 NextActionsStore、状态协议或排序。Action: claim G8.3。
 
+- **2026-07-14 · Codex（G8.3 completion）**：Action: `setActiveRow` 在 Workbench 回传当前线程 id 时保留已激活的唯一 `data-next-action-id`，Next Action 行只按唯一 action id 匹配；中英文完成按钮改为“标记已完成 / Mark Done”。Validated: TDD RED 同时锁定共享 threadId 高亮回归与双语文案；`npm run compile` 通过；sidebar/labels 相关测试 55 pass；fresh `npm test` 457 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——用一个含多个 actionItems 的 sample 线程进入 Next Actions，逐项点击确认始终只有一行高亮，并检查按钮新文案。Next: G8.4。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/sidebar-render.ts`、`src/lib/dashboard-labels.ts`、`src/test/sidebar-render.test.ts`、`src/test/dashboard-labels.test.ts`、本计划。
+  - 实现边界：只修 Sidebar 选择 id 的解析和双语按钮 label；未改 action 状态更新、store、排序或 Workbench reader。
+  - 验收结果：两个共享 threadId 的 action row 仍有不同唯一 id；线程回传保留当前唯一 action，其他 Next Action 不再用 threadId 参与匹配；全量 457 pass。
+  - Manual validation：**needs user validation**，真实 Webview 的单选高亮与新按钮文案由用户手动确认。
+  - Known issues：Workbench 独立聚焦一个线程且此前没有选中 action 时，不会猜测应高亮哪个 Next Action；会优先匹配普通线程行，这是有意避免多选。
+  - Commit：`1dac69c`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -310,7 +321,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **要求**：必须在 Extension Development Host 实测复现 → 修复 → 再实测 ↑/↓ 全流程（含折叠跳过），把观察写进 Completion Notes——G6 的教训是单测过了不等于真机可用。
 - **验收**：`npm test` 全绿 + dev host 实测记录。**needs user validation**：点击邮件后直接 ↑/↓ 可切换且 workbench 跟随。
 
-### [~] G8.3 Next Actions 多项高亮回归 + 按钮改名（额外反馈#1，P2）
+### [x] G8.3 Next Actions 多项高亮回归 + 按钮改名（额外反馈#1，P2）— `1dac69c`
 
 - 用 sample 线程数据复现"多个 action 同时高亮"（F7.2 修过一次，线程来源的 action 疑似再破）；修复并补覆盖线程场景的单测。按钮 label：`Done/完成` → `Mark Done/标记已完成`（中英文）。
 - **验收**：单测 + `npm test` 全绿。**needs user validation**：sample 线程下单选高亮正确。
