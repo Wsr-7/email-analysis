@@ -165,6 +165,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G8.3 已完成（`1dac69c`）：Workbench 回传线程 id 时保留唯一 Next Action 选择，不再高亮同线程全部 action；按钮改为“标记已完成 / Mark Done”。全量测试 457 pass。Next: claim G8.4。
 - 2026-07-14 · G8.4 已完成（`c807e46`）：批量分析初始 toast 恢复邮件数与 chunk 数，初始/进行中文案均按 zh-CN/en-US 本地化；代码级并发测试继续通过。全量测试 458 pass。Next: claim G8.5。
 - 2026-07-14 · G8.5 已完成（`01843d5`）：两类折叠组头统一使用更亮的 section header 前景、700 字重和轻微字距/垂直 padding，字号保持 11px。全量测试 459 pass。Next: claim G8.6。
+- 2026-07-14 · G8.6 已完成（`5087a8a`）：saveConfig 到达即登记设置写入链，后续读 config 的 webview 动作只等待该写入，不等待 refresh，也不把长动作彼此串行。全量测试 461 pass。Next: claim G8.7。
 
 ---
 
@@ -322,6 +323,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.6 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `d848c83`；重新定位确认 DashboardProvider 对每条 webview 消息独立异步 dispatch，`saveConfigFromMessage` 在 `readConfig` 与逐项 `settings.update` 间多次 yield，而下一条 Fetch 可并发进入 `pullMailCore` 并先读旧 config。边界：extension 收到 saveConfig 时立即登记只覆盖该设置保存的 promise，后续会读 config 的 webview 动作先 await 它；保存后的 refresh 不纳入等待链，长任务也不互相串行；不改 UI、消息顺序或设置结构。Action: claim G8.6。
 
+- **2026-07-14 · Codex（G8.6 completion）**：Action: extension 在 dispatch `saveConfig` 前立即把 `saveConfigFromMessage` 串入 `latestSettingsWrite`；Fetch/Load More/Sample/各分析/草稿生成与 Workbench 打开等配置依赖消息先 await 最新写入，保存后的 refresh 独立执行。Validated: TDD RED 复现 maxItems 写入未完成时 Fetch 读到旧 50；修复后 Fetch 等待并读到 7；另测两个长 Fetch 同时启动，证明未串行动作；fresh `npm test` 461 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——修改 maxItems 后不失焦、不等保存 toast，立即点 Fetch New，日志中的 `pullMail:start.maxItems` 应为新值。Next: G8.7。
+
+  **Completion Notes**
+  - 改动文件：`src/extension.ts`、`src/test/extension-cancellation.test.ts`、本计划。
+  - 实现边界：只在 extension message dispatch 层排序设置写入与配置依赖动作；未改 webview debounce、设置结构、VS Code command 或长任务互斥策略。
+  - 验收结果：保存→立即 Fetch 的确定性竞态测试由旧值失败转为新值通过；并行长动作不进入 settings 链；全量 461 pass。
+  - Manual validation：**needs user validation**，真实 Settings update 落盘时序与 collector 参数由用户手动确认。
+  - Known issues：若 VS Code 自身的 `settings.update` 成功返回后仍延迟向 `getConfiguration` 可见，将属于平台行为；当前 API 合约和自动化 mock 均以 promise resolve 作为可读边界。
+  - Commit：`5087a8a`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -365,7 +376,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - pending folder 组头与会议"已接受的日程"组头字体存在感不足：font-weight 提到 700、颜色用更亮的前景变量（如 `--vscode-sideBarSectionHeader-foreground`），可加少量 letter-spacing/上下 padding；不加大字号。两处组头样式统一。
 - **验收**：`npm test` 全绿。**needs user validation**：目视组头明显但不突兀。
 
-### [~] G8.6 设置保存与动作按钮的竞态（额外反馈#4，P2）
+### [x] G8.6 设置保存与动作按钮的竞态（额外反馈#4，P2）— `5087a8a`
 
 - **现象**：sidebar 改 maxItems 后直接点 Fetch New，本次仍按旧值执行（需先点别处触发保存 toast 才生效）。
 - **根因方向**：webview 消息（settings 更新、fetch）虽按序到达，但 `handleMessage` 异步并发处理——fetch 读 config 时 settings.update 还没落盘。
