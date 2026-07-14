@@ -6,10 +6,6 @@
   "publisher": "Wsr-7",
   "private": true,
   "icon": "media/icon.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Wsr-7/easy-mail.git"
-  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -29,6 +25,7 @@
     "onCommand:easyMail.openDailyBrief",
     "onCommand:easyMail.openThreadReport",
     "onCommand:easyMail.openSingleMailReport",
+    "onCommand:easyMail.selectFolders",
     "onCommand:easyMail.openGuide",
     "onCommand:easyMail.openReplyTemplate",
     "onCommand:easyMail.clearLocalCache",
@@ -42,7 +39,6 @@
     "prompts/**",
     "media/**",
     "LICENSE",
-    "README.md",
     "README_zh.md",
     "user guide.md",
     "setup.md",
@@ -91,24 +87,24 @@
             "Inbox",
             "Sent Items"
           ],
-          "description": "Outlook folders to scan. Use folder names or paths such as Inbox, Sent Items, Inbox/Project, or Mailbox Name/Inbox. Separate items in this array; Inbox-only legacy values are expanded to Inbox and Sent Items."
+          "description": "Outlook folders to scan. Prefer the EasyMail: Select Outlook Folders command to load available folders from Outlook, or enter names/paths such as Inbox, Sent Items, Inbox/Project, or Mailbox Name/Inbox. Inbox-only legacy values are expanded to Inbox and Sent Items."
         },
         "easyMail.bodyExcerptChars": {
           "type": "number",
-          "order": 8,
+          "order": 5,
           "default": 1500,
           "minimum": 100,
           "description": "Maximum body characters per mail sent to Copilot."
         },
         "easyMail.sampleMode": {
           "type": "boolean",
-          "order": 14,
+          "order": 6,
           "default": false,
           "description": "Generate sample mail data instead of reading Outlook."
         },
         "easyMail.outputLanguage": {
           "type": "string",
-          "order": 5,
+          "order": 11,
           "enum": [
             "zh-CN",
             "en-US"
@@ -122,7 +118,7 @@
         },
         "easyMail.draftLanguage": {
           "type": "string",
-          "order": 6,
+          "order": 12,
           "enum": [
             "auto",
             "en",
@@ -136,9 +132,23 @@
           "default": "auto",
           "description": "Draft reply language. Auto follows the source mail or thread language."
         },
+        "easyMail.draftGeneration": {
+          "type": "string",
+          "order": 12.5,
+          "enum": [
+            "auto",
+            "onDemand"
+          ],
+          "enumItemLabels": [
+            "Auto",
+            "On demand"
+          ],
+          "default": "auto",
+          "description": "Draft generation mode. On demand significantly speeds up analysis; use Generate Draft in the workbench when a reply is needed."
+        },
         "easyMail.autoAnalyzeMaxClassificationLevel": {
           "type": "number",
-          "order": 10,
+          "order": 13,
           "enum": [
             0,
             1,
@@ -156,50 +166,94 @@
           "maximum": 3,
           "description": "Maximum mail classification level allowed for analysis."
         },
+        "easyMail.hardBlockKeywords": {
+          "type": "array",
+          "order": 13.1,
+          "items": { "type": "string" },
+          "default": ["password", "passwd", "pwd", "api_key", "apikey", "access_token", "auth_token", "secret_key", "private_key", "credential", "credentials", "密码", "口令", "密钥", "私钥", "凭证", "令牌"],
+          "markdownDescription": "Case-insensitive substring matches that block Copilot analysis. An empty array disables this keyword protection layer."
+        },
+        "easyMail.manualConfirmKeywords": {
+          "type": "array",
+          "order": 13.2,
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "Case-insensitive substring matches that force manual confirmation before Copilot analysis, regardless of the mail classification or automatic-analysis threshold. An empty array disables this layer."
+        },
+        "easyMail.classificationLevel3Keywords": {
+          "type": "array",
+          "order": 13.3,
+          "items": { "type": "string" },
+          "default": ["high registered", "highly restricted", "secret"],
+          "markdownDescription": "Case-insensitive substring matches that classify mail as HIGH REGISTERED (level 3), affecting its badge and threshold comparison. Setting easyMail.autoAnalyzeMaxClassificationLevel to 3 allows automatic analysis unless another security gate requires confirmation. An empty array disables keyword elevation to this level."
+        },
+        "easyMail.classificationLevel2Keywords": {
+          "type": "array",
+          "order": 13.4,
+          "items": { "type": "string" },
+          "default": ["registered", "restricted", "confidential", "contract", "budget"],
+          "markdownDescription": "Case-insensitive substring matches that classify mail as REGISTERED (level 2). An empty array disables keyword elevation to this level."
+        },
         "easyMail.mailStoreRetentionDays": {
           "type": "number",
-          "order": 15,
+          "order": 14,
           "default": 7,
           "minimum": 1,
           "description": "Raw local mail queue retention days."
         },
         "easyMail.mailIndexRetentionDays": {
           "type": "number",
-          "order": 16,
+          "order": 15,
           "default": 7,
           "minimum": 1,
           "description": "Local de-duplication index retention days."
         },
         "easyMail.analysisRetentionDays": {
           "type": "number",
-          "order": 17,
+          "order": 16,
           "default": 7,
           "minimum": 1,
           "description": "Analysis summary retention days."
         },
         "easyMail.meetingDaysAhead": {
           "type": "number",
-          "order": 18,
+          "order": 7,
           "default": 2,
           "minimum": 1,
           "description": "Collect meetings within the next N days from Outlook calendar."
         },
         "easyMail.collectorTimeoutSeconds": {
           "type": "number",
-          "order": 19,
+          "order": 8,
           "default": 120,
           "minimum": 10,
           "description": "Timeout in seconds for the Outlook mail/meeting collector scripts. Increase for large mailboxes or slow Outlook cold starts."
         },
         "easyMail.importantSenders": {
           "type": "array",
-          "order": 12,
+          "order": 4.1,
           "items": {
             "type": "string",
             "default": "name@example.com"
           },
           "default": [],
           "markdownDescription": "Important senders, mail groups, or keywords matched into `importantSender`. Examples: `person@example.com`, `team-alerts@company.com`, `Customer A`, `Project Phoenix`."
+        },
+        "easyMail.ignoredSenders": {
+          "type": "array",
+          "order": 4.2,
+          "items": {
+            "type": "string",
+            "default": "no-reply@example.com"
+          },
+          "default": [],
+          "markdownDescription": "Unanalysed mail whose sender display name or email address contains any entry is placed in Ignored. Matching is case-insensitive. Examples: `no-reply@example.com`, `System Notifications`."
+        },
+        "easyMail.modelFamily": {
+          "type": "string",
+          "order": 9,
+          "default": "",
+          "description": "Copilot model identifier. Recommended: choose an available model with EasyMail: Load Copilot Models and the dashboard model dropdown. Manual Settings entry is fallback only."
         }
       }
     },
@@ -207,7 +261,7 @@
       "activitybar": [
         {
           "id": "easyMail",
-          "title": "Dashboard",
+          "title": "EasyMail",
           "icon": "media/activity-icon.svg"
         }
       ]
@@ -241,7 +295,7 @@
           {
             "id": "easyMail.configure",
             "title": "Configure Mail Range",
-            "description": "Click Settings File to edit mail range, folders, retention, and security settings. Use Load Models and the Analysis Model dropdown in the dashboard for model selection.",
+            "description": "Click Settings, then More Settings (VS Code Settings), to edit mail range, folders, retention, and security settings. Use EasyMail: Select Outlook Folders to load folder choices from Outlook. Use Load Models and the Analysis Model dropdown in the dashboard for model selection.",
             "completionEvents": [
               "onCommand:easyMail.openSettings"
             ]
@@ -296,10 +350,6 @@
         "title": "EasyMail: Load Copilot Models"
       },
       {
-        "command": "easyMail.refreshDashboard",
-        "title": "EasyMail: Refresh Dashboard"
-      },
-      {
         "command": "easyMail.openDigest",
         "title": "EasyMail: Open Digest"
       },
@@ -328,6 +378,10 @@
         "title": "EasyMail: Open Settings"
       },
       {
+        "command": "easyMail.selectFolders",
+        "title": "EasyMail: Select Outlook Folders"
+      },
+      {
         "command": "easyMail.openGuide",
         "title": "EasyMail: Open User Guide"
       },
@@ -351,8 +405,8 @@
   },
   "scripts": {
     "compile": "node scripts/clean-out.js && tsc -p .",
-    "test": "npm run compile && node --test out/test/digest.test.js out/test/analysis-schema.test.js out/test/summary.test.js out/test/dashboard-state.test.js out/test/mail-store.test.js out/test/classification.test.js out/test/prompt-config.test.js out/test/thread-engine.test.js out/test/thread-timeline.test.js out/test/redaction.test.js out/test/security-gate.test.js out/test/thread-analysis-schema.test.js out/test/thread-prompt-builder.test.js out/test/app-analysis.test.js out/test/report-single-mail.test.js out/test/report-thread.test.js out/test/report-daily.test.js out/test/llm-provider.test.js out/test/guide-webview.test.js out/test/reply-template.test.js out/test/draft-prompt.test.js out/test/analysis-translation.test.js out/test/html-utils.test.js out/test/config-utils.test.js out/test/dashboard-labels.test.js out/test/process-runner.test.js out/test/app-data.test.js out/test/dashboard-render.test.js out/test/message-handler.test.js out/test/sidebar-render.test.js out/test/workbench-render.test.js out/test/meeting-digest.test.js out/test/meeting-store.test.js out/test/next-actions.test.js",
-    "package:vsix": "npm run compile && vsce package --out releases/easymail-0.3.0.vsix",
+    "test": "npm run compile && node --test out/test/digest.test.js out/test/analysis-schema.test.js out/test/summary.test.js out/test/dashboard-state.test.js out/test/mail-store.test.js out/test/classification.test.js out/test/prompt-config.test.js out/test/thread-engine.test.js out/test/thread-timeline.test.js out/test/redaction.test.js out/test/security-gate.test.js out/test/thread-analysis-schema.test.js out/test/thread-prompt-builder.test.js out/test/app-analysis.test.js out/test/extension-cancellation.test.js out/test/report-single-mail.test.js out/test/report-thread.test.js out/test/report-daily.test.js out/test/llm-provider.test.js out/test/guide-webview.test.js out/test/reply-template.test.js out/test/draft-prompt.test.js out/test/analysis-translation.test.js out/test/html-utils.test.js out/test/config-utils.test.js out/test/dashboard-labels.test.js out/test/process-runner.test.js out/test/app-data.test.js out/test/dashboard-render.test.js out/test/message-handler.test.js out/test/sidebar-render.test.js out/test/workbench-render.test.js out/test/meeting-digest.test.js out/test/meeting-store.test.js out/test/next-actions.test.js out/test/collector-scripts.test.js out/test/marketplace-details.test.js",
+    "package:vsix": "npm run compile && vsce package --allow-missing-repository --readme-path docs/marketplace-details.md --out releases/easymail-0.3.0.vsix",
     "validate:sample": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-sample-validation.ps1"
   },
   "devDependencies": {

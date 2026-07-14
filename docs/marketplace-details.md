@@ -2,8 +2,6 @@
 
 > Bring classic Outlook mail into a local, Copilot-assisted triage workspace in VS Code.
 
-[简体中文](./README_zh.md)
-
 ## Overview
 
 EasyMail is a Windows VS Code extension for classic desktop Outlook. It uses local VBScript COM automation to collect mail and meetings, keeps its local data in VS Code storage, and uses the GitHub Copilot Language Model API only when you choose to analyze an item.
@@ -35,15 +33,13 @@ Mail content is not uploaded by EasyMail to its own service. The excerpt selecte
 
 ## Quick Start
 
-1. Install a package from [releases/](./releases), then open the **EasyMail** view from the VS Code Activity Bar.
+1. Install EasyMail, then open the **EasyMail** view from the VS Code Activity Bar.
 2. To try the extension without Outlook, run **EasyMail: Generate Sample Digest**.
 3. Otherwise, run **EasyMail: Fetch New Mail** to collect mail from the configured Outlook folders.
 4. Run **EasyMail: Load Copilot Models**, choose an **Analysis Model** in the Sidebar, and use **Analyze Next Batch**.
 5. Open a queue item to read its details and work on a draft in the Workbench.
 
 <!-- SCREENSHOT: sample-mode-results.png — Generate Sample Digest 后的示例邮件、会议与分诊结果 -->
-
-For source setup and development commands, see [setup.md](./setup.md).
 
 ## Usage
 
@@ -69,8 +65,6 @@ Run **EasyMail: Select Outlook Folders** to load folders from the running classi
 
 <!-- SCREENSHOT: select-outlook-folders.png — Select Outlook Folders QuickPick，需截到可多选文件夹和 Sent Items 标记 -->
 
-See [user guide.md](./user%20guide.md) for the complete command list and workflow details.
-
 ## Configuration
 
 All settings use the `easyMail.*` namespace in VS Code Settings. Common settings include:
@@ -82,7 +76,7 @@ All settings use the `easyMail.*` namespace in VS Code Settings. Common settings
 - `easyMail.autoAnalyzeMaxClassificationLevel` for the automatic-analysis gate.
 - `easyMail.bodyExcerptChars` for the maximum number of body characters retained per mail for analysis.
 
-The Sidebar exposes a small set of common controls. VS Code Settings remains the source of truth; see [user guide.md](./user%20guide.md) for the full reference.
+The Sidebar exposes a small set of common controls. VS Code Settings remains the source of truth.
 
 ## FAQ
 
@@ -98,10 +92,6 @@ No. It can open an Outlook compose window with a draft, but sending remains an O
 
 The mail may be pending, not yet selected, or above `easyMail.autoAnalyzeMaxClassificationLevel`. High-classification mail follows the confirmation flow.
 
-### Where is the detailed command and configuration reference?
-
-Read [user guide.md](./user%20guide.md). Contributors can use [setup.md](./setup.md) and the project map in [AGENTS.md](./AGENTS.md).
-
 ## Known Limitations
 
 - EasyMail is Windows-only because its collectors use Windows Script Host and Outlook COM automation.
@@ -116,4 +106,4 @@ Wsr-7
 
 ## License
 
-[MIT](./LICENSE)
+MIT

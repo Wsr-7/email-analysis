@@ -18,6 +18,7 @@ config.Add "output", ""
 config.Add "older-than-map", ""
 config.Add "sample", False
 config.Add "help", False
+config.Add "list-folders", False
 
 Dim g_currentUserSmtp, g_currentUserName, g_recipientParseFailures
 g_currentUserSmtp = ""
@@ -32,19 +33,33 @@ If config("help") Then
 End If
 
 If config("output") = "" Then
-  config("output") = fso.BuildPath(GetScriptDirectory(), "..\data\mail-digest.md")
+  If CBool(config("list-folders")) Then
+    config("output") = fso.BuildPath(GetScriptDirectory(), "..\data\outlook-folders.txt")
+  Else
+    config("output") = fso.BuildPath(GetScriptDirectory(), "..\data\mail-digest.md")
+  End If
 End If
 
 EnsureParentFolder config("output")
 
 If CBool(config("sample")) Then
-  WriteSampleDigest config("output"), config
-  WScript.Echo "Generated sample digest at: " & config("output")
+  If CBool(config("list-folders")) Then
+    WriteSampleFolderList config("output")
+    WScript.Echo "Generated sample folder list at: " & config("output")
+  Else
+    WriteSampleDigest config("output"), config
+    WScript.Echo "Generated sample digest at: " & config("output")
+  End If
   WScript.Quit 0
 End If
 
-CollectFromOutlook config("output"), config
-WScript.Echo "Generated digest at: " & config("output")
+If CBool(config("list-folders")) Then
+  CollectFolderList config("output")
+  WScript.Echo "Generated folder list at: " & config("output")
+Else
+  CollectFromOutlook config("output"), config
+  WScript.Echo "Generated digest at: " & config("output")
+End If
 
 Sub ParseArgs(byVal cliArgs, byRef target)
   Dim i
@@ -61,6 +76,8 @@ Sub ParseArgs(byVal cliArgs, byRef target)
         i = i + 1
       Case "--sample"
         target("sample") = True
+      Case "--list-folders"
+        target("list-folders") = True
       Case "--help", "-h", "/?"
         target("help") = True
       Case Else
@@ -68,6 +85,163 @@ Sub ParseArgs(byVal cliArgs, byRef target)
     End Select
   Next
 End Sub
+
+Sub CollectFolderList(byVal outputPath)
+  On Error Resume Next
+  Dim outlook
+  Set outlook = CreateObject("Outlook.Application")
+  If Err.Number <> 0 Then
+    Fail "Unable to create Outlook.Application. " & Err.Description
+  End If
+  On Error GoTo 0
+
+  Dim ns
+  Set ns = outlook.GetNamespace("MAPI")
+
+  Dim content
+  content = "EasyMailFolderList: version=1; mode=list-folders" & vbCrLf
+  Dim defaultFolderIds
+  Set defaultFolderIds = CreateObject("Scripting.Dictionary")
+  defaultFolderIds.CompareMode = 1
+  CollectDefaultFolderIds ns, defaultFolderIds
+
+  Dim storeCount
+  On Error Resume Next
+  storeCount = ns.Folders.Count
+  If Err.Number <> 0 Then
+    Fail "Unable to enumerate Outlook stores. " & Err.Description
+  End If
+  On Error GoTo 0
+
+  Dim idx
+  For idx = 1 To storeCount
+    Dim root
+    On Error Resume Next
+    Set root = ns.Folders.Item(idx)
+    If Err.Number <> 0 Then
+      content = content & "FolderList: storeIndex=" & CStr(idx) & "; error=" & OneLine(Err.Description) & vbCrLf
+      Err.Clear
+      On Error GoTo 0
+    Else
+      On Error GoTo 0
+      If Not root Is Nothing Then
+        EnumerateFolderForList root, SafeFolderName(root), content, False, defaultFolderIds
+      End If
+    End If
+  Next
+
+  WriteTextFile outputPath, content
+End Sub
+
+Sub CollectDefaultFolderIds(byRef ns, byRef defaultFolderIds)
+  CollectDefaultFolderId ns, 6, "Inbox", defaultFolderIds
+  CollectDefaultFolderId ns, 5, "Sent Items", defaultFolderIds
+  CollectDefaultFolderId ns, 16, "Drafts", defaultFolderIds
+End Sub
+
+Sub CollectDefaultFolderId(byRef ns, byVal folderType, byVal defaultName, byRef defaultFolderIds)
+  Dim folder, entryId
+  On Error Resume Next
+  Set folder = ns.GetDefaultFolder(folderType)
+  If Err.Number <> 0 Or folder Is Nothing Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+  End If
+  entryId = CStr(folder.EntryID)
+  If Err.Number <> 0 Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+  End If
+  On Error GoTo 0
+  entryId = Trim(entryId)
+  If entryId <> "" Then
+    defaultFolderIds(entryId) = defaultName
+  End If
+End Sub
+
+Sub EnumerateFolderForList(byRef folder, byVal folderPath, byRef content, byVal includeFolder, byRef defaultFolderIds)
+  If folderPath = "" Then
+    Exit Sub
+  End If
+
+  If InStr(folderPath, ";") > 0 Then
+    content = content & "FolderList: skipped=semicolon; path=" & OneLine(folderPath) & vbCrLf
+    Exit Sub
+  End If
+
+  If includeFolder And IsMailFolder(folder) Then
+    AppendDefaultFolderListMapping folder, folderPath, defaultFolderIds, content
+    content = content & folderPath & vbCrLf
+  End If
+
+  Dim childCount
+  On Error Resume Next
+  childCount = folder.Folders.Count
+  If Err.Number <> 0 Then
+    content = content & "FolderList: path=" & OneLine(folderPath) & "; error=" & OneLine(Err.Description) & vbCrLf
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+  End If
+  On Error GoTo 0
+
+  Dim idx
+  For idx = 1 To childCount
+    Dim child
+    On Error Resume Next
+    Set child = folder.Folders.Item(idx)
+    If Err.Number <> 0 Then
+      content = content & "FolderList: path=" & OneLine(folderPath) & "; childIndex=" & CStr(idx) & "; error=" & OneLine(Err.Description) & vbCrLf
+      Err.Clear
+      On Error GoTo 0
+    Else
+      On Error GoTo 0
+      If Not child Is Nothing Then
+        EnumerateFolderForList child, folderPath & "/" & SafeFolderName(child), content, True, defaultFolderIds
+      End If
+    End If
+  Next
+End Sub
+
+Sub AppendDefaultFolderListMapping(byRef folder, byVal folderPath, byRef defaultFolderIds, byRef content)
+  Dim entryId
+  On Error Resume Next
+  entryId = CStr(folder.EntryID)
+  If Err.Number <> 0 Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Sub
+  End If
+  On Error GoTo 0
+  entryId = Trim(entryId)
+  If entryId <> "" And defaultFolderIds.Exists(entryId) Then
+    content = content & "FolderListDefault: " & defaultFolderIds(entryId) & "=" & folderPath & vbCrLf
+  End If
+End Sub
+
+Function IsMailFolder(byRef folder)
+  IsMailFolder = False
+  On Error Resume Next
+  IsMailFolder = (CLng(folder.DefaultItemType) = 0)
+  If Err.Number <> 0 Then
+    Err.Clear
+    IsMailFolder = False
+  End If
+  On Error GoTo 0
+End Function
+
+Function SafeFolderName(byRef folder)
+  SafeFolderName = ""
+  On Error Resume Next
+  SafeFolderName = Trim(CStr(folder.Name))
+  If Err.Number <> 0 Then
+    Err.Clear
+    SafeFolderName = ""
+  End If
+  On Error GoTo 0
+End Function
 
 Sub CollectFromOutlook(byVal outputPath, byRef target)
   On Error Resume Next
@@ -122,6 +296,11 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
   If folderFailureCount + folderPartialCount > 0 Then
     WScript.Echo "FolderScanSummary: failed=" & folderFailureCount & "; partial=" & folderPartialCount & "; total=" & folderCount & "; folders=" & folderFailures & "; partialFolders=" & folderPartials
   End If
+  Dim scanSummary
+  scanSummary = "ok"
+  If folderFailureCount + folderPartialCount > 0 Then
+    scanSummary = "failed=" & folderFailureCount & "; partial=" & folderPartialCount & "; folders=" & AppendDiagList(folderFailures, folderPartials)
+  End If
 
   Dim beforeGlobalCap
   beforeGlobalCap = collectedCount
@@ -133,7 +312,7 @@ Sub CollectFromOutlook(byVal outputPath, byRef target)
   If g_recipientParseFailures > 0 Then
     WScript.Echo "RecipientResolution: parseFailures=" & g_recipientParseFailures & "; toMe/ccMe fell back to true for those mails"
   End If
-  WriteDigest outputPath, target, collected, collectedCount
+  WriteDigest outputPath, target, collected, collectedCount, scanSummary
 End Sub
 
 Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal maxItems, byVal recentHours, byVal bodyChars, byVal olderThan, byRef collected, byRef collectedCount)
@@ -174,6 +353,7 @@ Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal m
 
   Dim restricted
   If Trim(CStr(olderThan)) <> "" Then
+    WScript.Echo "RestrictFilter: folder=" & OneLine(folderPath) & "; filter=[" & timeProperty & "] < '" & FormatRestrictDate(ParseAnchorDate(olderThan)) & "'"
     On Error Resume Next
     Set restricted = items.Restrict("[" & timeProperty & "] < '" & FormatRestrictDate(ParseAnchorDate(olderThan)) & "'")
     If Err.Number <> 0 Then
@@ -186,6 +366,7 @@ Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal m
     Set items = restricted
   End If
   If cutoffEnabled Then
+    WScript.Echo "RestrictFilter: folder=" & OneLine(folderPath) & "; filter=[" & timeProperty & "] >= '" & FormatRestrictDate(cutoff) & "'"
     On Error Resume Next
     Set restricted = items.Restrict("[" & timeProperty & "] >= '" & FormatRestrictDate(cutoff) & "'")
     If Err.Number <> 0 Then
@@ -272,7 +453,13 @@ Function CollectFolderItems(byRef ns, byVal folderPath, byVal rangeMode, byVal m
     End If
     On Error GoTo 0
   Loop
-  WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; scanned=" & scanned & "; added=" & addedInFolder & "; itemErrors=" & itemErrors & "; maxItems=" & maxItems & "; recentHours=" & recentHours & "; olderThan=" & ValueOrDash(olderThan)
+  Dim modeParameter
+  If cutoffEnabled Then
+    modeParameter = "; recentHours=" & recentHours
+  Else
+    modeParameter = "; maxItems=" & maxItems
+  End If
+  WScript.Echo "FolderScan: folder=" & folderPath & "; mode=" & rangeMode & "; timeProperty=" & timeProperty & "; totalItems=" & totalItems & "; candidateItems=" & candidateItems & "; scanned=" & scanned & "; added=" & addedInFolder & "; itemErrors=" & itemErrors & modeParameter & "; olderThan=" & ValueOrDash(olderThan)
   If itemErrors > 0 Then
     CollectFolderItems = "partial"
   Else
@@ -329,6 +516,10 @@ Function IsSentFolder(byRef ns, byRef folder)
 
   Dim sentEntryId
   sentEntryId = SafeString(sentFolder.EntryID)
+  If sentEntryId = "" Then
+    On Error GoTo 0
+    Exit Function
+  End If
   Dim current
   Set current = folder
   Dim depth
@@ -336,7 +527,13 @@ Function IsSentFolder(byRef ns, byRef folder)
     If current Is Nothing Then
       Exit For
     End If
-    If SafeString(current.EntryID) = sentEntryId Then
+    Dim currentEntryId
+    currentEntryId = SafeString(current.EntryID)
+    If Err.Number <> 0 Then
+      Err.Clear
+      Exit For
+    End If
+    If currentEntryId = sentEntryId Then
       IsSentFolder = True
       Exit For
     End If
@@ -414,7 +611,7 @@ Function FormatRestrictDate(byVal dateValue)
   ElseIf hourPart > 12 Then
     hourPart = hourPart - 12
   End If
-  FormatRestrictDate = Month(dateValue) & "/" & Day(dateValue) & "/" & Year(dateValue) & " " & hourPart & ":" & Right("0" & Minute(dateValue), 2) & ":" & Right("0" & Second(dateValue), 2) & " " & suffix
+  FormatRestrictDate = Month(dateValue) & "/" & Day(dateValue) & "/" & Year(dateValue) & " " & hourPart & ":" & Right("0" & Minute(dateValue), 2) & " " & suffix
 End Function
 
 Function ParseAnchorDate(byVal value)
@@ -505,8 +702,14 @@ Function BuildMailRecord(byRef mail, byVal folderPath, byVal timeProperty, byVal
   record.Add "conversationId", SafeConversationId(mail)
   record.Add "conversationIndex", SafeConversationIndex(mail)
   record.Add "subject", SafeString(mail.Subject)
-  record.Add "senderName", SafeString(mail.SenderName)
-  record.Add "senderEmail", SafeSenderEmail(mail)
+  Dim senderName, senderEmail
+  senderName = SafeString(mail.SenderName)
+  senderEmail = SafeSenderEmail(mail)
+  If senderName = "" Then
+    senderName = senderEmail
+  End If
+  record.Add "senderName", senderName
+  record.Add "senderEmail", senderEmail
   record.Add "receivedTime", FormatDateValue(MailSortDate(mail, timeProperty))
   record.Add "sentTime", SafeDateValue(mail.SentOn)
   record.Add "sortKey", Replace(FormatDateValue(MailSortDate(mail, timeProperty)), " ", "T")
@@ -562,12 +765,39 @@ Function SafeStoreId(byRef mail)
 End Function
 
 Function SafeSenderEmail(byRef mail)
+  Dim address
   On Error Resume Next
-  SafeSenderEmail = SafeString(mail.SenderEmailAddress)
+  address = SafeString(mail.SenderEmailAddress)
   If Err.Number <> 0 Then
     Err.Clear
-    SafeSenderEmail = ""
   End If
+  Dim addressEntry
+  Set addressEntry = mail.Sender
+  If Err.Number = 0 And Not addressEntry Is Nothing Then
+    address = ResolveExchangeSmtpAddress(addressEntry, address)
+  End If
+  Err.Clear
+  SafeSenderEmail = address
+  On Error GoTo 0
+End Function
+
+Function ResolveExchangeSmtpAddress(byRef addressEntry, byVal address)
+  ResolveExchangeSmtpAddress = address
+  If LCase(Left(Trim(CStr(address)), 3)) <> "/o=" Then
+    Exit Function
+  End If
+
+  On Error Resume Next
+  Dim exchangeUser
+  Set exchangeUser = addressEntry.GetExchangeUser()
+  If Err.Number = 0 And Not exchangeUser Is Nothing Then
+    Dim smtp
+    smtp = SafeString(exchangeUser.PrimarySmtpAddress)
+    If smtp <> "" Then
+      ResolveExchangeSmtpAddress = smtp
+    End If
+  End If
+  Err.Clear
   On Error GoTo 0
 End Function
 
@@ -602,32 +832,120 @@ Function SafeDateValue(byVal value)
 End Function
 
 Function SafeTo(byRef mail)
-  On Error Resume Next
-  SafeTo = SafeString(mail.To)
-  If Err.Number <> 0 Then
-    Err.Clear
-    SafeTo = ""
-  End If
-  On Error GoTo 0
+  SafeTo = SafeRecipientsByType(mail, 1) ' olTo
 End Function
 
 Function SafeCc(byRef mail)
+  SafeCc = SafeRecipientsByType(mail, 2) ' olCC
+End Function
+
+Function SafeRecipientsByType(byRef mail, byVal recipientType)
+  SafeRecipientsByType = ""
   On Error Resume Next
-  SafeCc = SafeString(mail.CC)
-  If Err.Number <> 0 Then
+  Dim recipients
+  Set recipients = mail.Recipients
+  If Err.Number <> 0 Or recipients Is Nothing Then
     Err.Clear
-    SafeCc = ""
+    SafeRecipientsByType = SafeRecipientFallback(mail, recipientType)
+    On Error GoTo 0
+    Exit Function
   End If
+
+  Dim values
+  values = ""
+  Dim i
+  For i = 1 To recipients.Count
+    Dim recipient
+    Set recipient = Nothing
+    Err.Clear
+    Set recipient = recipients.Item(i)
+    If Err.Number = 0 And Not recipient Is Nothing Then
+      Dim recipientTypeValue
+      recipientTypeValue = recipient.Type
+      If Err.Number = 0 And recipientTypeValue = recipientType Then
+        Dim address
+        address = SafeString(recipient.Address)
+        Dim addressEntry
+        Set addressEntry = Nothing
+        Err.Clear
+        Set addressEntry = recipient.AddressEntry
+        If Err.Number = 0 And Not addressEntry Is Nothing Then
+          address = ResolveExchangeSmtpAddress(addressEntry, address)
+        End If
+        Err.Clear
+        values = AppendRecipientAddress(values, SafeString(recipient.Name), address)
+      End If
+    End If
+    Err.Clear
+  Next
+  If values = "" Then
+    values = SafeRecipientFallback(mail, recipientType)
+  End If
+  SafeRecipientsByType = values
   On Error GoTo 0
+End Function
+
+Function SafeRecipientFallback(byRef mail, byVal recipientType)
+  SafeRecipientFallback = ""
+  On Error Resume Next
+  If recipientType = 1 Then
+    SafeRecipientFallback = SafeString(mail.To)
+  ElseIf recipientType = 2 Then
+    SafeRecipientFallback = SafeString(mail.CC)
+  End If
+  Err.Clear
+  On Error GoTo 0
+End Function
+
+Function AppendRecipientAddress(byVal current, byVal displayName, byVal address)
+  Dim formatted
+  formatted = FormatRecipientAddress(displayName, address)
+  If formatted = "" Then
+    AppendRecipientAddress = current
+  ElseIf current = "" Then
+    AppendRecipientAddress = formatted
+  Else
+    AppendRecipientAddress = current & "; " & formatted
+  End If
+End Function
+
+Function FormatRecipientAddress(byVal displayName, byVal address)
+  displayName = Trim(CStr(displayName))
+  address = Trim(CStr(address))
+  If address = "" Then
+    FormatRecipientAddress = displayName
+  Else
+    If displayName = "" Then
+      displayName = address
+    End If
+    FormatRecipientAddress = displayName & " <" & address & ">"
+  End If
 End Function
 
 Function SafeAttachmentCount(byRef mail)
   On Error Resume Next
-  SafeAttachmentCount = CLng(mail.Attachments.Count)
-  If Err.Number <> 0 Then
+  Dim count
+  count = CLng(mail.Attachments.Count)
+  If Err.Number <> 0 Or count <= 0 Then
     Err.Clear
     SafeAttachmentCount = 0
+    On Error GoTo 0
+    Exit Function
   End If
+
+  Dim visibleCount, i, attachment
+  visibleCount = 0
+  For i = 1 To count
+    Set attachment = Nothing
+    Set attachment = mail.Attachments.Item(i)
+    If Err.Number <> 0 Or attachment Is Nothing Then
+      Err.Clear
+      visibleCount = visibleCount + 1
+    ElseIf IsVisibleAttachment(attachment) Then
+      visibleCount = visibleCount + 1
+    End If
+  Next
+  SafeAttachmentCount = visibleCount
   On Error GoTo 0
 End Function
 
@@ -642,17 +960,54 @@ Function SafeAttachmentNames(byRef mail)
     Exit Function
   End If
 
-  Dim names()
-  ReDim names(count - 1)
-  Dim i
+  Dim namesText, i, attachment, fileName
+  namesText = ""
   For i = 1 To count
-    names(i - 1) = SafeString(mail.Attachments.Item(i).FileName)
+    Set attachment = Nothing
+    Set attachment = mail.Attachments.Item(i)
     If Err.Number <> 0 Then
       Err.Clear
-      names(i - 1) = ""
+    ElseIf Not attachment Is Nothing And IsVisibleAttachment(attachment) Then
+      fileName = SafeString(attachment.FileName)
+      If Err.Number <> 0 Then
+        Err.Clear
+        fileName = ""
+      End If
+      If fileName <> "" Then
+        If namesText <> "" Then
+          namesText = namesText & "; "
+        End If
+        namesText = namesText & fileName
+      End If
     End If
   Next
-  SafeAttachmentNames = Join(names, "; ")
+  SafeAttachmentNames = namesText
+  On Error GoTo 0
+End Function
+
+Function IsVisibleAttachment(byRef attachment)
+  IsVisibleAttachment = True
+  On Error Resume Next
+  Dim accessor
+  Set accessor = attachment.PropertyAccessor
+  If Err.Number <> 0 Or accessor Is Nothing Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Function
+  End If
+
+  Dim hidden
+  hidden = accessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")
+  If Err.Number <> 0 Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Function
+  End If
+  IsVisibleAttachment = Not CBool(hidden)
+  If Err.Number <> 0 Then
+    Err.Clear
+    IsVisibleAttachment = True
+  End If
   On Error GoTo 0
 End Function
 
@@ -856,13 +1211,16 @@ Sub SortMailRecords(byRef records, byVal recordCount)
   Next
 End Sub
 
-Sub WriteDigest(byVal outputPath, byRef target, byRef records, byVal recordCount)
+Sub WriteDigest(byVal outputPath, byRef target, byRef records, byVal recordCount, byVal scanSummary)
   Dim content
   content = "# Outlook Mail Digest" & vbCrLf & vbCrLf
   content = content & "GeneratedAt: " & FormatDateValue(Now) & vbCrLf
   content = content & "RangeMode: " & target("range-mode") & vbCrLf
-  content = content & "RecentHours: " & target("recent-hours") & vbCrLf
-  content = content & "MaxItems: " & target("max-items") & vbCrLf
+  If IsRecentHoursMode(target("range-mode")) Then
+    content = content & "RecentHours: " & target("recent-hours") & vbCrLf
+  Else
+    content = content & "MaxItems: " & target("max-items") & vbCrLf
+  End If
   content = content & "Folders:" & vbCrLf
 
   Dim folderNames
@@ -871,6 +1229,7 @@ Sub WriteDigest(byVal outputPath, byRef target, byRef records, byVal recordCount
   For i = 0 To UBound(folderNames)
     content = content & "- " & Trim(folderNames(i)) & vbCrLf
   Next
+  content = content & "ScanSummary: " & scanSummary & vbCrLf
 
   content = content & vbCrLf & "---" & vbCrLf
 
@@ -911,25 +1270,96 @@ Sub WriteSampleDigest(byVal outputPath, byRef target)
   Dim recordCount
   recordCount = 0
   Dim record
+  Dim longSampleBody
 
-  Set record = BuildSampleRecord(1, "Contract approval needed", "Alice", "alice@example.com", "Inbox/Customer", "high", True, False, "Please review and approve the contract before EOD today.")
-  record("conversationId") = "sample-thread-contract"
+  Set record = BuildSampleRecord(1, "Approve release decision by 16:00 today", "Maya Chen", "maya.chen@example.com", "Inbox/Release", "high", True, False, "The launch window closes today." & vbCrLf & "Please approve or decline the release decision." & vbCrLf & "The deadline is 16:00 today.")
+  record("conversationId") = "sample-thread-release"
   record("conversationIndex") = "0001"
   record("attachmentCount") = 1
-  record("attachmentNames") = "contract.pdf"
+  record("attachmentNames") = "release-checklist.pdf"
   AddRecordToArray records, recordCount, record
-  Set record = BuildSampleRecord(2, "Weekly system notice", "No Reply", "no-reply@example.com", "Inbox/Notice", "normal", True, True, "This is the weekly system notification for the shared platform.")
-  AddRecordToArray records, recordCount, record
-  Set record = BuildSampleRecord(3, "Need your review on Q3 budget", "Bob", "bob@example.com", "Inbox/Project A", "high", True, False, "Please check the attached budget assumptions and send comments today.")
+
+  Set record = BuildSampleRecord(2, ChrW(&H98CE) & ChrW(&H9669) & ChrW(&H63D0) & ChrW(&H9192) & ChrW(&HFF1A) & ChrW(&H751F) & ChrW(&H4EA7) & ChrW(&H8BC1) & ChrW(&H4E66) & ChrW(&H5C06) & ChrW(&H5728) & ChrW(&H4ECA) & ChrW(&H5929) & ChrW(&H5230) & ChrW(&H671F), "Security Operations", "security@example.com", "Inbox/Operations", "high", True, False, "The production certificate expires today." & vbCrLf & "Renew it before customer traffic is affected." & vbCrLf & "Use the attached runbook if needed.")
   record("attachmentCount") = 1
-  record("attachmentNames") = "budget.xlsx"
+  record("attachmentNames") = "certificate-renewal-runbook.pdf"
   AddRecordToArray records, recordCount, record
-  Set record = BuildSampleRecord(4, "Follow-up: customer workshop next week", "Carol", "carol@example.com", "Inbox/Customer", "normal", False, False, "Waiting for your confirmation on the workshop agenda and attendee list.")
-  record("conversationId") = "sample-thread-contract"
+
+  Set record = BuildSampleRecord(3, "Project Atlas launch decision", "Elena Park, CEO", "elena.park@example.com", "Inbox/Leadership", "high", True, False, "Please share the final recommendation for Project Atlas." & vbCrLf & "I need your decision for the executive review." & vbCrLf & "Please include the main tradeoffs.")
+  record("conversationId") = "sample-thread-release"
   record("conversationIndex") = "0002"
   AddRecordToArray records, recordCount, record
 
-  WriteDigest outputPath, target, records, recordCount
+  Set record = BuildSampleRecord(4, "Re: Project Atlas launch decision", "Daniel Wu", "daniel.wu@example.com", "Inbox/Leadership", "high", True, True, ChrW(&H8BF7) & ChrW(&H5728) & ChrW(&H4ECA) & ChrW(&H5929) & ChrW(&H5341) & ChrW(&H4E03) & ChrW(&H70B9) & ChrW(&H524D) & ChrW(&H786E) & ChrW(&H8BA4) & ChrW(&H9879) & ChrW(&H76EE) & ChrW(&H53D1) & ChrW(&H5E03) & ChrW(&H51B3) & ChrW(&H5B9A) & ChrW(&H3002) & vbCrLf & "The regional team is waiting for your response." & vbCrLf & "Please reply with the final decision.")
+  record("conversationId") = "sample-thread-release"
+  record("conversationIndex") = "0003"
+  AddRecordToArray records, recordCount, record
+
+  Set record = BuildSampleRecord(5, "Re: Project Atlas launch decision", "Maya Chen", "maya.chen@example.com", "Inbox/Leadership", "normal", False, False, "If we defer the launch, please confirm the owner." & vbCrLf & "The customer communication plan needs a named lead." & vbCrLf & "Please respond before the announcement.")
+  record("conversationId") = "sample-thread-release"
+  record("conversationIndex") = "0004"
+  AddRecordToArray records, recordCount, record
+
+  Set record = BuildSampleRecord(6, ChrW(&H7B49) & ChrW(&H5F85) & ChrW(&H60A8) & ChrW(&H786E) & ChrW(&H8BA4) & ChrW(&H4F9B) & ChrW(&H5E94) & ChrW(&H5546) & ChrW(&H62A5) & ChrW(&H4EF7), ChrW(&H91C7) & ChrW(&H8D2D) & ChrW(&H56E2) & ChrW(&H961F), "procurement@example.com", "Inbox/Procurement", "normal", True, False, "Supplier A can hold the quoted price until Friday." & vbCrLf & "Please confirm whether we should proceed." & vbCrLf & "The quote is attached for review.")
+  record("attachmentCount") = 1
+  record("attachmentNames") = "supplier-quote.xlsx"
+  AddRecordToArray records, recordCount, record
+
+  Set record = BuildSampleRecord(7, "Weekly platform maintenance", "Platform Notifications", "no-reply@example.com", "Inbox/Notice", "normal", False, False, "Scheduled maintenance is planned for Sunday 02:00-03:00 UTC." & vbCrLf & "No action is required unless your team has a conflict." & vbCrLf & "Service status will be updated after completion.")
+  AddRecordToArray records, recordCount, record
+
+  Set record = BuildSampleRecord(8, ChrW(&H5B63) & ChrW(&H5EA6) & ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H7EF4) & ChrW(&H62A4) & ChrW(&H901A) & ChrW(&H77E5), ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H901A) & ChrW(&H77E5), "platform-notify@example.com", "Inbox/Notice", "normal", False, True, ChrW(&H672C) & ChrW(&H5468) & ChrW(&H672B) & ChrW(&H5C06) & ChrW(&H8FDB) & ChrW(&H884C) & ChrW(&H4F8B) & ChrW(&H884C) & ChrW(&H7EF4) & ChrW(&H62A4) & ChrW(&HFF0C) & ChrW(&H5982) & ChrW(&H6709) & ChrW(&H51B2) & ChrW(&H7A81) & ChrW(&H8BF7) & ChrW(&H8054) & ChrW(&H7CFB) & ChrW(&H5E73) & ChrW(&H53F0) & ChrW(&H56E2) & ChrW(&H961F) & ChrW(&H3002) & vbCrLf & "Please contact the platform team if you have a conflict." & vbCrLf & "The change window is listed above.")
+  AddRecordToArray records, recordCount, record
+
+  Set record = BuildSampleRecord(9, "FYI: Workspace beta invitation", "Product Research", "research@example.com", "Inbox/Research", "normal", False, False, "You may want to review the beta workspace proposal." & vbCrLf & "It is unclear whether a response is needed this week." & vbCrLf & "Feedback is welcome if you have time.")
+  AddRecordToArray records, recordCount, record
+
+  Set record = BuildSampleRecord(10, "HIGHLY RESTRICTED: acquisition diligence", "Legal Counsel", "legal@example.com", "Inbox/Legal", "high", True, False, "Secret board materials for the acquisition diligence review." & vbCrLf & "Do not forward these materials." & vbCrLf & "Please review the attachments before the confidential meeting.")
+  record("attachmentCount") = 2
+  record("attachmentNames") = "diligence-summary.pdf; board-notes.docx"
+  AddRecordToArray records, recordCount, record
+
+  longSampleBody = "This sample verifies that long original mail remains readable in the workbench." & vbCrLf & _
+    "It intentionally contains enough lines to require the reading pane to scroll." & vbCrLf & _
+    "Review the release checklist before the planned deployment window." & vbCrLf & _
+    "Confirm that the implementation owner and backup owner are available." & vbCrLf & _
+    "Record any dependency that could delay the release decision." & vbCrLf & _
+    "Share the final readiness summary with the delivery group." & vbCrLf & _
+    "Use the linked runbook for the rollback criteria and escalation path." & vbCrLf & _
+    "Keep the customer communication draft ready until approval is confirmed." & vbCrLf & _
+    "Validate the monitoring dashboard after the configuration change." & vbCrLf & _
+    "Document the outcome in the weekly operations update." & vbCrLf & _
+    "Escalate only if a blocker remains after the final review." & vbCrLf & _
+    "Review the approval record before sharing the release status." & vbCrLf & _
+    "Check that every open question has a named owner and next step." & vbCrLf & _
+    "Confirm the quality assurance sign-off is attached to the final update." & vbCrLf & _
+    "Keep the deployment timeline visible while reviewing the remaining tasks." & vbCrLf & _
+    "Verify the fallback contact can join the escalation bridge if needed." & vbCrLf & _
+    "Ensure the monitoring alerts use the agreed production thresholds." & vbCrLf & _
+    "Capture the decisions that affect the next weekly planning meeting." & vbCrLf & _
+    "Confirm the customer-facing notes match the approved release scope." & vbCrLf & _
+    "Compare the final checklist against the change-management record." & vbCrLf & _
+    "Leave enough time for a final review before the deployment window." & vbCrLf & _
+    "Confirm that all supporting documents are available to the delivery group." & vbCrLf & _
+    "Review the rollback contacts once more before closing the readiness review." & vbCrLf & _
+    "This final line ensures the sample body is visibly longer than the reader viewport."
+  Set record = BuildSampleRecord(11, "Long body layout verification", "EasyMail QA", "qa@example.com", "Inbox/Release", "normal", False, False, longSampleBody)
+  AddRecordToArray records, recordCount, record
+
+  WriteDigest outputPath, target, records, recordCount, "ok"
+End Sub
+
+Sub WriteSampleFolderList(byVal outputPath)
+  Dim content
+  content = "EasyMailFolderList: version=1; mode=list-folders; sample=true" & vbCrLf
+  content = content & "FolderListDefault: Inbox=Inbox" & vbCrLf
+  content = content & "FolderListDefault: Sent Items=Sent Items" & vbCrLf
+  content = content & "FolderListDefault: Drafts=Drafts" & vbCrLf
+  content = content & "Inbox" & vbCrLf
+  content = content & "Sent Items" & vbCrLf
+  content = content & "Mailbox Name/Project Alpha" & vbCrLf
+  content = content & ChrW(&H793A) & ChrW(&H4F8B) & ChrW(&H90AE) & ChrW(&H7BB1) & "/" & ChrW(&H6536) & ChrW(&H4EF6) & ChrW(&H7BB1) & vbCrLf
+  content = content & "FolderList: skipped=semicolon; path=Mailbox Name/Bad;Folder" & vbCrLf
+  WriteTextFile outputPath, content
 End Sub
 
 Function BuildSampleRecord(byVal recordIndex, byVal subject, byVal senderName, byVal senderEmail, byVal folderPath, byVal importance, byVal unread, byVal ccMe, byVal bodyExcerpt)
@@ -1041,10 +1471,11 @@ Sub PrintUsage()
   WScript.Echo "  --max-items <n>      Maximum mails to include."
   WScript.Echo "  --recent-hours <n>   Only include mails newer than n hours."
   WScript.Echo "  --folders <a;b;c>    Outlook folders to scan."
+  WScript.Echo "  --list-folders       Write available Outlook mail folders to --output."
   WScript.Echo "  --body-chars <n>     Body excerpt length."
   WScript.Echo "  --older-than-map <m> Per-folder older-than anchors: Inbox=2026-06-16 10:00:00;Inbox/Sub=..."
   WScript.Echo "  --output <path>      Output markdown path."
-  WScript.Echo "  --sample             Generate sample digest without Outlook."
+  WScript.Echo "  --sample             Generate sample digest or folder list without Outlook."
   WScript.Echo "  --help               Show this message."
 End Sub
 

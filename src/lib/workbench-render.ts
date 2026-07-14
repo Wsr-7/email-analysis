@@ -1,9 +1,9 @@
 import type { AnalysisResult } from "./analysis-schema";
 import { classificationFor, normalizeClassificationCache } from "./classification";
-import { getLocaleFromConfig } from "./config-utils";
+import { getLocaleFromConfig, positiveNumber } from "./config-utils";
 import { getLabels, type DashboardLabels } from "./dashboard-labels";
-import { filterVisibleThreadsForDashboard, buildThreadLookup, compareTimelineMessagesForDisplay } from "./dashboard-state";
-import { escapeHtml, escapeAttr, toJsLiteral } from "./html-utils";
+import { filterVisibleThreadsForDashboard, compareTimelineMessagesForDisplay } from "./dashboard-state";
+import { escapeHtml, escapeAttr, toJsLiteral, senderDisplayName, recipientDisplayNames } from "./html-utils";
 import type { StoredMail } from "./mail-store";
 import type { SecurityGateDecisionResult } from "./security-types";
 import { emptyThreadStore, type ThreadStore } from "./thread-store";
@@ -18,9 +18,12 @@ function ignoreOrRestore(queue: string, mailId: string, labels: DashboardLabels)
   return `<button class="wb-btn ghost" data-action="ignore" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.card.ignore)}</button>`;
 }
 
+function analyzeButton(mailId: string, label: string): string {
+  return `<button class="wb-btn" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(label)}</button>`;
+}
+
 function confirmAnalyzeButton(mailId: string, decision: SecurityGateDecisionResult | undefined, labels: DashboardLabels): string {
-  if (decision?.decision !== "manual_confirm") return "";
-  return `<button class="wb-btn" data-action="analyzeSelected" data-mail-id="${escapeAttr(mailId)}">${escapeHtml(labels.pending.confirmAnalyze)}</button>`;
+  return decision?.decision === "manual_confirm" ? analyzeButton(mailId, labels.pending.confirmAnalyze) : "";
 }
 
 function isThreadIgnored(thread: ThreadStore["items"][number], ignoredIds?: Set<string>): boolean {
@@ -32,19 +35,28 @@ function renderGateReasons(title: string, reasons: string[]): string {
   return `<div class="wb-field wb-warn"><strong>${escapeHtml(title)}:</strong><div class="wb-gate-reasons">${items.map((reason) => `<div class="wb-gate-reason">${escapeHtml(reason)}</div>`).join("")}</div></div>`;
 }
 
+function renderAttachments(item: StoredMail | undefined, labels: DashboardLabels): string {
+  const count = Number(item?.attachmentCount || 0);
+  if (!Number.isFinite(count) || count <= 0) return "";
+  const names = (item?.attachmentNames || []).filter(Boolean);
+  const suffix = names.length ? ` (${names.join("; ")})` : "";
+  return `<div class="wb-field"><strong>${escapeHtml(labels.threads.attachments)}:</strong> ${escapeHtml(`${count}${suffix}`)}</div>`;
+}
+
 function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabels, extra: string, extraActions = "", classifications?: ReturnType<typeof normalizeClassificationCache>): string {
-  const toHtml = item.to ? `<div class="wb-field"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(item.to)}</div>` : "";
-  const ccHtml = item.cc ? `<div class="wb-field"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(item.cc)}</div>` : "";
+  const toHtml = item.to ? `<div class="wb-field" title="${escapeAttr(item.to)}"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(recipientDisplayNames(item.to))}</div>` : "";
+  const ccHtml = item.cc ? `<div class="wb-field" title="${escapeAttr(item.cc)}"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(recipientDisplayNames(item.cc))}</div>` : "";
   const cls = classifications ? classificationFor(item.mailId, classifications) : undefined;
   const clsFromExtra = extra.includes(labels.pending.classification);
   const clsHtml = cls && !clsFromExtra ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(cls))}</div>` : "";
-  return `<div class="wb-detail-card">
+  return `<div class="wb-detail-card wb-with-body wb-mail-with-body">
     <h3>${escapeHtml(item.subject || item.mailId)}</h3>
     <div class="wb-meta-grid">
-      <div class="wb-field"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.from || "-")}</div>
+      <div class="wb-field" title="${escapeAttr(item.from || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.from || "-"))}</div>
       ${toHtml}
       ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
+      ${renderAttachments(item, labels)}
       ${clsHtml}
       ${extra}
     </div>
@@ -53,35 +65,37 @@ function renderMailDetail(item: StoredMail, queue: string, labels: DashboardLabe
       <button class="wb-btn" data-action="openInOutlook" data-mail-id="${escapeAttr(item.mailId)}">${escapeHtml(labels.card.openInOutlook)}</button>
       ${ignoreOrRestore(queue, item.mailId, labels)}
     </div>
-    <div class="wb-body">${escapeHtml(item.bodyExcerpt || "")}</div>
+    <div class="wb-section wb-original-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(item.bodyExcerpt || "")}</div></div>
   </div>`;
 }
 
-function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, threadId: string, classifications: ReturnType<typeof normalizeClassificationCache>, originalMail?: StoredMail): string {
+function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ReturnType<typeof normalizeClassificationCache>, originalMail?: StoredMail, workingDrafts?: Map<string, string>): string {
   const priority = formatPriority(item.priority, labels);
-  const draftHtml = renderEditableDraftBox(item.draftReply || "", labels, { itemId: `mail:${item.mailId}`, sourceId: item.mailId, generateAction: "analyzeSelected" });
+  const itemId = `mail:${item.mailId}`;
+  const draftHtml = renderEditableDraftBox(workingDrafts?.get(itemId) ?? (item.draftReply || ""), labels, { itemId, sourceId: item.mailId, generateAction: "analyzeSelected" });
   const classification = classificationFor(item.mailId, classifications);
   const clsHtml = classification ? `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>` : "";
-  const toHtml = originalMail?.to ? `<div class="wb-field"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(originalMail.to)}</div>` : "";
-  const ccHtml = originalMail?.cc ? `<div class="wb-field"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(originalMail.cc)}</div>` : "";
-  const threadLink = threadId
-    ? `<div class="wb-field"><strong>${escapeHtml(labels.card.thread)}:</strong> ${escapeHtml(threadId)}</div>`
-    : "";
+  const toHtml = originalMail?.to ? `<div class="wb-field" title="${escapeAttr(originalMail.to)}"><strong>${escapeHtml(labels.card.to)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.to))}</div>` : "";
+  const ccHtml = originalMail?.cc ? `<div class="wb-field" title="${escapeAttr(originalMail.cc)}"><strong>${escapeHtml(labels.card.cc)}:</strong> ${escapeHtml(recipientDisplayNames(originalMail.cc))}</div>` : "";
+  const dueHtml = item.dueDate ? `<div class="wb-field"><strong>${escapeHtml(labels.card.due)}:</strong> ${escapeHtml(item.dueDate)}</div>` : "";
   const bodyText = originalMail?.bodyExcerpt || "";
-  const bodyHtml = bodyText ? `<div class="wb-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(bodyText)}</div></div>` : "";
-  return `<div class="wb-detail-card">
+  const bodyHtml = bodyText ? `<div class="wb-section wb-original-section"><div class="wb-field"><strong>${escapeHtml(labels.card.body)}:</strong></div><div class="wb-body">${escapeHtml(bodyText)}</div></div>` : "";
+  return `<div class="wb-detail-card wb-with-body wb-mail-with-body">
     <div class="wb-detail-header">
       <h3>${escapeHtml(item.subject || item.mailId)}</h3>
       <span class="wb-priority">${escapeHtml(priority)}</span>
     </div>
     <div class="wb-meta-grid">
-      <div class="wb-field"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.sender || "-")}</div>
+      <div class="wb-field" title="${escapeAttr(item.sender || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.sender || "-"))}</div>
       ${toHtml}
       ${ccHtml}
       <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
+      ${renderAttachments(originalMail, labels)}
+      ${dueHtml}
       ${clsHtml}
     </div>
     <div class="wb-actions">
+      ${analyzeButton(item.mailId, labels.card.reanalyze)}
       <button class="wb-btn" data-action="openInOutlook" data-mail-id="${escapeAttr(item.mailId)}">${escapeHtml(labels.card.openInOutlook)}</button>
       ${ignoreOrRestore(queue, item.mailId, labels)}
     </div>
@@ -97,7 +111,6 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], queue: stri
       <div class="wb-field"><strong>${escapeHtml(labels.card.suggestedAction)}:</strong></div>
       <div class="wb-section-body">${escapeHtml(item.suggestedAction || "-")}</div>
     </div>
-    ${threadLink}
     ${draftHtml}
     ${bodyHtml}
   </div>`;
@@ -127,7 +140,7 @@ function renderSpotlightRisks(analysis: ThreadAnalysisResult["items"][number], l
   return `<h4>${escapeHtml(labels.threads.risks)}</h4><ul class="wb-ul">${analysis.risks.map((risk) => `<li><span class="wb-risk-level">${escapeHtml(risk.level)}</span> ${escapeHtml(risk.description)}</li>`).join("")}</ul>`;
 }
 
-function renderThreadSpotlight(analysis: ThreadAnalysisResult["items"][number] | undefined, labels: DashboardLabels): string {
+function renderThreadSpotlight(analysis: ThreadAnalysisResult["items"][number] | undefined, labels: DashboardLabels, workingDrafts?: Map<string, string>): string {
   if (!analysis) {
     return "";
   }
@@ -144,7 +157,7 @@ function renderThreadSpotlight(analysis: ThreadAnalysisResult["items"][number] |
       ${renderSpotlightRisks(analysis, labels)}
       <div class="wb-field"><strong>${escapeHtml(labels.threads.needMyReply)}:</strong> ${escapeHtml(analysis.needMyReply ? labels.threads.yes : labels.threads.no)}</div>
       ${analysis.suggestedAction ? `<div class="wb-field"><strong>${escapeHtml(labels.threads.suggestedAction)}:</strong></div><div class="wb-section-body">${escapeHtml(analysis.suggestedAction)}</div>` : ""}
-      ${renderEditableDraftBox(analysis.draftReply || "", labels, { itemId: `thread:${analysis.threadId}`, sourceId: analysis.threadId, generateAction: "analyzeThread" })}
+      ${renderEditableDraftBox(workingDrafts?.get(`thread:${analysis.threadId}`) ?? (analysis.draftReply || ""), labels, { itemId: `thread:${analysis.threadId}`, sourceId: analysis.threadId, generateAction: "analyzeThread" })}
     </section>`;
 }
 
@@ -153,34 +166,39 @@ function renderThreadDetail(
   labels: DashboardLabels,
   analysis: ThreadAnalysisResult["items"][number] | undefined,
   busyKind: string,
-  ignoredIds?: Set<string>
+  bodyExcerptChars: number,
+  ignoredIds?: Set<string>,
+  workingDrafts?: Map<string, string>
 ): string {
   const timelineItems = [...(thread.timeline || [])].sort(compareTimelineMessagesForDisplay);
   const timeline = timelineItems.map((msg) =>
     `<div class="wb-tl-item">
       <div class="wb-tl-head">
-        <strong>${escapeHtml(msg.from || msg.senderEmail || "")}</strong>
+        <strong title="${escapeAttr(msg.from || msg.senderEmail || "")}">${escapeHtml(senderDisplayName(msg.from || msg.senderEmail || ""))}</strong>
         <span class="wb-tl-time">${escapeHtml(msg.receivedTime || msg.sentTime || "")}</span>
       </div>
-      <div class="wb-tl-body-wrap">${msg.mailId ? `<button class="wb-tl-open" data-action="openInOutlook" data-mail-id="${escapeAttr(msg.mailId)}" title="${escapeAttr(labels.card.openInOutlook)}">↗</button>` : ""}<div class="wb-tl-body">${escapeHtml(msg.bodyDelta || msg.bodyPreview || "")}</div></div>
+      <div class="wb-tl-body-wrap">${msg.mailId ? `<button class="wb-tl-open" data-action="openInOutlook" data-mail-id="${escapeAttr(msg.mailId)}" title="${escapeAttr(labels.card.openInOutlook)}">↗</button>` : ""}<div class="wb-tl-body">${escapeHtml(msg.bodyDelta || msg.bodyPreview || "")}</div>${msg.bodyPreview.length > bodyExcerptChars ? `<div class="wb-tl-truncated">${escapeHtml(labels.threads.contentTruncated)}</div>` : ""}</div>
     </div>`
   ).join("");
 
   return `<div class="wb-detail-card">
-    <h3>${escapeHtml(thread.subject || thread.threadId)}</h3>
+    <h3>${escapeHtml(thread.subject || "-")}</h3>
     <div class="wb-meta-grid">
-      <div class="wb-field"><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.join(", ") || "-")}</div>
+      <div class="wb-field" title="${escapeAttr(thread.participants.join(", ") || "-")}"><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.map(senderDisplayName).join(", ") || "-")}</div>
       <div class="wb-field"><strong>${escapeHtml(labels.threads.lastTime)}:</strong> ${escapeHtml(thread.lastTime || "-")}</div>
       <div class="wb-field"><strong>${escapeHtml(labels.threads.security)}:</strong> ${escapeHtml(formatThreadSecurity(thread.security))}</div>
     </div>
     <div class="wb-actions">
-      <button class="wb-btn${busyKind === "analyzeThread" ? " is-busy" : ""}" data-action="analyzeThread" data-thread-id="${escapeAttr(thread.threadId)}"${busyKind ? " disabled" : ""}>${escapeHtml(labels.threads.analyzeThread)}${renderButtonSpinner(busyKind === "analyzeThread")}</button>
+      <button class="wb-btn${busyKind === "analyzeThread" ? " is-busy" : ""}" data-action="analyzeThread" data-thread-id="${escapeAttr(thread.threadId)}"${busyKind ? " disabled" : ""}>${escapeHtml(analysis ? labels.card.reanalyze : labels.threads.analyzeThread)}${renderButtonSpinner(busyKind === "analyzeThread")}</button>
       ${ignoredIds && thread.sourceMailIds.length > 0 && thread.sourceMailIds.every((id) => ignoredIds.has(id))
         ? `<button class="wb-btn ghost" data-action="unignoreThread" data-thread-id="${escapeAttr(thread.threadId)}">${escapeHtml(labels.card.restore)}</button>`
         : `<button class="wb-btn ghost" data-action="ignoreThread" data-thread-id="${escapeAttr(thread.threadId)}">${escapeHtml(labels.card.ignore)}</button>`}
     </div>
-    ${renderThreadSpotlight(analysis, labels)}
-    ${timelineItems.length ? `<div class="wb-timeline-section"><h4>${escapeHtml(labels.threads.timeline)} (${timelineItems.length})</h4>${timeline}</div>` : ""}
+    ${renderThreadSpotlight(analysis, labels, workingDrafts)}
+    ${timelineItems.length ? `<div class="wb-timeline-section">
+      <button class="wb-timeline-sort" data-action="toggleTimelineOrder" data-thread-id="${escapeAttr(thread.threadId)}" data-order="asc">${escapeHtml(labels.threads.timeline)} (${timelineItems.length}) <span class="wb-timeline-arrow" aria-hidden="true">↑</span></button>
+      <div class="wb-timeline-list">${timeline}</div>
+    </div>` : ""}
   </div>`;
 }
 
@@ -200,7 +218,7 @@ function renderMeetingDetail(item: StoredMeeting, labels: DashboardLabels): stri
   const flags: string[] = [];
   if (item.isAllDay) flags.push(labels.meetings.allDay);
   if (item.isRecurring) flags.push(labels.meetings.recurring);
-  return `<div class="wb-detail-card">
+  return `<div class="wb-detail-card wb-with-body">
     <div class="wb-detail-header">
       <h3>${escapeHtml(item.subject || "-")}</h3>
       <span class="wb-priority wb-mtg-${escapeAttr(item.responseStatus)}">${escapeHtml(meetingStatusLabel(item.responseStatus, labels))}</span>
@@ -209,25 +227,26 @@ function renderMeetingDetail(item: StoredMeeting, labels: DashboardLabels): stri
       <div class="wb-field"><strong>${escapeHtml(labels.meetings.organizer)}:</strong> ${escapeHtml(item.organizer || "-")}</div>
       <div class="wb-field"><strong>${escapeHtml(labels.meetings.time)}:</strong> ${escapeHtml(timeRange)}</div>
       ${item.location ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.location)}:</strong> ${escapeHtml(item.location)}</div>` : ""}
-      ${item.requiredAttendees ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.attendees)}:</strong> ${escapeHtml(item.requiredAttendees)}</div>` : ""}
+      ${item.requiredAttendees ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.requiredAttendees)}:</strong> ${escapeHtml(item.requiredAttendees)}</div>` : ""}
+      ${item.optionalAttendees ? `<div class="wb-field"><strong>${escapeHtml(labels.meetings.optionalAttendees)}:</strong> ${escapeHtml(item.optionalAttendees)}</div>` : ""}
       ${flags.length ? `<div class="wb-field">${escapeHtml(flags.join(", "))}</div>` : ""}
     </div>
-    ${item.bodyExcerpt ? `<div class="wb-body">${escapeHtml(item.bodyExcerpt)}</div>` : ""}
     <div class="wb-actions">
       <button class="wb-btn" data-action="openMeetingInOutlook" data-meeting-id="${escapeAttr(item.entryId)}">${escapeHtml(labels.meetings.openInOutlook)}</button>
     </div>
+    ${item.bodyExcerpt ? `<div class="wb-body">${escapeHtml(item.bodyExcerpt)}</div>` : ""}
   </div>`;
 }
 
-export function renderWorkbenchHtml(input: DashboardRenderInput): string {
+export function renderWorkbenchHtml(input: DashboardRenderInput, nonce: string): string {
   const { state, busyKind } = input;
   const config = state.config as Record<string, unknown>;
   const locale = getLocaleFromConfig(config);
+  const bodyExcerptChars = positiveNumber(config.bodyExcerptChars, 1500);
   const labels = getLabels(locale);
   const threadStore = input.threadStore || emptyThreadStore();
   const visibleThreadStore = filterVisibleThreadsForDashboard(threadStore);
   const threadAnalysis = input.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] };
-  const threadByMailId = buildThreadLookup(visibleThreadStore);
   const queue = input.queue || { pending: [], blocked: [], analysed: [], allowed: [], ignoredPending: [] };
   const classifications = input.classifications || normalizeClassificationCache({});
   const securityDecisions = input.securityDecisions || new Map<string, SecurityGateDecisionResult>();
@@ -237,7 +256,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   const sortedMeetings = [...meetingStore.items].sort((a, b) => {
     if (a.responseStatus === "notResponded" && b.responseStatus !== "notResponded") return -1;
     if (a.responseStatus !== "notResponded" && b.responseStatus === "notResponded") return 1;
-    return (a.start || "").localeCompare(b.start || "");
+    return (b.start || "").localeCompare(a.start || "");
   });
 
   const detailData: string[] = [];
@@ -245,7 +264,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   for (const item of queue.allowed) {
     const classification = classificationFor(item.mailId, classifications);
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>`;
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="pending">${renderMailDetail(item, "pending", labels, extra, "", classifications)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="pending">${renderMailDetail(item, "pending", labels, extra, analyzeButton(item.mailId, labels.card.analyze), classifications)}</div>`);
   }
 
   for (const item of queue.blocked) {
@@ -261,9 +280,8 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
 
   for (const cat of state.categories) {
     for (const item of cat.items) {
-      const threadId = threadByMailId.get(item.mailId) || "";
       const originalMail = mailById.get(item.mailId);
-      detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="${escapeAttr(cat.id)}">${renderAnalysisDetail(item, cat.id, labels, threadId, classifications, originalMail)}</div>`);
+      detailData.push(`<div class="wb-reader" data-id="${escapeAttr(item.mailId)}" data-queue="${escapeAttr(cat.id)}">${renderAnalysisDetail(item, cat.id, labels, classifications, originalMail, input.workingDrafts)}</div>`);
     }
   }
 
@@ -278,13 +296,14 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   const sortedThreads = [...(visibleThreadStore.items || [])].sort((a, b) => String(b.lastTime || "").localeCompare(String(a.lastTime || "")));
   for (const thread of sortedThreads) {
     const threadQueue = isThreadIgnored(thread, input.ignoredIds) ? "ignored" : "threads";
-    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}" data-queue="${escapeAttr(threadQueue)}">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, input.ignoredIds)}</div>`);
+    detailData.push(`<div class="wb-reader" data-id="${escapeAttr(thread.threadId)}" data-queue="${escapeAttr(threadQueue)}">${renderThreadDetail(thread, labels, analysisByThreadId.get(thread.threadId), busyKind, bodyExcerptChars, input.ignoredIds, input.workingDrafts)}</div>`);
   }
 
   return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${escapeAttr(nonce)}'; img-src data:;" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -300,23 +319,26 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   /* ── Full-width reading pane ── */
   .wb-pane { height: 100%; overflow-y: auto; }
   .wb-reader { display: none; }
-  .wb-reader.active { display: block; }
+  .wb-reader.active { display: flex; width: 100%; height: 100%; min-height: 0; }
+  .wb-reader.active ~ .wb-placeholder { display: none; }
   .wb-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; opacity: 0.3; font-size: 14px; }
 
   /* Detail card styles */
-  .wb-detail-card { padding: 24px 28px; }
+  .wb-detail-card { width: 100%; padding: 24px 28px; }
+  .wb-reader.active .wb-with-body { display: flex; flex-direction: column; min-height: 100%; width: 100%; }
   .wb-detail-card h3 { font-size: 17px; line-height: 1.4; margin-bottom: 4px; font-weight: 600; }
   .wb-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .wb-detail-header h3 { flex: 1; }
   .wb-priority { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); white-space: nowrap; flex-shrink: 0; margin-top: 4px; }
-  .wb-meta-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); margin-bottom: 12px; }
+  .wb-meta-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 0; }
   .wb-field { font-size: 12px; line-height: 1.6; }
   .wb-warn { color: var(--vscode-errorForeground, #f48771); }
   .wb-gate-reasons { display: grid; gap: 2px; margin-top: 2px; }
   .wb-section { margin-bottom: 12px; }
+  .wb-original-section { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; }
   .wb-section-body { font-size: 13px; line-height: 1.6; padding: 4px 0; opacity: 0.9; }
-  .wb-body { font-size: 12px; line-height: 1.7; white-space: pre-wrap; padding: 12px 14px; margin: 8px 0; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; border-left: 3px solid var(--vscode-focusBorder, #007fd4); max-height: 400px; overflow-y: auto; }
-  .wb-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); flex-wrap: wrap; }
+  .wb-body { flex: 1 0 auto; min-height: 140px; width: 100%; font-size: 12px; line-height: 1.7; white-space: pre-wrap; padding: 12px 14px; margin: 8px 0; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); border-radius: 4px; border-left: 3px solid var(--vscode-focusBorder, #007fd4); }
+  .wb-actions { display: flex; gap: 8px; margin: 0 0 12px; padding: 12px 0; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); border-bottom: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); flex-wrap: wrap; }
   .wb-btn { padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: 500; background: var(--vscode-button-background, #0e639c); color: var(--vscode-button-foreground, #fff); display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, transform 0.1s; }
   .wb-btn:hover:not(:disabled) { background: var(--vscode-button-hoverBackground, #1177bb); }
   .wb-btn:active:not(:disabled) { transform: scale(0.97); }
@@ -326,7 +348,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-btn.is-busy { gap: 6px; }
 
   /* Thread analysis */
-  .wb-thread-analysis { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); }
+  .wb-thread-analysis { margin-top: 12px; padding-top: 0; }
   .wb-thread-analysis h4 { font-size: 12px; font-weight: 600; margin: 12px 0 4px 0; opacity: 0.8; }
   .wb-thread-analysis h4:first-child { margin-top: 0; }
   .wb-ul { margin: 4px 0 4px 20px; font-size: 13px; }
@@ -334,8 +356,9 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-risk-level { font-size: 10px; padding: 1px 5px; border-radius: 6px; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); text-transform: uppercase; margin-right: 4px; }
 
   /* Timeline */
-  .wb-timeline-section { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.12)); }
-  .wb-timeline-section > h4 { font-size: 13px; font-weight: 600; margin-bottom: 12px; opacity: 0.7; }
+  .wb-timeline-section { margin-top: 20px; padding-top: 0; }
+  .wb-timeline-sort { padding: 4px 6px; margin: 0 0 8px -6px; border-radius: 4px; background: transparent; color: var(--vscode-editor-foreground, #ccc); font-size: 13px; font-weight: 600; opacity: 0.7; }
+  .wb-timeline-sort:hover { opacity: 1; background: var(--vscode-button-hoverBackground, #1177bb); color: var(--vscode-button-foreground, #fff); }
   .wb-tl-item { padding: 10px 0 10px 14px; border-left: 2px solid var(--vscode-panel-border, rgba(128,128,128,0.25)); margin-bottom: 2px; }
   .wb-tl-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   .wb-tl-head strong { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -345,6 +368,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
   .wb-tl-body-wrap:hover .wb-tl-open { opacity: 0.7; }
   .wb-tl-open:hover { opacity: 1 !important; background: var(--vscode-button-hoverBackground, #1177bb); }
   .wb-tl-body { font-size: 12px; line-height: 1.6; white-space: pre-wrap; padding: 8px 36px 8px 12px; border-radius: 4px; background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08)); color: var(--vscode-editor-foreground, #ccc); }
+  .wb-tl-truncated { font-size: 11px; opacity: 0.65; margin-top: 4px; }
 
   /* Draft box */
   .draft-box { position: relative; margin-top: 8px; }
@@ -401,14 +425,14 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     <div class="wb-placeholder" id="placeholder">${escapeHtml(locale === "zh-CN" ? "从侧栏选择邮件以阅读详情" : "Select an item from sidebar to read")}</div>
   </div>
 
-<script>
+<script nonce="${escapeAttr(nonce)}">
 var vscode = acquireVsCodeApi();
 var prev = vscode.getState() || {};
 var currentId = prev.currentId || '';
-var draftState = prev.draftState || null;
+var draftReportTimer;
 
+restoreTimelineOrders();
 if (currentId) showReader(currentId);
-restoreDraftState();
 
 function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, extra || {})); }
 
@@ -444,19 +468,6 @@ function hideReaders() {
   document.getElementById('placeholder').hidden = false;
 }
 
-function restoreDraftState() {
-  if (!draftState || !draftState.itemId || draftState.itemId !== currentId) return;
-  var box = document.querySelector('.draft-box-editable[data-item-id="' + draftState.itemId + '"]');
-  if (!box) return;
-  var ta = box.querySelector('.draft-textarea');
-  if (!ta) return;
-  if (ta.value !== draftState.draft) {
-    ta.value = draftState.draft;
-    if (String(draftState.draft || '').trim()) showDraftActionButtons(box);
-    else showGenerateDraftButton(box);
-  }
-}
-
 window.addEventListener('message', function(e) {
   var msg = e.data;
   if (msg && msg.type === 'focusItem' && msg.id) {
@@ -465,10 +476,18 @@ window.addEventListener('message', function(e) {
     setPersistedState({ currentId: currentId });
   }
   if (msg && msg.type === 'updateDraft' && msg.itemId) {
-    draftState = { itemId: msg.itemId, draft: msg.text || '' };
-    setPersistedState({ draftState: draftState });
     var box = document.querySelector('.draft-box-editable[data-item-id="' + msg.itemId + '"]');
     if (box) { var ta = box.querySelector('.draft-textarea'); if (ta) ta.value = msg.text || ''; if (String(msg.text || '').trim()) showDraftActionButtons(box); }
+  }
+  if (msg && msg.type === 'requestWorkingDraftFlush' && msg.requestId) {
+    clearTimeout(draftReportTimer);
+    var drafts = [];
+    for (var draftBox of document.querySelectorAll('.draft-box-editable')) {
+      var draftItemId = draftBox.getAttribute('data-item-id') || '';
+      var draftTextarea = draftBox.querySelector('.draft-textarea');
+      if (draftItemId && draftTextarea) drafts.push({ itemId: draftItemId, draftText: draftTextarea.value });
+    }
+    post('workingDraftsFlushed', { requestId: msg.requestId, drafts: drafts });
   }
 });
 
@@ -481,8 +500,8 @@ document.addEventListener('input', function(e) {
   else showGenerateDraftButton(box);
   var itemId = box.getAttribute('data-item-id') || '';
   if (itemId) {
-    draftState = { itemId: itemId, draft: target.value };
-    setPersistedState({ draftState: draftState });
+    clearTimeout(draftReportTimer);
+    draftReportTimer = setTimeout(function() { post('updateWorkingDraft', { itemId: itemId, draftText: target.value }); }, 500);
   }
 });
 
@@ -505,14 +524,49 @@ function showGenerateDraftButton(box) {
   actions.innerHTML = '<button class="wb-btn" data-action="generateDraft">' + ${toJsLiteral(labels.card.generateDraft)} + '</button>';
 }
 
+function closeDraftOutlookActions() {
+  for (var menu of document.querySelectorAll('details.draft-outlook-actions[open]')) {
+    menu.removeAttribute('open');
+  }
+}
+
+function setTimelineOrder(button, order, persist) {
+  var section = button.closest('.wb-timeline-section');
+  var list = section ? section.querySelector('.wb-timeline-list') : null;
+  if (!list) return;
+  if (button.getAttribute('data-order') !== order) {
+    var items = Array.prototype.slice.call(list.children);
+    for (var i = items.length - 1; i >= 0; i--) list.appendChild(items[i]);
+  }
+  button.setAttribute('data-order', order);
+  var arrow = button.querySelector('.wb-timeline-arrow');
+  if (arrow) arrow.textContent = order === 'asc' ? '↑' : '↓';
+  if (!persist) return;
+  var state = vscode.getState() || {};
+  var timelineOrders = Object.assign({}, state.timelineOrders || {});
+  var threadId = button.getAttribute('data-thread-id') || '';
+  if (threadId) timelineOrders[threadId] = order;
+  setPersistedState({ timelineOrders: timelineOrders });
+}
+
+function restoreTimelineOrders() {
+  var timelineOrders = prev.timelineOrders || {};
+  for (var button of document.querySelectorAll('.wb-timeline-sort')) {
+    var threadId = button.getAttribute('data-thread-id') || '';
+    if (timelineOrders[threadId] === 'desc') setTimelineOrder(button, 'desc', false);
+  }
+}
+
 document.addEventListener('click', function(e) {
   var t = e.target && e.target.closest ? e.target.closest('button[data-action]') : null;
   if (!t) return;
   var a = t.getAttribute('data-action');
+  if (a === 'toggleTimelineOrder') setTimelineOrder(t, t.getAttribute('data-order') === 'asc' ? 'desc' : 'asc', true);
+  if (['polishDraft', 'refineDraft', 'composeMail', 'generateDraft'].includes(a)) closeDraftOutlookActions();
   if (a === 'copyDraft') { var ta = t.closest('.draft-box-editable'); var v = ta ? ta.querySelector('.draft-textarea') : null; post('copyDraft', { draftReply: v ? v.value : (t.getAttribute('data-draft-reply') || '') }); }
-  if (a === 'polishDraft' || a === 'refineDraft') { var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; var itemId = box ? box.getAttribute('data-item-id') || '' : ''; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: itemId }); }
-  if (a === 'composeMail') { var menu = t.closest('.draft-outlook-actions'); if (menu) menu.removeAttribute('open'); var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
-  if (a === 'generateDraft') { var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var itemId3 = box3 ? box3.getAttribute('data-item-id') || '' : ''; post('generateDraft', { itemId: itemId3, sourceId: sourceId }); }
+  if (a === 'polishDraft' || a === 'refineDraft') { clearTimeout(draftReportTimer); var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; var itemId = box ? box.getAttribute('data-item-id') || '' : ''; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: itemId }); }
+  if (a === 'composeMail') { var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
+  if (a === 'generateDraft') { clearTimeout(draftReportTimer); var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var itemId3 = box3 ? box3.getAttribute('data-item-id') || '' : ''; post('generateDraft', { itemId: itemId3, sourceId: sourceId }); }
   if (a === 'ignore') { var reader = t.closest('.wb-reader'); var removedId = reader ? reader.getAttribute('data-id') || '' : t.getAttribute('data-mail-id') || ''; focusAfterRemoving(removedId); post('ignore', { mailId: t.getAttribute('data-mail-id') || '' }); }
   if (a === 'unignore') { var reader2 = t.closest('.wb-reader'); var restoredId = reader2 ? reader2.getAttribute('data-id') || '' : t.getAttribute('data-mail-id') || ''; focusAfterRemoving(restoredId); post('unignore', { mailId: t.getAttribute('data-mail-id') || '' }); }
   if (a === 'openInOutlook') post('openInOutlook', { mailId: t.getAttribute('data-mail-id') || '' });

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, normalizeMailFolders, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
+import { positiveNumber, parseFolders, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildClassificationKeywords, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
 import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
 
 describe("positiveNumber", () => {
@@ -39,11 +39,78 @@ describe("default folders", () => {
     assert.deepEqual(manifest.contributes.configuration.properties["easyMail.folders"].default, ["Inbox", "Sent Items"]);
   });
 
-  it("migrates old Inbox-only folder settings to the current default", () => {
-    assert.deepEqual(normalizeMailFolders(["Inbox"], ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
-    assert.deepEqual(normalizeMailFolders("Inbox", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
+  it("keeps an explicit Inbox-only folder setting", () => {
+    assert.deepEqual(normalizeMailFolders(["Inbox"], ["Inbox", "Sent Items"]), ["Inbox"]);
+    assert.deepEqual(normalizeMailFolders("Inbox", ["Inbox", "Sent Items"]), ["Inbox"]);
     assert.deepEqual(normalizeMailFolders("Archive", ["Inbox", "Sent Items"]), ["Archive"]);
     assert.deepEqual(normalizeMailFolders("", ["Inbox", "Sent Items"]), ["Inbox", "Sent Items"]);
+  });
+});
+
+describe("parseOutlookFolderList", () => {
+  it("parses folder list files and ignores diagnostics", () => {
+    const content = [
+      "\uFEFFEasyMailFolderList: version=1; mode=list-folders",
+      "",
+      "Inbox",
+      "FolderListDefault: Inbox=Mailbox Name/Inbox",
+      "FolderListDefault: Sent Items=Mailbox Name/已发送邮件",
+      "FolderList: skipped=bad-store",
+      "Mailbox Name/Project Alpha",
+      "示例邮箱/收件箱",
+      "inbox",
+      "Sent Items"
+    ].join("\r\n");
+
+    assert.deepEqual(parseOutlookFolderList(content), {
+      defaults: {
+        Inbox: "Mailbox Name/Inbox",
+        "Sent Items": "Mailbox Name/已发送邮件"
+      },
+      folders: [
+      "Inbox",
+      "Mailbox Name/Project Alpha",
+      "示例邮箱/收件箱",
+      "Sent Items"
+      ]
+    });
+  });
+});
+
+describe("Outlook folder picker", () => {
+  const defaults = {
+    Inbox: "Mailbox Name/Inbox",
+    "Sent Items": "Mailbox Name/已发送邮件",
+    Drafts: "Mailbox Name/草稿"
+  };
+
+  it("marks mapped default folders and preselects their canonical names", () => {
+    assert.deepEqual(
+      buildOutlookFolderPickItems(["Mailbox Name/Inbox", "Mailbox Name/已发送邮件", "Mailbox Name/Project Alpha"], ["Inbox", "Sent Items"], defaults),
+      [
+        { label: "Mailbox Name/Inbox", description: "(Inbox)", picked: true },
+        { label: "Mailbox Name/已发送邮件", description: "(Sent Items)", picked: true },
+        { label: "Mailbox Name/Project Alpha", picked: false }
+      ]
+    );
+  });
+
+  it("preselects canonical choices from configured real folder paths", () => {
+    assert.deepEqual(
+      buildOutlookFolderPickItems(["Inbox", "Sent Items", "Mailbox Name/Project Alpha"], ["Mailbox Name/Inbox", "Mailbox Name/已发送邮件"], defaults),
+      [
+        { label: "Inbox", description: "(Inbox)", picked: true },
+        { label: "Sent Items", description: "(Sent Items)", picked: true },
+        { label: "Mailbox Name/Project Alpha", picked: false }
+      ]
+    );
+  });
+
+  it("writes mapped folders back once under their canonical names", () => {
+    assert.deepEqual(
+      normalizeOutlookFolderSelection(["Mailbox Name/Inbox", "Inbox", "Mailbox Name/已发送邮件", "Sent Items", "Mailbox Name/Project Alpha"], defaults),
+      ["Inbox", "Sent Items", "Mailbox Name/Project Alpha"]
+    );
   });
 });
 
@@ -79,15 +146,15 @@ describe("getLocaleFromConfig", () => {
 });
 
 describe("resolveModelFamily", () => {
-  it("uses private config before legacy settings and defaults", () => {
-    assert.equal(resolveModelFamily("stored-model", "legacy-model", "default-model"), "stored-model");
+  it("uses the registered VS Code setting before private config and defaults", () => {
+    assert.equal(resolveModelFamily("settings-model", "stored-model", "default-model"), "settings-model");
   });
 
-  it("falls back from empty private config to legacy settings", () => {
-    assert.equal(resolveModelFamily(" ", " legacy-model ", "default-model"), "legacy-model");
+  it("falls back from an empty VS Code setting to private config", () => {
+    assert.equal(resolveModelFamily(" ", " stored-model ", "default-model"), "stored-model");
   });
 
-  it("falls back to the default model when neither stored nor legacy settings are set", () => {
+  it("falls back to the default model when neither setting nor private config is set", () => {
     assert.equal(resolveModelFamily(undefined, "", "default-model"), "default-model");
   });
 
@@ -100,6 +167,13 @@ describe("resolveModelFamily", () => {
 
   it("does not re-migrate legacy settings after migration was marked complete", () => {
     assert.equal(shouldMigrateLegacyModelFamily("gpt-5.4", "legacy-model", "gpt-5.4", true, true), false);
+  });
+
+  it("reads the registered setting first and writes sidebar model choices back to it", () => {
+    const extensionSource = fs.readFileSync(path.join(process.cwd(), "src", "extension.ts"), "utf8");
+
+    assert.ok(extensionSource.includes("resolveModelFamily(legacySettingsModelFamily, storedModelFamily, defaults.modelFamily)"));
+    assert.ok(!extensionSource.includes('if (key === "modelFamily") {\n        continue;\n      }'));
   });
 });
 
@@ -206,6 +280,27 @@ describe("buildSecuritySettings", () => {
   it("uses parsed max allowed classification level", () => {
     const settings = buildSecuritySettings({ autoAnalyzeMaxClassificationLevel: "REGISTERED" });
     assert.equal(settings.maxAutoClassificationLevel, 2);
+  });
+
+  it("uses custom security keywords and preserves explicit empty arrays", () => {
+    assert.deepEqual(buildSecuritySettings({ hardBlockKeywords: ["vault"], manualConfirmKeywords: ["review"] }).hardBlockKeywords, ["vault"]);
+    assert.deepEqual(buildSecuritySettings({ hardBlockKeywords: [], manualConfirmKeywords: [] }).hardBlockKeywords, []);
+    assert.deepEqual(buildSecuritySettings({ hardBlockKeywords: [], manualConfirmKeywords: [] }).manualConfirmKeywords, []);
+  });
+
+  it("falls back from invalid security and classification keyword settings", () => {
+    assert.ok(buildSecuritySettings({ hardBlockKeywords: "vault" }).hardBlockKeywords?.includes("password"));
+    assert.deepEqual(buildClassificationKeywords({ classificationLevel3Keywords: "secret", classificationLevel2Keywords: 2 }), {
+      3: ["high registered", "highly restricted", "secret"],
+      2: ["registered", "restricted", "confidential", "contract", "budget"]
+    });
+  });
+
+  it("supports custom and explicitly disabled classification levels", () => {
+    assert.deepEqual(buildClassificationKeywords({ classificationLevel3Keywords: ["atlas"], classificationLevel2Keywords: [] }), {
+      3: ["atlas"],
+      2: []
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatModelLabel, isModelRefreshableErrorMessage, modelKey, normalizeAvailableModel, resolveModelSelection, selectConfiguredModel, selectConfiguredModelIndex } from "../lib/llm-provider";
+import { formatModelLabel, isModelRefreshableErrorMessage, modelKey, normalizeAvailableModel, readLlmResponseText, resolveModelSelection, selectConfiguredModel, selectConfiguredModelIndex } from "../lib/llm-provider";
 import { MockProvider } from "../lib/mock-provider";
 
 const models = [
@@ -50,6 +50,18 @@ test("normalizeAvailableModel tolerates missing model fields", () => {
     name: "",
     vendor: ""
   });
+});
+
+test("readLlmResponseText stops when the response stream is cancelled", async () => {
+  let cancelled = false;
+  const token = { get isCancellationRequested() { return cancelled; } };
+  async function* stream(): AsyncGenerator<{ value: string }> {
+    yield { value: "first" };
+    cancelled = true;
+    yield { value: "second" };
+  }
+
+  await assert.rejects(() => readLlmResponseText(stream(), token), /cancelled/i);
 });
 
 test("MockProvider returns configured models and records prompts", async () => {

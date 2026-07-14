@@ -121,7 +121,6 @@ Please review and approve the contract before EOD today.
 ```text
 Easy Mail: Pull Mail
 Easy Mail: Analyze with Copilot
-Easy Mail: Refresh Dashboard
 Easy Mail: Open Digest
 Easy Mail: Open Summary
 Easy Mail: Export Report
@@ -190,8 +189,8 @@ P3: 通知或低优先级
 ├──────────────────────────────┼───────────────────────────────────────────────┤
 │ [Pull Mail]                  │ Today Mail Summary                           │
 │ [Analyze]                    │                                               │
-│ [Refresh]                    │ Range: Last 24 hours                         │
-│ [Settings]                   │ Folders: Inbox, Customer, Project A          │
+│ [More Settings]              │ Range: Last 24 hours                         │
+│ [Settings]                   │ More settings: VS Code Settings               │
 │                              │ Last analyzed: 2026-06-16 10:30              │
 │ Scope                        │                                               │
 │ ○ Last 50 mails              │ ┌─────────────┬─────────────┬─────────────┐   │
@@ -222,11 +221,11 @@ Pull Mail:
 Analyze:
   调用 Copilot 分析 mail-digest.md，生成 analysis-result.json。
 
-Refresh:
-  重新读取本地 JSON，不重新采集、不重新调用模型。
-
 Settings:
-  配置扫描范围、文件夹、正文截断长度、重点联系人、关键词。
+  在侧栏展开常用的扫描范围和分析模型。
+
+More Settings:
+  打开 VS Code Settings；文件夹、正文截断、密级和保留期在此管理。Prompt 配置通过 `EasyMail: Open Prompt Config` 命令打开。
 
 Open Digest:
   打开原始 mail-digest.md。

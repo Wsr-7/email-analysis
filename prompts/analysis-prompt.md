@@ -29,6 +29,12 @@ The `summary` field must be 2-3 sentences that answer:
 
 Do not merely restate the subject line. Extract the substantive content.
 
+## Due date extraction
+
+Set `dueDate` to `YYYY-MM-DD` only when the mail explicitly states a deadline. If the date is uncertain or only inferred, leave `dueDate` empty.
+
+Attachment fields provide only the count and file names; attachment contents are not available — never claim to have read an attachment.
+
 ## Confidence scoring
 
 - 0.9-1.0: Category, priority, and summary are well-supported by the mail content.

@@ -14,25 +14,21 @@
 - `EasyMail: Generate Sample Digest`
 - `EasyMail: Analyze Next Batch with Copilot`
 - `EasyMail: Analyze All Allowed with Copilot`
-- `EasyMail: Refresh Dashboard`
 - `EasyMail: Open Digest`
 - `EasyMail: Open Summary`
 - `EasyMail: Open Settings`
 - `EasyMail: Open Prompt Config`
 
-看板顶部也提供同等按钮：
+侧栏提供以下常用入口：
 
 - `Fetch New`
 - `More History`
+- `Analyze`（可选批量大小）
+- `Workbench`
+- `Generate Reports`
 - `Sample`
-- `Analyze Next Batch`
-- `Analyze Selected`
-- `Analyze All Allowed`
-- `Refresh`
-- `Open Digest`
-- `Open Summary`
-- `Settings File`
-- `Prompt Config`
+- `Settings`（范围和模型）
+- `More Settings (VS Code Settings)`（其余配置）
 
 执行 `Fetch New`、`More History`、`Sample` 或 `Analyze` 时，看板会显示进行中的 loading 条，VS Code 也会显示任务进度提示。
 
@@ -60,7 +56,7 @@ VS Code Settings 是唯一生效源。Dashboard 顶部的 Settings panel 只是�
 
 如果你直接在 VS Code Settings 页面修改 `EasyMail` 配置，Dashboard 会监听配置变化并自动刷新。模型选择也是同一套规则：Dashboard 中的 `Analysis Model` 会保存到 VS Code Settings，VS Code Settings 中修改后也会反映回 Dashboard。
 
-Dashboard 的模型下拉来自当前 VS Code session 实际暴露的 Copilot 模型列表，显示格式为 `vendor / family / id / name`。VS Code Settings 里的模型选项是静态枚举，用于常见模型；如果当前 VS Code runtime 暴露了更多模型，以 Dashboard 列表为准。
+Dashboard 的模型下拉来自当前 VS Code session 实际暴露的 Copilot 模型列表，显示格式为 `vendor / family / id / name`。VS Code Settings 的模型字段可直接填写模型标识；当前可用模型仍以 Dashboard 列表为准。
 
 看板顶部会显示：
 
@@ -174,7 +170,7 @@ AI 分析默认优先请求 `gpt-5.4`。如果当前 VS Code / Copilot 运行时
 prompt-config.json
 ```
 
-点击看板里的 `Prompt Config` 可以打开它。用户可以在这里增加或修改分类：
+执行 `EasyMail: Open Prompt Config` 可以打开它。用户可以在这里增加或修改分类：
 
 ```json
 {
@@ -191,8 +187,8 @@ prompt-config.json
 ```json
 {
   "id": "importantSender",
-  "labelZh": "重点发件人/邮件组",
-  "labelEn": "Important Sender or Group",
+  "labelZh": "重点发件人",
+  "labelEn": "Important Senders",
   "description": "Mail from or containing configured important senders, mail groups, or keywords.",
   "priorityHint": "Usually P0 or P1 unless it is clearly a notice"
 }

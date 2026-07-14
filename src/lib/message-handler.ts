@@ -36,6 +36,8 @@ export interface MessageHandlerContext {
   openPromptConfig: () => Promise<void>;
   clearLocalCache: () => Promise<void>;
   openWorkbench: (focusId?: string) => Promise<void>;
+  updateWorkingDraft: (itemId: string, draftText: string) => void;
+  completeWorkingDraftFlush: (requestId: string) => void;
   generateDraft: (itemId: string, sourceId: string) => Promise<void>;
   polishDraft: (draftText: string, itemId: string) => Promise<void>;
   refineDraft: (draftText: string, instruction: string, itemId: string) => Promise<void>;
@@ -50,7 +52,7 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
     return;
   }
 
-  const typed = message as { type?: string; draftReply?: string; draftText?: string; instruction?: string; itemId?: string; sourceId?: string; mode?: string; actionId?: string; status?: string; mailId?: string; mailIds?: string[]; threadId?: string; meetingId?: string; batchSize?: unknown; config?: unknown; silent?: boolean };
+  const typed = message as { type?: string; draftReply?: string; draftText?: string; instruction?: string; itemId?: string; sourceId?: string; mode?: string; actionId?: string; status?: string; mailId?: string; mailIds?: string[]; threadId?: string; meetingId?: string; batchSize?: unknown; config?: unknown; silent?: boolean; requestId?: string; drafts?: unknown };
   await ctx.log("message:received", {
     type: typed.type || "",
     mailId: typed.mailId || "",
@@ -65,6 +67,30 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
     }
     await ctx.copyToClipboard(draftReply);
     ctx.showInfo("Draft reply copied.");
+    return;
+  }
+
+  if (typed.type === "updateWorkingDraft") {
+    const itemId = String(typed.itemId || "");
+    if (itemId) {
+      ctx.updateWorkingDraft(itemId, String(typed.draftText || ""));
+    }
+    return;
+  }
+
+  if (typed.type === "workingDraftsFlushed") {
+    if (Array.isArray(typed.drafts)) {
+      for (const draft of typed.drafts) {
+        if (!draft || typeof draft !== "object") {
+          continue;
+        }
+        const { itemId, draftText } = draft as { itemId?: unknown; draftText?: unknown };
+        if (typeof itemId === "string" && itemId) {
+          ctx.updateWorkingDraft(itemId, String(draftText || ""));
+        }
+      }
+    }
+    ctx.completeWorkingDraftFlush(String(typed.requestId || ""));
     return;
   }
 
@@ -87,7 +113,11 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
       ctx.showWarning("Draft is empty. Write or generate a draft first.");
       return;
     }
-    await ctx.polishDraft(draftText, String(typed.itemId || ""));
+    const itemId = String(typed.itemId || "");
+    if (itemId) {
+      ctx.updateWorkingDraft(itemId, draftText);
+    }
+    await ctx.polishDraft(draftText, itemId);
     return;
   }
 
@@ -102,7 +132,11 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
       ctx.showWarning("Please enter an instruction for refine, or use Polish instead.");
       return;
     }
-    await ctx.refineDraft(draftText, instruction, String(typed.itemId || ""));
+    const itemId = String(typed.itemId || "");
+    if (itemId) {
+      ctx.updateWorkingDraft(itemId, draftText);
+    }
+    await ctx.refineDraft(draftText, instruction, itemId);
     return;
   }
 
@@ -186,11 +220,6 @@ export async function handleWebviewMessage(ctx: MessageHandlerContext, message: 
 
   if (typed.type === "openMeetingInOutlook" && typed.meetingId) {
     await ctx.openMeetingInOutlook(String(typed.meetingId));
-    return;
-  }
-
-  if (typed.type === "refresh") {
-    await ctx.refresh();
     return;
   }
 

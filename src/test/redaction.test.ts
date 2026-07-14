@@ -111,7 +111,7 @@ test("redactText applies custom patterns", () => {
   assert.deepEqual(result.findings, [{ type: "projectName", replacement: "[PROJECT]", count: 2 }]);
 });
 
-test("redactStoredMails preserves metadata and redacts only body content", () => {
+test("redactStoredMails redacts body content and attachment names", () => {
   const mail: StoredMail = {
     mailId: "mail-1",
     sourceMailId: "source-1",
@@ -133,7 +133,7 @@ test("redactStoredMails preserves metadata and redacts only body content", () =>
     to: "Bob <bob@example.com>",
     cc: "Carol <carol@example.com>",
     attachmentCount: 1,
-    attachmentNames: ["alice-contract.pdf"],
+    attachmentNames: ["contract-alice@example.com"],
     bodyExcerpt: "Please call alice@example.com at +1 (415) 555-0100.",
     bodyHash: "hash-1",
     pulledAt: "2026-07-02T01:01:00.000Z"
@@ -149,9 +149,9 @@ test("redactStoredMails preserves metadata and redacts only body content", () =>
   assert.equal(result.items[0].from, mail.from);
   assert.equal(result.items[0].senderEmail, mail.senderEmail);
   assert.equal(result.items[0].to, mail.to);
-  assert.deepEqual(result.items[0].attachmentNames, mail.attachmentNames);
+  assert.deepEqual(result.items[0].attachmentNames, ["[EMAIL_1]"]);
   assert.equal(result.items[0].bodyExcerpt, "Please call [EMAIL_1] at [PHONE_1].");
-  assert.equal(result.totalReplacements, 2);
+  assert.equal(result.totalReplacements, 3);
 });
 
 test("redactThreadForPrompt preserves thread metadata and redacts only body content", () => {

@@ -3,13 +3,13 @@ import { classificationFor, normalizeClassificationCache, type ClassificationCac
 import { getLocaleFromConfig, mergeStringLists, parseFolders } from "./config-utils";
 import { getLabels, buildCategoryLabels, type DashboardLabels } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard } from "./dashboard-state";
-import { escapeHtml, escapeAttr, selected } from "./html-utils";
+import { escapeHtml, escapeAttr, selected, senderDisplayName } from "./html-utils";
 import { selectConfiguredModel } from "./llm-provider";
 import { emptyMailIndex, folderOldestReceivedTimes, type StoredMail } from "./mail-store";
 import type { NextActionItem } from "./next-actions";
 import { normalizePromptConfig } from "./prompt-config";
 import { emptyThreadStore, type ThreadStore } from "./thread-store";
-import { renderButtonSpinner, formatPriority, formatClassification, renderModelOptions, renderRangeValueControl, renderClassificationOptions, formatAnalyzeNextLabel, type DashboardRenderInput } from "./dashboard-render";
+import { renderButtonSpinner, formatPriority, formatClassification, renderModelOptions, renderRangeValueControl, formatAnalyzeNextLabel, type DashboardRenderInput } from "./dashboard-render";
 import { emptyMeetingStore, type StoredMeeting } from "./meeting-store";
 
 const QUEUE_ORDER = [
@@ -18,19 +18,19 @@ const QUEUE_ORDER = [
   "pending",
   "blocked",
   "mustHandleToday",
+  "importantSender",
   "risk",
   "waitingForMe",
   "followUp",
-  "importantSender",
   "notice",
   "threads",
-  "ignored",
-  "uncertain"
+  "uncertain",
+  "ignored"
 ] as const;
 
 const STABLE_QUEUES = new Set([
-  "meetings", "nextActions", "pending", "blocked", "mustHandleToday", "risk", "waitingForMe",
-  "followUp", "importantSender", "notice", "threads", "ignored", "uncertain"
+  "meetings", "nextActions", "pending", "blocked", "mustHandleToday", "importantSender", "risk",
+  "waitingForMe", "followUp", "notice", "threads", "uncertain", "ignored"
 ]);
 
 function queueIcon(queueId: string): string {
@@ -58,6 +58,7 @@ function queueLabel(queueId: string, labels: DashboardLabels, categoryLabels: Re
   if (queueId === "pending") return labels.pending.title;
   if (queueId === "blocked") return labels.pending.blockedTitle;
   if (queueId === "threads") return labels.threads.title;
+  if (queueId === "importantSender") return labels.categories.importantSender;
   return categoryLabels[queueId] || labels.categories[queueId] || queueId;
 }
 
@@ -74,21 +75,54 @@ function classificationBadge(mailId: string, classifications: ClassificationCach
   return `<span class="sb-cls-badge">${escapeHtml(label)}</span>`;
 }
 
+function attachmentBadge(item?: Pick<StoredMail, "attachmentCount" | "attachmentNames">): string {
+  const count = Number(item?.attachmentCount || 0);
+  if (!Number.isFinite(count) || count <= 0) return "";
+  const names = (item?.attachmentNames || []).filter(Boolean);
+  const title = `${count}${names.length ? `: ${names.join("; ")}` : ""}`;
+  return `<span class="sb-attachment" title="${escapeAttr(title)}">📎</span>`;
+}
+
 function renderCompactMailRow(item: StoredMail, queue: string, classifications: ClassificationCache): string {
-  const time = shortTime(item.receivedTime || "");
-  const meta = [item.from || "", time].filter(Boolean).join(" · ");
-  return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
+  const time = item.receivedTime || "";
+  const sender = item.from || "";
+  const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
+  const title = [sender, time].filter(Boolean).join(" · ");
+  return `<div class="sb-row" data-action="openItem" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}</div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${attachmentBadge(item)}${classificationBadge(item.mailId, classifications)}</div>
   </div>`;
 }
 
-function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ClassificationCache): string {
-  const time = shortTime(item.receivedTime || "");
-  const meta = [item.sender || "", time].filter(Boolean).join(" · ");
-  return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}" onclick="openItem('${escapeAttr(item.mailId)}')">
+function renderPendingFolderGroups(items: StoredMail[], folders: string[], classifications: ClassificationCache): string {
+  const groups = new Map<string, StoredMail[]>();
+  for (const folder of folders) {
+    if (!groups.has(folder)) groups.set(folder, []);
+  }
+  for (const item of items) {
+    const folder = item.folder || "";
+    if (!groups.has(folder)) groups.set(folder, []);
+    groups.get(folder)!.push(item);
+  }
+  return [...groups].map(([folder, folderItems]) => `<section class="sb-pending-folder" data-queue="pending" data-pending-folder="${escapeAttr(folder)}">
+    <button class="sb-pending-folder-header" type="button" aria-expanded="false" data-action="togglePendingFolder">${escapeHtml(folder)} (${folderItems.length})</button>
+    <div class="sb-pending-folder-items" hidden>${folderItems.map((item) => renderCompactMailRow(item, "pending", classifications)).join("")}</div>
+  </section>`).join("");
+}
+
+function renderCompactAnalysisRow(item: AnalysisResult["items"][number], queue: string, labels: DashboardLabels, classifications: ClassificationCache, originalMail?: StoredMail): string {
+  const time = item.receivedTime || "";
+  const sender = item.sender || "";
+  const meta = [senderDisplayName(sender), time].filter(Boolean).join(" · ");
+  const title = [sender, time].filter(Boolean).join(" · ");
+  const today = new Date();
+  const todayText = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const dueBadge = item.dueDate
+    ? `<span class="sb-due-badge${item.dueDate <= todayText ? " sb-due-urgent" : ""}">${escapeHtml(item.dueDate)}</span>`
+    : "";
+  return `<div class="sb-row" data-action="openItem" data-queue="${escapeAttr(queue)}" data-mail-id="${escapeAttr(item.mailId)}">
     <div class="sb-subject" title="${escapeAttr(item.subject || item.mailId)}">${escapeHtml(item.subject || item.mailId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(title)}">${escapeHtml(meta)}</span>${attachmentBadge(originalMail)}${dueBadge}${classificationBadge(item.mailId, classifications)}<span class="sb-badge">${escapeHtml(formatPriority(item.priority, labels))}</span></div>
   </div>`;
 }
 
@@ -98,10 +132,11 @@ function isThreadIgnored(thread: ThreadStore["items"][number], ignoredIds?: Set<
 
 function renderCompactThreadRow(thread: ThreadStore["items"][number], queue: string, labels: DashboardLabels): string {
   const time = shortTime(thread.lastTime || "");
-  const meta = [thread.participants.slice(0, 2).join(", "), time].filter(Boolean).join(" · ");
-  return `<div class="sb-row" data-queue="${escapeAttr(queue)}" data-thread-id="${escapeAttr(thread.threadId)}" onclick="openItem('${escapeAttr(thread.threadId)}')">
+  const participants = thread.participants.slice(0, 2);
+  const meta = [participants.map(senderDisplayName).join(", "), time].filter(Boolean).join(" · ");
+  return `<div class="sb-row" data-action="openItem" data-queue="${escapeAttr(queue)}" data-thread-id="${escapeAttr(thread.threadId)}">
     <div class="sb-subject" title="${escapeAttr(thread.subject || thread.threadId)}">${escapeHtml(thread.subject || thread.threadId)}</div>
-    <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span><span class="sb-badge">${escapeHtml(labels.card.thread)}</span><span class="sb-badge">${escapeHtml(String(thread.messageCount))}</span></div>
+    <div class="sb-line2"><span class="sb-line2-meta" title="${escapeAttr(participants.join(", "))}">${escapeHtml(meta)}</span><span class="sb-badge">${escapeHtml(labels.card.thread)}</span><span class="sb-badge">${escapeHtml(String(thread.messageCount))}</span></div>
   </div>`;
 }
 
@@ -120,9 +155,9 @@ function meetingStatusBadge(status: string, labels: DashboardLabels): string {
 function renderCompactNextActionRow(item: NextActionItem, labels: DashboardLabels): string {
   const meta = [item.owner || "", item.deadline || ""].filter(Boolean).join(" · ");
   const statusBtn = item.status === "open"
-    ? `<button class="sb-badge sb-action-status" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="done" onclick="event.stopPropagation();post('markNextAction',{actionId:'${escapeAttr(item.id)}',status:'done'})">${escapeHtml(labels.nextActions.markDone)}</button>`
-    : `<button class="sb-badge sb-action-status sb-mtg-dim" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="open" onclick="event.stopPropagation();post('markNextAction',{actionId:'${escapeAttr(item.id)}',status:'open'})">${escapeHtml(labels.nextActions.reopen)}</button>`;
-  return `<div class="sb-row${item.status !== "open" ? " sb-row-dim" : ""}" data-queue="nextActions" data-thread-id="${escapeAttr(item.sourceId)}" onclick="openItem('${escapeAttr(item.sourceId)}')">
+    ? `<button class="sb-badge sb-action-status" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="done">${escapeHtml(labels.nextActions.markDone)}</button>`
+    : `<button class="sb-badge sb-action-status sb-mtg-dim" data-action="markNextAction" data-action-id="${escapeAttr(item.id)}" data-status="open">${escapeHtml(labels.nextActions.reopen)}</button>`;
+  return `<div class="sb-row${item.status !== "open" ? " sb-row-dim" : ""}" data-action="openItem" data-queue="nextActions" data-thread-id="${escapeAttr(item.sourceId)}" data-next-action-id="${escapeAttr(item.id)}">
     <div class="sb-subject" title="${escapeAttr(item.task)}">${escapeHtml(item.task)}</div>
     <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${statusBtn}</div>
   </div>`;
@@ -130,13 +165,13 @@ function renderCompactNextActionRow(item: NextActionItem, labels: DashboardLabel
 
 function renderCompactMeetingRow(item: StoredMeeting, labels: DashboardLabels): string {
   const meta = [item.organizer || "", item.start || ""].filter(Boolean).join(" · ");
-  return `<div class="sb-row" data-queue="meetings" data-meeting-id="${escapeAttr(item.entryId)}" onclick="openItem('${escapeAttr(item.entryId)}')">
+  return `<div class="sb-row" data-action="openItem" data-queue="meetings" data-meeting-id="${escapeAttr(item.entryId)}">
     <div class="sb-subject" title="${escapeAttr(item.subject || "-")}">${escapeHtml(item.subject || "-")}</div>
     <div class="sb-line2"><span class="sb-line2-meta">${escapeHtml(meta)}</span>${meetingStatusBadge(item.responseStatus, labels)}</div>
   </div>`;
 }
 
-export function renderSidebarHtml(input: DashboardRenderInput): string {
+export function renderSidebarHtml(input: DashboardRenderInput, nonce: string): string {
   const { state, store, index, availableModels, busyKind, isBusy } = input;
   const config = state.config as Record<string, unknown>;
   const locale = getLocaleFromConfig(config);
@@ -157,7 +192,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   const analyzeNextBusy = busyKind === "analyzeNext";
   const analyzeNextLabel = formatAnalyzeNextLabel(labels, config);
   const batchSize: number = 5;
-  const configuredFolders = Array.isArray(config.folders) ? config.folders.map(String) : ["Inbox", "Sent Items"];
+  const configuredFolders = Array.isArray(config.folders) ? [...new Set(config.folders.map(String))] : ["Inbox", "Sent Items"];
   const hasHistoryAnchors = Object.keys(folderOldestReceivedTimes(index, configuredFolders)).length > 0;
 
   const queueCounts: Record<string, number> = {};
@@ -165,12 +200,16 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     queueCounts[cat.id] = cat.items.length;
   }
   const meetingStore = input.meetingStore || emptyMeetingStore();
-  const unrespondedMeetings = meetingStore.items.filter((m) => m.responseStatus === "notResponded");
-  const upcomingMeetings = meetingStore.items.filter((m) => m.responseStatus !== "notResponded");
-  const sortedMeetings = [...unrespondedMeetings, ...upcomingMeetings].sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  const meetingInvites = meetingStore.items
+    .filter((item) => item.responseStatus === "notResponded")
+    .sort((a, b) => (b.start || "").localeCompare(a.start || ""));
+  const acceptedSchedule = meetingStore.items
+    .filter((item) => ["accepted", "tentative", "organizer"].includes(item.responseStatus)
+      && new Date(String(item.start || "").replace(" ", "T")).getTime() >= Date.now())
+    .sort((a, b) => (b.start || "").localeCompare(a.start || ""));
 
   const nextActionsItems = (input.nextActionsStore?.items || []).filter((a) => a.status === "open");
-  queueCounts["meetings"] = meetingStore.items.length;
+  queueCounts["meetings"] = meetingInvites.length;
   queueCounts["nextActions"] = nextActionsItems.length;
   queueCounts["pending"] = queue.allowed.length;
   queueCounts["blocked"] = queue.blocked.length;
@@ -185,7 +224,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     if (count === 0 && !STABLE_QUEUES.has(q)) return "";
     const dimClass = count === 0 ? " sb-queue-dim" : "";
     const separator = q === "mustHandleToday" ? `<div class="sb-queue-separator"></div>` : "";
-    return `${separator}<button class="sb-queue-btn${q === defaultQueue ? " active" : ""}${dimClass}" data-queue-id="${escapeAttr(q)}" onclick="showQueue('${escapeAttr(q)}')">
+    return `${separator}<button class="sb-queue-btn${q === defaultQueue ? " active" : ""}${dimClass}" data-action="showQueue" data-queue-id="${escapeAttr(q)}">
       <span class="sb-queue-icon">${queueIcon(q)}</span>
       <span class="sb-queue-label">${escapeHtml(queueLabel(q, labels, categoryLabels))}</span>
       <span class="sb-queue-count">${count}</span>
@@ -193,11 +232,12 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   }).filter(Boolean).join("");
 
   const classifications = input.classifications || normalizeClassificationCache({});
+  const mailById = new Map(store.items.map((item) => [item.mailId, item]));
 
-  const pendingRows = queue.allowed.map((item) => renderCompactMailRow(item, "pending", classifications)).join("");
+  const pendingRows = renderPendingFolderGroups(queue.allowed, configuredFolders, classifications);
   const blockedRows = queue.blocked.map((item) => renderCompactMailRow(item, "blocked", classifications)).join("");
   const analysisRows = state.categories.map((cat) =>
-    cat.items.map((item) => renderCompactAnalysisRow(item, cat.id, labels, classifications)).join("")
+    cat.items.map((item) => renderCompactAnalysisRow(item, cat.id, labels, classifications, mailById.get(item.mailId))).join("")
   ).join("");
   const ignoredPendingRows = (queue.ignoredPending || []).map((item) => renderCompactMailRow(item, "ignored", classifications)).join("");
   const ignoredThreadRows = [...ignoredThreads].sort((a, b) =>
@@ -207,10 +247,18 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     String(b.lastTime || "").localeCompare(String(a.lastTime || ""))
   ).map((thread) => renderCompactThreadRow(thread, "threads", labels)).join("");
   const nextActionRows = nextActionsItems.map((a) => renderCompactNextActionRow(a, labels)).join("");
-  const meetingRows = sortedMeetings.map((m) => renderCompactMeetingRow(m, labels)).join("");
+  const meetingRows = [
+    ...meetingInvites.map((meeting) => renderCompactMeetingRow(meeting, labels)),
+    acceptedSchedule.length
+      ? `<section class="sb-meeting-schedule" data-queue="meetings">
+          <button class="sb-pending-folder-header" type="button" aria-expanded="false" data-action="toggleAcceptedSchedule">${escapeHtml(labels.meetings.acceptedSchedule)} (${acceptedSchedule.length})</button>
+          <div class="sb-meeting-schedule-items" hidden>${acceptedSchedule.map((meeting) => renderCompactMeetingRow(meeting, labels)).join("")}</div>
+        </section>`
+      : ""
+  ].join("");
 
   const statusText = isBusy
-    ? `<span class="sb-status-dot busy"></span> ${escapeHtml(busyKind)}`
+    ? `<span class="sb-status-dot busy"></span> ${escapeHtml(busyKind === "cancelling" ? labels.progress.cancelling : busyKind)}`
     : `<span class="sb-status-dot idle"></span> ${escapeHtml(labels.toolbar.refresh)}`;
 
   const lastPull = store.lastPullAt || "-";
@@ -221,6 +269,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
 <html>
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${escapeAttr(nonce)}'; img-src data:;" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
@@ -382,9 +431,18 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   .sb-line2-meta { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: 0.55; }
   .sb-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; white-space: nowrap; flex-shrink: 0; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); }
   .sb-cls-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; opacity: 0.8; border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.35)); color: var(--vscode-foreground, #ccc); }
+  .sb-due-badge { font-size: 10px; white-space: nowrap; flex-shrink: 0; color: var(--vscode-descriptionForeground, #aaa); }
+  .sb-due-urgent { color: var(--vscode-errorForeground, #f48771); font-weight: 600; }
+  .sb-attachment { font-size: 11px; flex-shrink: 0; }
 
   .sb-row-dim { opacity: 0.45; }
   .sb-action-status { cursor: pointer; font-size: 10px; padding: 1px 6px; border-radius: 8px; border: none; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); }
+  .sb-pending-folder[hidden], .sb-meeting-schedule[hidden] { display: none; }
+  .sb-pending-folder-header { width: 100%; padding: 7px 12px; text-align: left; background: transparent; color: var(--vscode-sideBarSectionHeader-foreground, var(--vscode-foreground, #ddd)); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
+  .sb-pending-folder-header:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08)); }
+  .sb-pending-folder-header::before { content: "›"; display: inline-block; width: 12px; }
+  .sb-pending-folder-header[aria-expanded="true"]::before { transform: rotate(90deg); }
+  .sb-pending-folder-items { border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, rgba(128,128,128,0.08)); }
 
   /* ── Meeting status badges ── */
   .sb-mtg-warn { background: var(--vscode-editorWarning-foreground, #cca700); color: #000; }
@@ -426,7 +484,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   /* ── Settings panel (inside bottom) ── */
   .sb-settings { padding: 0 4px; }
   .sb-settings[hidden] { display: none; }
-  .sb-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 0; }
+  .sb-settings-grid { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 8px 0; }
   .sb-settings label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; opacity: 0.8; }
   .sb-settings input, .sb-settings select {
     padding: 5px 8px; border-radius: 4px; font-size: 12px;
@@ -469,25 +527,25 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
       <div class="sb-status">${statusText}</div>
       <div class="sb-last-pull">${escapeHtml(lastPull)}</div>
       <div class="sb-header-actions">
-        <button class="sb-icon-btn" onclick="post('openGuide')" title="${escapeAttr(locale === "zh-CN" ? "帮助" : "Help")}">
+        <button class="sb-icon-btn" data-action="post" data-message-type="openGuide" title="${escapeAttr(locale === "zh-CN" ? "帮助" : "Help")}">
           <svg viewBox="0 0 16 16" fill="currentColor"><path d="M7.5 1a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM7.5 0a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15z"/><path d="M5.3 5.7c.2-1.3 1.1-2 2.3-2 1.3 0 2.2.8 2.2 1.9 0 .9-.4 1.3-1.2 1.8-.7.4-1 .8-1 1.5v.4H6.5v-.5c0-.9.4-1.4 1.1-1.8.6-.4.9-.7.9-1.3 0-.6-.5-1-1.2-1-.8 0-1.2.5-1.3 1.1L5.3 5.7zM6.3 11c0-.5.4-.9.9-.9s.9.4.9.9-.4.9-.9.9-.9-.4-.9-.9z"/></svg>
         </button>
         <div class="sb-lang-wrap" id="langToggle">
-          <button class="sb-icon-btn" onclick="toggleLangMenu(event)" title="${escapeAttr(locale === "zh-CN" ? "语言" : "Language")}">
+          <button class="sb-icon-btn" data-action="toggleLangMenu" title="${escapeAttr(locale === "zh-CN" ? "语言" : "Language")}">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.1"><circle cx="8" cy="8" r="6.5"/><ellipse cx="8" cy="8" rx="2.8" ry="6.5"/><line x1="1.5" y1="5.5" x2="14.5" y2="5.5"/><line x1="1.5" y1="10.5" x2="14.5" y2="10.5"/></svg>
           </button>
           <div class="sb-lang-dropdown" id="langDropdown">
-            <button class="sb-lang-option${locale === "en-US" ? " active" : ""}" onclick="setLanguage('en-US')">English</button>
-            <button class="sb-lang-option${locale === "zh-CN" ? " active" : ""}" onclick="setLanguage('zh-CN')">中文</button>
+            <button class="sb-lang-option${locale === "en-US" ? " active" : ""}" data-action="setLanguage" data-language="en-US">English</button>
+            <button class="sb-lang-option${locale === "zh-CN" ? " active" : ""}" data-action="setLanguage" data-language="zh-CN">中文</button>
           </div>
         </div>
       </div>
     </div>
 
     <div class="sb-actions-bar">
-      <button class="sb-primary${pullMailBusy ? " is-busy" : ""}" onclick="post('pullMail')"${busyDisabled}>${escapeHtml(labels.toolbar.pullMail)}${renderButtonSpinner(pullMailBusy)}</button>
+      <button class="sb-primary${pullMailBusy ? " is-busy" : ""}" data-action="post" data-message-type="pullMail" data-save-config-before-action="true"${busyDisabled}>${escapeHtml(labels.toolbar.pullMail)}${renderButtonSpinner(pullMailBusy)}</button>
       <div class="sb-analyze-group">
-        <button class="sb-primary${analyzeNextBusy ? " is-busy" : ""}" onclick="runAnalyze()"${analysisDisabled}>${escapeHtml(locale === "zh-CN" ? "分析" : "Analyze")}${renderButtonSpinner(analyzeNextBusy)}</button>
+        <button class="sb-primary${analyzeNextBusy ? " is-busy" : ""}" data-action="runAnalyze" data-save-config-before-action="true"${analysisDisabled}>${escapeHtml(locale === "zh-CN" ? "分析" : "Analyze")}${renderButtonSpinner(analyzeNextBusy)}</button>
         <select class="sb-batch-select" id="batchSelect"${analysisDisabled}>
           <option value="5"${batchSize === 5 ? " selected" : ""}>5</option>
           <option value="10"${batchSize === 10 ? " selected" : ""}>10</option>
@@ -496,8 +554,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
           <option value="all">${escapeHtml(locale === "zh-CN" ? "全部" : "All")}</option>
         </select>
       </div>
-      <button class="sb-secondary" onclick="post('loadMore')"${!hasHistoryAnchors ? " disabled" : busyDisabled} title="${escapeAttr(labels.toolbar.loadMore)}">+</button>
-      <button class="sb-secondary" onclick="post('refresh')"${busyDisabled} title="${escapeAttr(labels.toolbar.refresh)}">↻</button>
+      <button class="sb-secondary" data-action="post" data-message-type="loadMore" data-save-config-before-action="true"${!hasHistoryAnchors ? " disabled" : busyDisabled} title="${escapeAttr(labels.toolbar.loadMore)}">+</button>
     </div>
     ${!canAnalyze ? `<div class="sb-model-hint"><svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M7.5 1a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM6.3 11c0-.5.4-.9.9-.9s.9.4.9.9-.4.9-.9.9-.9-.4-.9-.9zM6.5 4h2v5h-2V4z"/></svg>${escapeHtml(locale === "zh-CN" ? "请先在下方设置中加载模型" : "Load models in settings below to analyze")}</div>` : ""}
   </div>
@@ -507,7 +564,7 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
     <div class="sb-queue-nav" id="queueNav">
       ${queueNav}
     </div>
-    <div class="sb-list-area" id="itemList">
+    <div class="sb-list-area" id="itemList" tabindex="0">
       ${meetingRows}
       ${nextActionRows}
       ${pendingRows}
@@ -523,15 +580,15 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
   <!-- ═══ Fixed bottom ═══ -->
   <div class="sb-bottom">
     <div class="sb-bottom-row">
-      <button class="sb-bottom-btn wb-open" onclick="post('openWorkbench')">
+      <button class="sb-bottom-btn wb-open" data-action="post" data-message-type="openWorkbench">
         <svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12" style="flex-shrink:0"><path d="M1 2h14v12H1V2zm1 1v10h5V3H2zm6 0v10h6V3H8z"/></svg>
         ${escapeHtml(locale === "zh-CN" ? "工作台" : "Workbench")}
       </button>
-      <button class="sb-bottom-btn" onclick="post('generateReports')"${busyDisabled}>${escapeHtml(labels.toolbar.generateReports)}</button>
-      <button class="sb-bottom-btn" onclick="post('sampleDigest')"${busyDisabled}>${escapeHtml(labels.toolbar.sample)}</button>
+      <button class="sb-bottom-btn" data-action="post" data-message-type="generateReports"${busyDisabled}>${escapeHtml(labels.toolbar.generateReports)}</button>
+      <button class="sb-bottom-btn" data-action="post" data-message-type="sampleDigest"${busyDisabled}>${escapeHtml(labels.toolbar.sample)}</button>
       <span style="flex:1"></span>
-      <button class="sb-bottom-btn" onclick="toggleSettings()">⚙</button>
-      <button class="sb-bottom-btn danger" onclick="confirmClear()"${busyDisabled} title="${escapeAttr(locale === "zh-CN" ? "清空所有邮件和分析数据" : "Clear all mail and analysis data")}">✕</button>
+      <button class="sb-bottom-btn" data-action="toggleSettings">⚙</button>
+      <button class="sb-bottom-btn danger" data-action="confirmClear"${busyDisabled} title="${escapeAttr(locale === "zh-CN" ? "清空所有邮件和分析数据" : "Clear all mail and analysis data")}">✕</button>
     </div>
     <div class="sb-settings" id="settingsPanel" hidden>
       <div class="sb-settings-grid">
@@ -542,37 +599,33 @@ export function renderSidebarHtml(input: DashboardRenderInput): string {
           </select>
         </label>
         ${renderRangeValueControl(config, labels)}
-        <label><span>${escapeHtml(labels.settings.modelFamily)} <button class="sb-bottom-btn" onclick="post('loadModels')" style="display:inline;padding:1px 6px;">${escapeHtml(labels.toolbar.loadModels)}</button></span>
+        <label><span>${escapeHtml(labels.settings.modelFamily)} <button class="sb-bottom-btn" data-action="post" data-message-type="loadModels" style="display:inline;padding:1px 6px;">${escapeHtml(labels.toolbar.loadModels)}</button></span>
           <select id="modelFamily">${modelOptions}</select>
         </label>
-        <label>${escapeHtml(labels.settings.maxClassification)}
-          <select id="autoAnalyzeMaxClassificationLevel">
-            ${renderClassificationOptions(Number(config.autoAnalyzeMaxClassificationLevel ?? 2), labels)}
-          </select>
-        </label>
-        <label>${escapeHtml(labels.toolbar.promptConfig)}
-          <button class="sb-bottom-btn" onclick="post('openPromptConfig')" style="text-align:left;padding:4px 6px;">${escapeHtml(locale === "zh-CN" ? "打开配置文件" : "Open config file")}</button>
-        </label>
+        <button class="sb-bottom-btn" data-action="post" data-message-type="openSettings">${escapeHtml(locale === "zh-CN" ? "更多设置（VS Code Settings）" : "More settings (VS Code Settings)")}</button>
       </div>
     </div>
   </div>
 
-<script>
+<script nonce="${escapeAttr(nonce)}">
 const vscode = acquireVsCodeApi();
 const prev = vscode.getState() || {};
 let currentQueue = prev.currentQueue || '${escapeAttr(defaultQueue)}';
 
 applyQueue(currentQueue, false);
+restorePendingFolders();
+restoreAcceptedSchedule();
 if (prev.settingsOpen) { document.getElementById('settingsPanel').hidden = false; }
 if (prev.batchSelect) { document.getElementById('batchSelect').value = prev.batchSelect; }
 if (prev.currentItemId) setActiveRow(prev.currentItemId);
 
 function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, extra || {})); }
 
-function showQueue(queueId) {
+function showQueue(queueId, focusFirst) {
   currentQueue = queueId;
   applyQueue(queueId, true);
   vscode.setState(Object.assign({}, vscode.getState() || {}, { currentQueue: queueId }));
+  if (focusFirst) focusFirstQueueItem();
 }
 
 window.addEventListener('message', function(e) {
@@ -586,7 +639,7 @@ function applyQueue(queueId, smooth) {
     btn.classList.toggle('active', btn.getAttribute('data-queue-id') === queueId);
   }
   let anyVisible = false;
-  for (const row of document.querySelectorAll('.sb-row')) {
+  for (const row of document.querySelectorAll('.sb-row, .sb-pending-folder, .sb-meeting-schedule')) {
     const match = row.getAttribute('data-queue') === queueId;
     row.hidden = !match;
     if (match) anyVisible = true;
@@ -594,17 +647,81 @@ function applyQueue(queueId, smooth) {
   document.getElementById('emptyState').hidden = anyVisible;
 }
 
-function openItem(id) {
-  setActiveRow(id);
+function focusFirstQueueItem() {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.sb-row')).filter(function(row) {
+    return !row.hidden && row.offsetParent !== null;
+  });
+  if (!rows.length) return;
+  var first = rows[0];
+  document.getElementById('itemList').focus({ preventScroll: true });
+  openItem(rowItemId(first), first.getAttribute('data-next-action-id') || '');
+  first.scrollIntoView({ block: 'nearest' });
+}
+
+function restorePendingFolders() {
+  var expanded = Array.isArray(prev.pendingFolders) ? prev.pendingFolders : [];
+  for (const group of document.querySelectorAll('.sb-pending-folder')) {
+    var open = expanded.indexOf(group.getAttribute('data-pending-folder')) !== -1;
+    group.querySelector('.sb-pending-folder-header').setAttribute('aria-expanded', String(open));
+    group.querySelector('.sb-pending-folder-items').hidden = !open;
+  }
+}
+
+function togglePendingFolder(button) {
+  var group = button.closest('.sb-pending-folder');
+  var folder = group.getAttribute('data-pending-folder');
+  var state = vscode.getState() || {};
+  var expanded = Array.isArray(state.pendingFolders) ? state.pendingFolders.slice() : [];
+  var index = expanded.indexOf(folder);
+  var open = index === -1;
+  if (open) expanded.push(folder); else expanded.splice(index, 1);
+  button.setAttribute('aria-expanded', String(open));
+  group.querySelector('.sb-pending-folder-items').hidden = !open;
+  vscode.setState(Object.assign({}, state, { pendingFolders: expanded }));
+}
+
+function restoreAcceptedSchedule() {
+  var group = document.querySelector('.sb-meeting-schedule');
+  if (!group) return;
+  var open = prev.acceptedScheduleOpen === true;
+  group.querySelector('.sb-pending-folder-header').setAttribute('aria-expanded', String(open));
+  group.querySelector('.sb-meeting-schedule-items').hidden = !open;
+}
+
+function toggleAcceptedSchedule(button) {
+  var group = button.closest('.sb-meeting-schedule');
+  var open = button.getAttribute('aria-expanded') !== 'true';
+  button.setAttribute('aria-expanded', String(open));
+  group.querySelector('.sb-meeting-schedule-items').hidden = !open;
+  vscode.setState(Object.assign({}, vscode.getState() || {}, { acceptedScheduleOpen: open }));
+}
+
+function openItem(id, activeId) {
+  setActiveRow(activeId || id);
   post('openInWorkbench', { mailId: id });
 }
 
+function rowItemId(row) {
+  return row.getAttribute('data-mail-id') || row.getAttribute('data-thread-id') || row.getAttribute('data-meeting-id') || '';
+}
+
 function setActiveRow(id) {
+  var preservedNextActionId = '';
+  for (var activeRow of document.querySelectorAll('.sb-row.active[data-next-action-id]')) {
+    if (activeRow.getAttribute('data-thread-id') === id) {
+      preservedNextActionId = activeRow.getAttribute('data-next-action-id') || '';
+      break;
+    }
+  }
+  var selectionId = preservedNextActionId || id;
   for (var row of document.querySelectorAll('.sb-row')) {
-    var match = row.getAttribute('data-mail-id') === id || row.getAttribute('data-thread-id') === id || row.getAttribute('data-meeting-id') === id;
+    var rowNextActionId = row.getAttribute('data-next-action-id') || '';
+    var match = rowNextActionId
+      ? rowNextActionId === selectionId
+      : row.getAttribute('data-mail-id') === selectionId || row.getAttribute('data-thread-id') === selectionId || row.getAttribute('data-meeting-id') === selectionId;
     row.classList.toggle('active', match);
   }
-  vscode.setState(Object.assign({}, vscode.getState() || {}, { currentItemId: id }));
+  vscode.setState(Object.assign({}, vscode.getState() || {}, { currentItemId: selectionId }));
 }
 
 function toggleSettings() {
@@ -613,8 +730,7 @@ function toggleSettings() {
   vscode.setState(Object.assign({}, vscode.getState() || {}, { settingsOpen: !panel.hidden }));
 }
 
-function toggleLangMenu(e) {
-  if (e) e.stopPropagation();
+function toggleLangMenu() {
   var dd = document.getElementById('langDropdown');
   dd.classList.toggle('open');
 }
@@ -626,6 +742,45 @@ document.addEventListener('click', function(e) {
   if (!e.target.closest('#langToggle')) {
     document.getElementById('langDropdown').classList.remove('open');
   }
+  var target = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+  if (!target) return;
+  var action = target.getAttribute('data-action') || '';
+  if (target.getAttribute('data-save-config-before-action') === 'true') saveConfig(true, true);
+  if (action === 'post') post(target.getAttribute('data-message-type') || '');
+  if (action === 'showQueue') showQueue(target.getAttribute('data-queue-id') || '', true);
+  if (action === 'togglePendingFolder') togglePendingFolder(target);
+  if (action === 'toggleAcceptedSchedule') toggleAcceptedSchedule(target);
+  if (action === 'openItem') {
+    document.getElementById('itemList').focus({ preventScroll: true });
+    var id = rowItemId(target);
+    openItem(id, target.getAttribute('data-next-action-id') || '');
+  }
+  if (action === 'markNextAction') post('markNextAction', { actionId: target.getAttribute('data-action-id') || '', status: target.getAttribute('data-status') || '' });
+  if (action === 'toggleLangMenu') toggleLangMenu();
+  if (action === 'setLanguage') setLanguage(target.getAttribute('data-language') || '');
+  if (action === 'runAnalyze') runAnalyze();
+  if (action === 'toggleSettings') toggleSettings();
+  if (action === 'confirmClear') confirmClear();
+});
+
+document.getElementById('itemList').addEventListener('keydown', function(e) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  var rows = Array.prototype.slice.call(this.querySelectorAll('.sb-row')).filter(function(row) {
+    return !row.hidden && row.offsetParent !== null;
+  });
+  if (!rows.length) return;
+  var current = this.querySelector('.sb-row.active');
+  var index = rows.indexOf(current);
+  var nextIndex = index < 0
+    ? (e.key === 'ArrowDown' ? 0 : rows.length - 1)
+    : Math.max(0, Math.min(rows.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1)));
+  if (index === nextIndex) return;
+  var next = rows[nextIndex];
+  var id = rowItemId(next);
+  var activeId = next.getAttribute('data-next-action-id') || '';
+  openItem(id, activeId);
+  next.scrollIntoView({ block: 'nearest' });
 });
 
 function runAnalyze() {
@@ -647,7 +802,7 @@ var rangeLabels = {
   recentHours: '${escapeAttr(labels.settings.recentHours)}',
   maxItems: '${escapeAttr(labels.settings.maxItems)}'
 };
-var configControlIds = ['rangeMode', 'rangeValue', 'modelFamily', 'autoAnalyzeMaxClassificationLevel'];
+var configControlIds = ['rangeMode', 'rangeValue', 'modelFamily'];
 var autoSave = debounce(function() { saveConfig(true, false); }, 450);
 for (var i = 0; i < configControlIds.length; i++) {
   var el = document.getElementById(configControlIds[i]);
@@ -671,8 +826,7 @@ function saveConfig(keepSettingsOpen, silent) {
       outputLanguage: '${escapeAttr(locale)}',
       recentHours: rangeMode === 'recentHours' ? rangeValue.value : undefined,
       maxItems: rangeMode === 'maxItems' ? rangeValue.value : undefined,
-      modelFamily: document.getElementById('modelFamily').value,
-      autoAnalyzeMaxClassificationLevel: document.getElementById('autoAnalyzeMaxClassificationLevel').value
+      modelFamily: document.getElementById('modelFamily').value
     }
   });
 }

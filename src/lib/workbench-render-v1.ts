@@ -3,7 +3,7 @@ import { classificationFor } from "./classification";
 import { getLocaleFromConfig, mergeStringLists, parseFolders } from "./config-utils";
 import { getLabels, buildCategoryLabels, type DashboardLabels } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard, buildThreadLookup, compareTimelineMessagesForDisplay, type DashboardState } from "./dashboard-state";
-import { escapeHtml, escapeAttr, domIdForMail, domIdForThread } from "./html-utils";
+import { escapeHtml, escapeAttr, domIdForMail, domIdForThread, senderDisplayName } from "./html-utils";
 import { selectConfiguredModel } from "./llm-provider";
 import { emptyMailStore, type StoredMail } from "./mail-store";
 import { normalizePromptConfig } from "./prompt-config";
@@ -46,7 +46,7 @@ function queueLabel(queueId: string, labels: DashboardLabels, categoryLabels: Re
 function renderMailDetail(item: StoredMail, labels: DashboardLabels, extra: string): string {
   return `<div class="wb-detail-card" id="detail-${escapeAttr(item.mailId)}">
     <h3>${escapeHtml(item.subject || item.mailId)}</h3>
-    <div class="wb-field"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.from || "-")}</div>
+    <div class="wb-field" title="${escapeAttr(item.from || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.from || "-"))}</div>
     <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
     ${extra}
     <div class="wb-field-body">${escapeHtml(item.bodyExcerpt || "")}</div>
@@ -66,7 +66,7 @@ function renderAnalysisDetail(item: AnalysisResult["items"][number], labels: Das
   return `<div class="wb-detail-card" id="detail-${escapeAttr(item.mailId)}">
     <h3>${escapeHtml(item.subject || item.mailId)}</h3>
     <span class="wb-badge">${escapeHtml(priority)}</span>
-    <div class="wb-field"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(item.sender || "-")}</div>
+    <div class="wb-field" title="${escapeAttr(item.sender || "-")}"><strong>${escapeHtml(labels.card.from)}:</strong> ${escapeHtml(senderDisplayName(item.sender || "-"))}</div>
     <div class="wb-field"><strong>${escapeHtml(labels.card.received)}:</strong> ${escapeHtml(item.receivedTime || "-")}</div>
     <div class="wb-field"><strong>${escapeHtml(labels.card.summary)}:</strong> ${escapeHtml(item.summary || "-")}</div>
     <div class="wb-field"><strong>${escapeHtml(labels.card.reason)}:</strong> ${escapeHtml(item.reason || "-")}</div>
@@ -89,7 +89,7 @@ function renderThreadDetail(
   const timelineItems = [...(thread.timeline || [])].sort(compareTimelineMessagesForDisplay);
   const timeline = timelineItems.map((msg) =>
     `<div class="wb-timeline-item">
-      <div class="wb-timeline-head">${escapeHtml(msg.from || msg.senderEmail || "")} · ${escapeHtml(msg.receivedTime || msg.sentTime || "")}</div>
+      <div class="wb-timeline-head" title="${escapeAttr(msg.from || msg.senderEmail || "")}">${escapeHtml(senderDisplayName(msg.from || msg.senderEmail || ""))} · ${escapeHtml(msg.receivedTime || msg.sentTime || "")}</div>
       <div class="wb-timeline-body">${escapeHtml((msg.bodyDelta || msg.bodyPreview || "").slice(0, 300))}</div>
     </div>`
   ).join("");
@@ -104,7 +104,7 @@ function renderThreadDetail(
 
   return `<div class="wb-detail-card" id="detail-thread-${escapeAttr(thread.threadId)}">
     <h3>${escapeHtml(thread.subject || thread.threadId)}</h3>
-    <div class="wb-field"><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.join(", ") || "-")}</div>
+    <div class="wb-field" title="${escapeAttr(thread.participants.join(", ") || "-")}"><strong>${escapeHtml(labels.threads.participants)}:</strong> ${escapeHtml(thread.participants.map(senderDisplayName).join(", ") || "-")}</div>
     <div class="wb-field"><strong>${escapeHtml(labels.threads.lastTime)}:</strong> ${escapeHtml(thread.lastTime || "-")}</div>
     <div class="wb-field"><strong>${escapeHtml(labels.threads.security)}:</strong> ${escapeHtml(formatThreadSecurity(thread.security))}</div>
     <div class="wb-actions">
@@ -165,7 +165,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     const extra = `<div class="wb-field"><strong>${escapeHtml(labels.pending.classification)}:</strong> ${escapeHtml(formatClassification(classification))}</div>`;
     listData.push(`<div class="wb-list-item" data-queue="pending" data-id="${escapeAttr(item.mailId)}" onclick="selectItem(this)">
       <span class="wb-list-subject">${escapeHtml(item.subject || item.mailId)}</span>
-      <span class="wb-list-meta">${escapeHtml(item.from || "")}</span>
+      <span class="wb-list-meta" title="${escapeAttr(item.from || "")}">${escapeHtml(senderDisplayName(item.from || ""))}</span>
     </div>`);
     detailData.push(`<div class="wb-detail-panel" data-queue="pending" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, labels, extra)}</div>`);
   }
@@ -177,7 +177,7 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
       <div class="wb-field wb-blocked-reason"><strong>${escapeHtml(labels.pending.gateBlocked)}:</strong> ${escapeHtml(gateDecision?.reasons.join("; ") || "-")}</div>`;
     listData.push(`<div class="wb-list-item" data-queue="blocked" data-id="${escapeAttr(item.mailId)}" onclick="selectItem(this)">
       <span class="wb-list-subject">${escapeHtml(item.subject || item.mailId)}</span>
-      <span class="wb-list-meta">${escapeHtml(item.from || "")}</span>
+      <span class="wb-list-meta" title="${escapeAttr(item.from || "")}">${escapeHtml(senderDisplayName(item.from || ""))}</span>
     </div>`);
     detailData.push(`<div class="wb-detail-panel" data-queue="blocked" data-id="${escapeAttr(item.mailId)}">${renderMailDetail(item, labels, extra)}</div>`);
   }
@@ -356,7 +356,6 @@ export function renderWorkbenchHtml(input: DashboardRenderInput): string {
     <button class="wb-action${isBusy && busyKind === "pullMail" ? " is-busy" : ""}" onclick="post('pullMail')"${busyDisabled}>${escapeHtml(labels.toolbar.pullMail)}${renderButtonSpinner(busyKind === "pullMail")}</button>
     <button class="wb-action${isBusy && busyKind === "analyzeNext" ? " is-busy" : ""}" onclick="post('analyze')"${analysisDisabled}>${escapeHtml(locale === "zh-CN" ? "分析" : "Analyze")}${renderButtonSpinner(busyKind === "analyzeNext")}</button>
     <button class="wb-action secondary" onclick="post('generateReports')"${busyDisabled}>${escapeHtml(labels.toolbar.generateReports)}</button>
-    <button class="wb-action secondary" onclick="post('refresh')"${busyDisabled}>↻</button>
   </div>
 
   <div class="wb-columns">

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { randomBytes } from "node:crypto";
 import { parseDigest, type DigestData } from "./lib/digest";
 import { buildQueueState, ensureClassifications, normalizeClassificationCache, type ClassificationCache } from "./lib/classification";
 import { buildDashboardState, CATEGORY_ORDER, filterVisibleThreadsForDashboard, type DashboardState } from "./lib/dashboard-state";
@@ -17,11 +18,11 @@ import { buildThreadReport } from "./lib/report-thread";
 import { CopilotProvider } from "./lib/copilot-provider";
 import { type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./lib/llm-provider";
 import { renderEasyMailGuideHtml } from "./lib/guide-webview";
-import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, normalizeMailFolders, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
+import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, buildClassificationKeywords, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
-import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisContext } from "./lib/app-analysis";
-import { handleWebviewMessage, type MessageHandlerContext } from "./lib/message-handler";
+import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisBatchResult, type AnalysisContext } from "./lib/app-analysis";
+import { handleWebviewMessage, saveConfigFromMessage, type MessageHandlerContext } from "./lib/message-handler";
 import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
 import { buildPolishDraftPrompt, buildRefineDraftPrompt } from "./lib/draft-prompt";
 import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/process-runner";
@@ -40,6 +41,51 @@ type BusyState = {
 };
 
 type SecurityDecisionMap = Map<string, SecurityGateDecisionResult>;
+
+const SETTINGS_DEPENDENT_MESSAGE_TYPES = new Set([
+  "pullMail", "loadMore", "sampleDigest", "analyze", "analyzeAllAllowed", "analyzeSelected", "analyzeThread",
+  "generateDraft", "polishDraft", "refineDraft", "openWorkbench", "openInWorkbench"
+]);
+
+type LoadedDashboardState = DashboardState & {
+  modelInfo?: Record<string, unknown>;
+  store?: MailStore;
+  index?: MailIndex;
+  queue?: ReturnType<typeof buildQueueState>;
+  classifications?: ClassificationCache;
+  securityDecisions?: SecurityDecisionMap;
+  promptConfig?: PromptConfig;
+  threadStore?: ThreadStore;
+  threadAnalysis?: ThreadAnalysisResult;
+  meetingStore?: MeetingStore;
+  ignoredIds?: Set<string>;
+};
+
+export function buildSidebarRenderInput(
+  state: LoadedDashboardState,
+  availableModels: AvailableModel[],
+  nextActionsStore: NextActionsStore,
+  busyKind: string,
+  isBusy: boolean
+): Parameters<typeof renderSidebarHtml>[0] {
+  return {
+    state,
+    store: state.store || emptyMailStore(),
+    index: state.index || emptyMailIndex(),
+    queue: state.queue || { pending: [], blocked: [], analysed: [], allowed: [] },
+    classifications: state.classifications || normalizeClassificationCache({}),
+    securityDecisions: state.securityDecisions || new Map(),
+    promptConfig: state.promptConfig || normalizePromptConfig({}),
+    threadStore: state.threadStore || emptyThreadStore(),
+    threadAnalysis: state.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    meetingStore: state.meetingStore || emptyMeetingStore(),
+    ignoredIds: state.ignoredIds,
+    nextActionsStore,
+    availableModels,
+    busyKind,
+    isBusy
+  };
+}
 
 function configuredOutputLanguage(settings: vscode.WorkspaceConfiguration): Locale {
   const inspected = settings.inspect<string>("outputLanguage");
@@ -62,7 +108,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
     vscode.commands.registerCommand("easyMail.analyzeAllAllowed", () => app.analyzeAllAllowed()),
-    vscode.commands.registerCommand("easyMail.refreshDashboard", () => app.refresh()),
     vscode.commands.registerCommand("easyMail.openDigest", () => app.openDigest()),
     vscode.commands.registerCommand("easyMail.openSummary", () => app.openSummary()),
     vscode.commands.registerCommand("easyMail.generateReports", () => app.generateReports()),
@@ -71,6 +116,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("easyMail.openThreadReport", () => app.openThreadReport()),
     vscode.commands.registerCommand("easyMail.openSingleMailReport", () => app.openSingleMailReport()),
     vscode.commands.registerCommand("easyMail.openSettings", () => app.openSettings()),
+    vscode.commands.registerCommand("easyMail.selectFolders", () => app.selectFolders()),
     vscode.commands.registerCommand("easyMail.openPromptConfig", () => app.openPromptConfig()),
     vscode.commands.registerCommand("easyMail.openReplyTemplate", () => app.openReplyTemplate()),
     vscode.commands.registerCommand("easyMail.openGuide", () => app.openGuide()),
@@ -99,7 +145,7 @@ function extractDraftText(raw: string): string {
   return text;
 }
 
-class EasyMailApp {
+export class EasyMailApp {
   public readonly dashboardProvider: DashboardProvider;
   public readonly data: AppDataStore;
   private readonly llmProvider: LlmProvider;
@@ -110,6 +156,9 @@ class EasyMailApp {
   private guidePanel: vscode.WebviewPanel | null = null;
   private workbenchPanel: vscode.WebviewPanel | null = null;
   private workingDrafts: Map<string, string> = new Map();
+  private pendingWorkbenchDraftFlush: { requestId: string; done: Promise<void>; resolve: () => void } | null = null;
+  private workbenchDraftFlushSequence = 0;
+  private latestSettingsWrite: Promise<void> = Promise.resolve();
 
   public constructor(private readonly context: vscode.ExtensionContext) {
     this.llmProvider = new CopilotProvider();
@@ -133,7 +182,16 @@ class EasyMailApp {
   }
 
   private async maybeOpenGuide(): Promise<void> {
-    const key = `easyMail.guideShown.${this.context.extension.packageJSON?.version || "0.0.0"}`;
+    const packageJSON = this.context.extension.packageJSON;
+    let installSignature = packageJSON?.__metadata?.installedTimestamp;
+    if (!installSignature) {
+      try {
+        installSignature = String((await fs.promises.stat(this.context.extensionPath)).birthtimeMs);
+      } catch {
+        installSignature = packageJSON?.version || "0.0.0";
+      }
+    }
+    const key = `easyMail.guideShown.${installSignature}`;
     if (this.context.globalState.get<boolean>(key)) {
       return;
     }
@@ -182,15 +240,15 @@ class EasyMailApp {
         this.workbenchPanel.dispose();
         return;
       }
-      this.workbenchPanel.reveal(vscode.ViewColumn.One);
-      this.workbenchPanel.webview.html = await this.getWorkbenchHtml();
+      this.workbenchPanel.reveal(vscode.ViewColumn.One, true);
+      await this.rebuildWorkbenchHtml();
       this.workbenchPanel.webview.postMessage({ type: "focusItem", id: focusId });
       return;
     }
     const panel = vscode.window.createWebviewPanel(
       "easyMail.workbench",
       "EasyMail",
-      vscode.ViewColumn.One,
+      { viewColumn: vscode.ViewColumn.One, preserveFocus: Boolean(focusId) },
       { enableScripts: true, retainContextWhenHidden: true }
     );
     this.workbenchPanel = panel;
@@ -199,6 +257,7 @@ class EasyMailApp {
       void this.handleMessage(message);
     });
     panel.onDidDispose(() => {
+      this.completeWorkbenchDraftFlush();
       this.workbenchPanel = null;
     });
     panel.webview.html = await this.getWorkbenchHtml();
@@ -338,17 +397,7 @@ class EasyMailApp {
 
   private async getWorkbenchHtml(): Promise<string> {
     const state = await this.loadState();
-    const extendedState = state as DashboardState & {
-      store?: MailStore;
-      index?: MailIndex;
-      queue?: ReturnType<typeof buildQueueState>;
-      classifications?: ClassificationCache;
-      securityDecisions?: SecurityDecisionMap;
-      promptConfig?: PromptConfig;
-      threadStore?: ThreadStore;
-      threadAnalysis?: ThreadAnalysisResult;
-      ignoredIds?: Set<string>;
-    };
+    const extendedState = state as LoadedDashboardState;
     const availableModels = await this.data.readCachedAvailableModels(this.availableModelsCache, (event, d) => this.log(event, d));
     return renderWorkbenchHtml({
       state,
@@ -360,11 +409,13 @@ class EasyMailApp {
       promptConfig: extendedState.promptConfig || normalizePromptConfig({}),
       threadStore: extendedState.threadStore || emptyThreadStore(),
       threadAnalysis: extendedState.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+      meetingStore: extendedState.meetingStore || emptyMeetingStore(),
       ignoredIds: extendedState.ignoredIds,
+      workingDrafts: this.workingDrafts,
       availableModels,
       busyKind: this.busy?.kind || "",
       isBusy: !!this.busy
-    });
+    }, randomBytes(16).toString("base64"));
   }
 
   private async getGuideHtml(): Promise<string> {
@@ -383,7 +434,7 @@ class EasyMailApp {
         analysed: state.overview.totalMails,
         threads: visibleThreadStore.items.length
       }
-    });
+    }, randomBytes(16).toString("base64"));
   }
 
   private async handleGuideMessage(message: unknown): Promise<void> {
@@ -417,6 +468,10 @@ class EasyMailApp {
     }
     if (typed.action === "openSettings") {
       await this.openSettings();
+      return;
+    }
+    if (typed.action === "selectFolders") {
+      await this.selectFolders();
       return;
     }
     if (typed.action === "openPromptConfig") {
@@ -491,6 +546,11 @@ class EasyMailApp {
     await this.log("pullMail:start", { forceSample, loadMore, maxItems, recentHours, rangeMode, folders, collectorTimeoutMs });
     await runProcess("cscript.exe", args, collectorTimeoutMs, (event, data) => void this.log(`process:${event}`, data));
     const digest = parseDigest(await fs.promises.readFile(this.data.getDigestPath(), "utf8"));
+    const { failed, partial, folders: failedFolders } = digest.metadata.scanSummary || { failed: 0, partial: 0, folders: [] };
+    if (failed > 0 || partial > 0) {
+      const folderList = failedFolders.length ? failedFolders.join(", ") : "configured Outlook folders";
+      void vscode.window.showWarningMessage(`EasyMail could not fully scan Outlook folders: ${folderList} (${failed} failed, ${partial} partial). Check easyMail.folders or run EasyMail: Select Outlook Folders.`);
+    }
     const merge = mergeDigestIntoStore(await this.data.readMailStore(), digest, currentIndex.items.map((item) => item.mailId));
     const nextIndex = pruneMailIndex(mergeDigestIntoIndex(currentIndex, digest), Number(config.mailIndexRetentionDays || 7));
     const prunedStore = pruneMailStore(merge.store, Number(config.mailStoreRetentionDays || 1));
@@ -498,7 +558,7 @@ class EasyMailApp {
     await this.data.writeMailIndex(nextIndex);
     const nextThreadStore = buildThreadStore(prunedStore.items);
     await this.data.writeThreadStore(nextThreadStore);
-    const classificationCache = ensureClassifications(prunedStore.items, await this.data.readClassificationCache());
+    const classificationCache = ensureClassifications(prunedStore.items, await this.data.readClassificationCache(), buildClassificationKeywords(config));
     await this.data.writeClassificationCache(classificationCache);
     await this.collectMeetings(config, forceSample);
     await this.log("pullMail:done", {
@@ -530,45 +590,92 @@ class EasyMailApp {
   }
 
   public async analyze(batchSize?: number): Promise<void> {
-    const locale = await this.readLocale();
-    const labels = getLabels(locale);
-    await this.runWithBusy(
-      labels.progress.analyze,
-      labels.progress.detail,
-      "analyzeNext",
-      async (token) => await this.analyzeBatchCore(batchSize, token),
-      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
-      true
-    );
+    await this.runAnalysisWithBusy("analyzeNext", batchSize);
+  }
+
+  private completeWorkbenchDraftFlush(requestId?: string): void {
+    const pending = this.pendingWorkbenchDraftFlush;
+    if (!pending || (requestId && pending.requestId !== requestId)) {
+      return;
+    }
+    this.pendingWorkbenchDraftFlush = null;
+    pending.resolve();
+  }
+
+  private async flushWorkbenchDrafts(): Promise<void> {
+    const panel = this.workbenchPanel;
+    if (!panel) {
+      return;
+    }
+    if (this.pendingWorkbenchDraftFlush) {
+      await this.pendingWorkbenchDraftFlush.done;
+      return;
+    }
+    const requestId = String(++this.workbenchDraftFlushSequence);
+    let resolve = () => {};
+    const done = new Promise<void>((finish) => { resolve = finish; });
+    this.pendingWorkbenchDraftFlush = { requestId, done, resolve };
+    const timeout = setTimeout(() => this.completeWorkbenchDraftFlush(requestId), 1500);
+    const delivered = await panel.webview.postMessage({ type: "requestWorkingDraftFlush", requestId });
+    if (!delivered) {
+      this.completeWorkbenchDraftFlush(requestId);
+    }
+    await done;
+    clearTimeout(timeout);
+  }
+
+  private async rebuildWorkbenchHtml(): Promise<void> {
+    const panel = this.workbenchPanel;
+    if (!panel) {
+      return;
+    }
+    await this.flushWorkbenchDrafts();
+    const html = await this.getWorkbenchHtml();
+    if (this.workbenchPanel === panel) {
+      panel.webview.html = html;
+    }
   }
 
   public async analyzeAllAllowed(): Promise<void> {
-    const locale = await this.readLocale();
-    const labels = getLabels(locale);
-    await this.runWithBusy(
-      labels.progress.analyze,
-      labels.progress.detail,
-      "analyzeAll",
-      async (token) => await this.analyzeBatchCore("allAllowed", token),
-      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
-      true
-    );
+    await this.runAnalysisWithBusy("analyzeAll", "allAllowed");
   }
 
   private async analyzeSelected(mailIds: string[]): Promise<void> {
-    const locale = await this.readLocale();
-    const labels = getLabels(locale);
-    await this.runWithBusy(
-      labels.progress.analyze,
-      labels.progress.detail,
-      "analyzeSelected",
-      async (token) => await this.analyzeBatchCore(mailIds, token),
-      (result) => `EasyMail analysis completed for ${result.batchSize} mail(s).`,
-      true
-    );
+    await this.runAnalysisWithBusy("analyzeSelected", mailIds);
   }
 
-  private analysisContext(cancellationToken?: CancellationTokenLike): AnalysisContext {
+  private async runAnalysisWithBusy(kind: string, selection?: "allAllowed" | string[] | number): Promise<void> {
+    const locale = await this.readLocale();
+    const labels = getLabels(locale);
+    const isSingleMail = Array.isArray(selection) && selection.length === 1;
+    try {
+      const result = await this.runWithBusy(
+        labels.progress.analyze,
+        isSingleMail ? "Analyzing 1 email" : labels.progress.detail,
+        kind,
+        async (token, reportProgress) => await this.analyzeBatchCore(selection, token, isSingleMail ? undefined : reportProgress, () => this.refreshCancellationSidebar(labels.progress.analyze)),
+        (analysis) => `EasyMail analysis completed for ${analysis.batchSize} mail(s).`,
+        true,
+        labels.progress.cancelling
+      );
+      this.showAnalysisWarning(result);
+    } catch (error) {
+      if (error && typeof error === "object") {
+        this.showAnalysisWarning(error as Partial<AnalysisBatchResult>);
+      }
+      throw error;
+    }
+  }
+
+  private showAnalysisWarning(result: Partial<AnalysisBatchResult>): void {
+    const skippedChunks = Number(result.skippedChunks || 0);
+    const omittedMails = Number(result.omittedMails || 0);
+    if (skippedChunks || omittedMails) {
+      void vscode.window.showWarningMessage(`EasyMail analysis incomplete: ${skippedChunks} chunk(s) skipped; ${omittedMails} mail(s) marked Uncertain.`);
+    }
+  }
+
+  private analysisContext(cancellationToken?: CancellationTokenLike, progress?: (message: string) => void, onChunkPersisted?: () => Promise<void>): AnalysisContext {
     return {
       data: this.data,
       llmProvider: this.llmProvider,
@@ -576,12 +683,14 @@ class EasyMailApp {
       readConfig: () => this.readConfig(),
       log: (event, data) => this.log(event, data),
       availableModelsCache: this.availableModelsCache,
-      cancellationToken
+      cancellationToken,
+      progress,
+      onChunkPersisted
     };
   }
 
-  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike): Promise<{ batchSize: number }> {
-    return analyzeBatchCoreImpl(this.analysisContext(cancellationToken), selection);
+  private async analyzeBatchCore(selection?: "allAllowed" | string[] | number, cancellationToken?: CancellationTokenLike, progress?: (message: string) => void, onChunkPersisted?: () => Promise<void>): Promise<AnalysisBatchResult> {
+    return analyzeBatchCoreImpl(this.analysisContext(cancellationToken, progress, onChunkPersisted), selection);
   }
 
   public async analyzeThread(threadId: string): Promise<void> {
@@ -589,11 +698,12 @@ class EasyMailApp {
     const labels = getLabels(locale);
     await this.runWithBusy(
       labels.progress.analyze,
-      labels.progress.detail,
+      "Analyzing 1 thread",
       "analyzeThread",
       async (token) => await this.analyzeThreadCore(threadId, token),
       (result) => `Thread analysis completed for ${result.subject}.`,
-      true
+      true,
+      labels.progress.cancelling
     );
   }
 
@@ -615,9 +725,10 @@ class EasyMailApp {
     label: string,
     detail: string,
     kind: string,
-    task: (cancellationToken: CancellationTokenLike) => Promise<T>,
+    task: (cancellationToken: CancellationTokenLike, reportProgress?: (message: string) => void) => Promise<T>,
     completionMessage?: (result: T) => string,
-    cancellable = false
+    cancellable = false,
+    cancellingDetail = "Cancelling…"
   ): Promise<T> {
     if (this.busy) {
       throw new Error(`Another EasyMail task is already running: ${this.busy.label}`);
@@ -632,7 +743,23 @@ class EasyMailApp {
         { location: vscode.ProgressLocation.Notification, title: label, cancellable },
         async (progress, token) => {
           progress.report({ message: detail });
-          return await task(token);
+          const cancellationSubscription = token.onCancellationRequested(() => {
+            if (this.busy) {
+              this.busy = { ...this.busy, kind: "cancelling", detail: cancellingDetail };
+              progress.report({ message: cancellingDetail });
+              if (cancellable) void vscode.window.showInformationMessage("EasyMail: Cancelling… Waiting for the current request to finish.");
+              void this.refreshCancellationSidebar(label);
+            }
+          });
+          try {
+            const result = await task(token, (message) => progress.report({ message }));
+            if (token.isCancellationRequested) {
+              throw new Error("EasyMail task cancelled.");
+            }
+            return result;
+          } finally {
+            cancellationSubscription.dispose();
+          }
         }
       );
       const elapsedMs = Date.now() - startedAtMs;
@@ -651,11 +778,17 @@ class EasyMailApp {
     }
   }
 
+  private async refreshCancellationSidebar(label: string): Promise<void> {
+    try {
+      await this.dashboardProvider.update();
+    } catch (error) {
+      await this.log("busy:cancelSidebarError", { label, error: formatError(error) });
+    }
+  }
+
   public async refresh(): Promise<void> {
     await this.dashboardProvider.update();
-    if (this.workbenchPanel) {
-      this.workbenchPanel.webview.html = await this.getWorkbenchHtml();
-    }
+    await this.rebuildWorkbenchHtml();
   }
 
   public async openDigest(): Promise<void> {
@@ -727,12 +860,13 @@ class EasyMailApp {
     await this.updateSettings({ ...config, outputLanguage: nextLocale });
     if (choice === translateLabel) {
       await this.runWithBusy(
-        labels.progress.translate,
-        labels.progress.detail,
-        "translate",
-        async (token) => await this.translateExistingAnalysis(nextLocale, token),
-        (result) => `EasyMail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
-        true
+      labels.progress.translate,
+      labels.progress.detail,
+      "translate",
+      async (token) => await this.translateExistingAnalysis(nextLocale, token),
+      (result) => `EasyMail translated ${result.mailItems} mail analysis item(s) and ${result.threadItems} thread analysis item(s).`,
+      true,
+      labels.progress.cancelling
       );
     } else {
       await this.refresh();
@@ -756,6 +890,55 @@ class EasyMailApp {
 
   public async openSettings(): Promise<void> {
     await vscode.commands.executeCommand("workbench.action.openSettings", "@ext:Wsr-7.easymail");
+  }
+
+  public async selectFolders(): Promise<void> {
+    const config = await this.readConfig();
+    const currentFolders = normalizeMailFolders(config.folders, ["Inbox", "Sent Items"]).map(String);
+    const folderLoadingTip = getLocaleFromConfig(config) === "zh-CN"
+      ? "提示：先启动 Outlook 可加快加载。"
+      : "Tip: starting Outlook first makes this faster.";
+    const scriptPath = await this.findScript("collect-outlook-mails.vbs");
+    const outputPath = path.join(this.context.globalStorageUri.fsPath, "outlook-folder-list.txt");
+    let folderList;
+    await fs.promises.mkdir(this.context.globalStorageUri.fsPath, { recursive: true });
+    await deleteFileIfExists(outputPath);
+    try {
+      folderList = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Loading Outlook folders…" },
+        async (progress) => {
+          progress.report({ message: folderLoadingTip });
+          await runProcess("cscript.exe", ["//nologo", scriptPath, "--list-folders", "--output", outputPath], 90000, (event, data) => {
+            void this.log(`listFolders:${event}`, data);
+          });
+          return parseOutlookFolderList(await fs.promises.readFile(outputPath, "utf8"));
+        }
+      );
+    } catch (err) {
+      await vscode.window.showWarningMessage(`EasyMail could not load Outlook folders: ${err instanceof Error ? err.message : String(err)} Tip: start Outlook first for faster loading.`);
+      return;
+    } finally {
+      await deleteFileIfExists(outputPath).catch((error) => void this.log("listFolders:cleanupFailed", { error: formatError(error) }));
+    }
+
+    if (!folderList.folders.length) {
+      await vscode.window.showWarningMessage("EasyMail did not find any Outlook mail folders. Existing folder settings were not changed.");
+      return;
+    }
+
+    const picked = await vscode.window.showQuickPick(buildOutlookFolderPickItems(folderList.folders, currentFolders, folderList.defaults), {
+      canPickMany: true,
+      placeHolder: "Select Outlook folders for EasyMail to scan"
+    });
+    if (picked === undefined) {
+      return;
+    }
+    if (picked.length === 0) {
+      await vscode.window.showWarningMessage("No folders selected. EasyMail folder settings were not changed.");
+      return;
+    }
+    await this.updateSettings({ folders: normalizeOutlookFolderSelection(picked.map((item) => item.label), folderList.defaults) });
+    await vscode.window.showInformationMessage("EasyMail folder settings updated.");
   }
 
   public async openPromptConfig(): Promise<void> {
@@ -929,7 +1112,7 @@ class EasyMailApp {
     );
     const modelFamily = shouldMigrateModelFamily
       ? String(legacySettingsModelFamily || "").trim()
-      : resolveModelFamily(storedModelFamily, legacySettingsModelFamily, defaults.modelFamily);
+      : resolveModelFamily(legacySettingsModelFamily, storedModelFamily, defaults.modelFamily);
     if (shouldMigrateModelFamily) {
       await this.data.writeConfig({ ...storedConfig, modelFamily, modelFamilyMigrated: true });
     }
@@ -944,12 +1127,18 @@ class EasyMailApp {
       modelFamily,
       outputLanguage: configuredOutputLanguage(settings),
       draftLanguage: normalizeDraftLanguage(settings.get("draftLanguage", defaults.draftLanguage || "auto")),
+      draftGeneration: settings.get("draftGeneration", defaults.draftGeneration || "auto"),
       autoAnalyzeMaxClassificationLevel: settings.get("autoAnalyzeMaxClassificationLevel", defaults.autoAnalyzeMaxClassificationLevel),
       mailStoreRetentionDays: settings.get("mailStoreRetentionDays", defaults.mailStoreRetentionDays),
       mailIndexRetentionDays: settings.get("mailIndexRetentionDays", defaults.mailIndexRetentionDays),
       analysisRetentionDays: settings.get("analysisRetentionDays", defaults.analysisRetentionDays),
       collectorTimeoutSeconds: settings.get("collectorTimeoutSeconds", defaults.collectorTimeoutSeconds),
-      importantSenders: settings.get("importantSenders", defaults.importantSenders)
+      importantSenders: settings.get("importantSenders", defaults.importantSenders),
+      ignoredSenders: settings.get("ignoredSenders", defaults.ignoredSenders),
+      hardBlockKeywords: settings.get("hardBlockKeywords", defaults.hardBlockKeywords),
+      manualConfirmKeywords: settings.get("manualConfirmKeywords", defaults.manualConfirmKeywords),
+      classificationLevel3Keywords: settings.get("classificationLevel3Keywords", defaults.classificationLevel3Keywords),
+      classificationLevel2Keywords: settings.get("classificationLevel2Keywords", defaults.classificationLevel2Keywords)
     };
   }
 
@@ -971,9 +1160,6 @@ class EasyMailApp {
       });
     }
     for (const [key, value] of Object.entries(values)) {
-      if (key === "modelFamily") {
-        continue;
-      }
       await settings.update(key, value, vscode.ConfigurationTarget.Global);
     }
   }
@@ -1068,7 +1254,7 @@ class EasyMailApp {
     const index = pruneMailIndex(await this.data.readMailIndex(), Number(config.mailIndexRetentionDays || 7));
     await this.data.writeMailIndex(index);
     const threadStore = buildThreadStore(store.items);
-    const classifications = ensureClassifications(store.items, await this.data.readClassificationCache());
+    const classifications = ensureClassifications(store.items, await this.data.readClassificationCache(), buildClassificationKeywords(config));
     await this.data.writeClassificationCache(classifications);
     const securitySettings = buildSecuritySettings(config);
     const securityDecisions = buildMailSecurityDecisionMap(store.items, classifications, securitySettings);
@@ -1086,21 +1272,11 @@ class EasyMailApp {
       ignoredIds,
       classifications,
       true,
-      config.autoAnalyzeMaxClassificationLevel
+      config.autoAnalyzeMaxClassificationLevel,
+      config.ignoredSenders,
+      securityDecisions
     );
-    const state = buildDashboardState(config, digest, analysis, ignoredIds, allowedCategoryIds(promptConfig), securedThreadStore) as DashboardState & {
-      modelInfo?: Record<string, unknown>;
-      store?: MailStore;
-      index?: MailIndex;
-      queue?: ReturnType<typeof buildQueueState>;
-      classifications?: ClassificationCache;
-      securityDecisions?: SecurityDecisionMap;
-      promptConfig?: PromptConfig;
-      threadStore?: ThreadStore;
-      threadAnalysis?: ThreadAnalysisResult;
-      meetingStore?: MeetingStore;
-      ignoredIds?: Set<string>;
-    };
+    const state = buildDashboardState(config, digest, analysis, ignoredIds, allowedCategoryIds(promptConfig), securedThreadStore) as LoadedDashboardState;
     state.modelInfo = await this.data.readModelInfo();
     state.store = store;
     state.index = index;
@@ -1154,6 +1330,10 @@ class EasyMailApp {
       openPromptConfig: () => this.openPromptConfig(),
       clearLocalCache: () => this.clearLocalCache(),
       openWorkbench: (focusId) => this.openWorkbench(focusId),
+      updateWorkingDraft: (itemId, draftText) => {
+        if (draftText || this.workingDrafts.has(itemId)) this.workingDrafts.set(itemId, draftText);
+      },
+      completeWorkingDraftFlush: (requestId) => this.completeWorkbenchDraftFlush(requestId),
       generateDraft: (itemId, sourceId) => this.generateDraft(itemId, sourceId),
       polishDraft: (draftText, itemId) => this.polishDraft(draftText, itemId),
       refineDraft: (draftText, instruction, itemId) => this.refineDraft(draftText, instruction, itemId),
@@ -1165,40 +1345,33 @@ class EasyMailApp {
   }
 
   private async handleMessage(message: unknown): Promise<void> {
-    return handleWebviewMessage(this.messageHandlerContext(), message);
+    const typed = message && typeof message === "object" ? message as Record<string, unknown> : {};
+    const type = String(typed.type || "");
+    const context = this.messageHandlerContext();
+    if (type === "saveConfig") {
+      const write = this.latestSettingsWrite
+        .catch(() => {})
+        .then(() => saveConfigFromMessage(context, typed));
+      this.latestSettingsWrite = write;
+      await write;
+      await context.refresh();
+      return;
+    }
+    if (SETTINGS_DEPENDENT_MESSAGE_TYPES.has(type)) {
+      await this.latestSettingsWrite;
+    }
+    return handleWebviewMessage(context, message);
   }
 
   private async getDashboardHtml(): Promise<string> {
     const state = await this.loadState();
-    const extendedState = state as DashboardState & {
-      store?: MailStore;
-      index?: MailIndex;
-      queue?: ReturnType<typeof buildQueueState>;
-      classifications?: ClassificationCache;
-      securityDecisions?: SecurityDecisionMap;
-      promptConfig?: PromptConfig;
-      threadStore?: ThreadStore;
-      threadAnalysis?: ThreadAnalysisResult;
-      ignoredIds?: Set<string>;
-    };
+    const extendedState = state as LoadedDashboardState;
     const availableModels = await this.data.readCachedAvailableModels(this.availableModelsCache, (event, d) => this.log(event, d));
     const nextActionsStore = await this.data.readNextActions();
-    return renderSidebarHtml({
-      state,
-      store: extendedState.store || emptyMailStore(),
-      index: extendedState.index || emptyMailIndex(),
-      queue: extendedState.queue || { pending: [], blocked: [], analysed: [], allowed: [] },
-      classifications: extendedState.classifications || normalizeClassificationCache({}),
-      securityDecisions: extendedState.securityDecisions || new Map(),
-      promptConfig: extendedState.promptConfig || normalizePromptConfig({}),
-      threadStore: extendedState.threadStore || emptyThreadStore(),
-      threadAnalysis: extendedState.threadAnalysis || { generatedAt: "", overview: { totalThreads: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
-      ignoredIds: extendedState.ignoredIds,
-      nextActionsStore,
-      availableModels,
-      busyKind: this.busy?.kind || "",
-      isBusy: !!this.busy
-    });
+    return renderSidebarHtml(
+      buildSidebarRenderInput(extendedState, availableModels, nextActionsStore, this.busy?.kind || "", !!this.busy),
+      randomBytes(16).toString("base64")
+    );
   }
 }
 

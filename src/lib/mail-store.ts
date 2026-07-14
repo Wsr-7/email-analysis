@@ -292,6 +292,10 @@ export function buildBatchDigestMarkdown(items: StoredMail[]): string {
     lines.push(`Importance: ${item.importance}`);
     lines.push(`ToMe: ${item.toMe}`);
     lines.push(`CcMe: ${item.ccMe}`);
+    lines.push(`AttachmentCount: ${Math.max(0, Number(item.attachmentCount || 0))}`);
+    if (item.attachmentNames?.length) {
+      lines.push(`AttachmentNames: ${item.attachmentNames.join("; ")}`);
+    }
     lines.push("");
     lines.push("BodyExcerpt:");
     lines.push(item.bodyExcerpt);

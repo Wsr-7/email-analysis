@@ -1,102 +1,119 @@
 # EasyMail
 
-**EasyMail** 是一个 VS Code 插件，把本地 classic Outlook 变成一个由 AI 分诊的收件箱：通过 VBScript COM 自动化采集邮件与日程，用 GitHub Copilot（VS Code Language Model API）在本地分析，再用一个分诊看板展示结果 —— 除了发送给 Copilot 模型的摘录之外，数据不会离开你的机器。
+> 在 VS Code 中把 classic Outlook 邮件带入本地、由 Copilot 辅助的分诊工作区。
 
 [English](./README.md)
 
-## 工作原理
+## Overview
 
-```text
-classic Outlook（Windows）
-  │  VBScript COM 自动化（cscript.exe）
-  ▼
-mail-digest.md / meeting-digest.md
-  │  由插件解析
-  ▼
-mail-store.json / meeting-store.json / thread-store.json
-  │  由 GitHub Copilot 分析（vscode.lm API）
-  ▼
-analysis-result.json / thread-analysis-result.json
-  │
-  ▼
-Sidebar（分诊队列）+ Workbench（阅读面板）+ Markdown 报告
-```
+EasyMail 是面向 Windows 与 classic 桌面版 Outlook 的 VS Code 插件。它通过本地 VBScript COM 自动化采集邮件和会议，把本地数据保存在 VS Code 存储中，并且只在你主动执行分析时调用 GitHub Copilot Language Model API。
 
-所有数据都在本地处理，除发送给所选 Copilot 模型的邮件摘录外，不会有邮件内容离开本机。
+EasyMail 不会把邮件内容上传到自己的服务。用于分析的邮件摘录只会发送给你所选择的 Copilot 模型。
 
-## 核心能力
+## Features
 
-- **本地采集** —— 通过 COM 从 classic Outlook 拉取邮件与会议，无需服务器或邮箱导出
-- **灵活的拉取范围** —— 支持按最近 N 小时或最大条数拉取，可指定一个或多个文件夹
-- **渐进式分析** —— 邮件先进入本地队列，再按下一批 / 已选中 / 全部允许三种方式分析
-- **会话感知** —— 按会话把邮件分组、裁剪引用历史、在送给模型前对重复正文去重
-- **安全密级门控** —— 超过配置密级（`PUBLIC` → `HIGH REGISTERED`）的邮件不会自动分析，需要手动确认
-- **草稿回复** —— Copilot 为邮件/会话生成回复草稿，支持润色/改写，并可一键交给 Outlook 编辑窗口（绝不会自动发送）
-- **双栏界面** —— 侧边栏分诊队列（分类计数、待办事项）+ 全宽 workbench 阅读面板
-- **双语支持** —— 界面与分析输出支持中英文，运行时可切换
-- **Sample 模式** —— 生成演示用的虚构邮件数据，无需 Outlook 或 Copilot 即可体验
-- **不落云端存储** —— 所有数据写入 VS Code 的 `globalStorageUri`，保留期可配置，并提供一键清空本地缓存
+### 本地采集与整理
 
-## 环境要求
+- 从一个或多个 classic Outlook 文件夹采集邮件，支持按最近小时数或最大条数限定范围。
+- 采集近期会议，并把邮件、会议、线程和分析结果保存在 VS Code 本地存储中。
+- 用 Sample 模式生成示例数据，在连接 Outlook 前体验完整流程。
 
-- Windows，已安装并配置 classic（桌面版）Outlook
-- VS Code `^1.90.0`
-- 已登录、具备 Language Model API 权限的 GitHub Copilot 订阅
+### 分诊与分析
 
-## 安装
+- 在 Sidebar 中查看带分类计数的待办队列。
+- 用已加载的 Copilot 模型分析下一批、选中邮件、线程或全部允许分析的邮件。
+- 将相关邮件归成线程，并在分析前裁掉重复的引用历史。
+- 对较高密级邮件保留既有确认门控，不会自动分析。
 
-从 [releases/](./releases) 下载 `.vsix` 后安装：
+### 阅读与处理
 
-```powershell
-code --install-extension releases/easymail-0.3.0.vsix
-```
+- 在全宽 Workbench 阅读邮件、线程、会议和分析详情。
+- 生成、润色和改写回复草稿，再交给 Outlook 撰写窗口；EasyMail 绝不会自动发送邮件。
+- 在英文与简体中文之间切换界面和分析输出。
 
-也可以从源码构建，见下方[开发](#开发)部分。
+<!-- SCREENSHOT: sidebar-triage-counts.png — Sidebar 分诊队列，需截到分类计数、待分析邮件和当前选中项 -->
 
-## 快速开始
+## Quick Start
 
-1. 从 Activity Bar 打开 EasyMail 视图。
-2. 还没有 Outlook？先执行 **EasyMail: Generate Sample Digest** 用演示数据体验整个流程。
-3. 执行 **EasyMail: Fetch New Mail** 从 Outlook 拉取最近邮件。
-4. 在侧边栏选择一个 **Analysis Model**，然后执行 **Analyze Next Batch**（或 **Analyze All Allowed**）。
-5. 在侧边栏队列中查看分诊结果，点开某一项在 workbench 中阅读、生成草稿或执行操作。
+1. 从 [releases/](./releases) 安装扩展包，然后从 VS Code Activity Bar 打开 **EasyMail** 视图。
+2. 若暂时没有 Outlook，运行 **EasyMail: Generate Sample Digest**。
+3. 否则运行 **EasyMail: Fetch New Mail**，从已配置的 Outlook 文件夹采集邮件。
+4. 运行 **EasyMail: Load Copilot Models**，在 Sidebar 选择 **Analysis Model**，然后执行 **Analyze Next Batch**。
+5. 打开队列中的邮件，在 Workbench 中阅读详情并处理草稿。
 
-完整命令列表、配置说明与自定义分类 prompt 见 [user guide.md](./user%20guide.md)。
+<!-- SCREENSHOT: sample-mode-results.png — Generate Sample Digest 后的示例邮件、会议与分诊结果 -->
 
-## 配置
+源码搭建和开发命令见 [setup.md](./setup.md)。
 
-所有设置都在 VS Code Settings 的 `easyMail.*` 命名空间下（`easyMail.rangeMode`、`easyMail.folders`、`easyMail.outputLanguage`、`easyMail.autoAnalyzeMaxClassificationLevel`、各类保留期、`easyMail.importantSenders` 等）。看板顶部的 Settings 面板只是常用字段的快捷编辑器，VS Code Settings 始终是唯一生效源。
+## Usage
 
-## 目录结构
+### 采集邮件与会议
 
-```text
-src/         TypeScript 插件源码（src/lib 是业务逻辑模块）
-scripts/     Outlook VBScript COM 自动化脚本，以及构建/验证脚本
-prompts/     Copilot 分析提示词模板
-media/       插件图标资源
-releases/    带版本号的 .vsix 安装包
-docs/        设计文档与修复计划
-```
+在 VS Code Settings 或 Sidebar 中设置采集范围，然后使用 **Fetch New Mail**。EasyMail 会在本地采集已配置的邮件文件夹和相应日历范围。需要较早邮件时使用 **More History**；需要演示数据时使用 **Generate Sample Digest**。
 
-完整的模块地图与架构图见 [AGENTS.md](./AGENTS.md)。
+### 分析队列
 
-## 开发
+先加载可用 Copilot 模型并在 Sidebar 中选择它，再执行 **Analyze Next Batch**、**Analyze All Allowed**，或者在 Workbench 中分析单封邮件或线程。高于自动分析密级阈值的项目仍需通过既有确认操作。
 
-```powershell
-npm install
-npm run compile      # 清空 out/ 后执行 tsc
-npm test             # 编译 + 运行全部测试（node --test）
-npm run package:vsix # 打包 releases/easymail-0.3.0.vsix
-```
+<!-- SCREENSHOT: analysis-in-progress.png — 点击 Analyze Next Batch 后的分析进行中状态，需包含取消按钮或忙碌提示 -->
 
-编译后运行单个测试文件：
+### 处理回复草稿
 
-```powershell
-node --test out/test/digest.test.js
-```
+在 Workbench 打开邮件或线程。生成回复草稿后可以直接编辑，需要时使用 **Polish** 或 **Refine**。**Compose in Outlook** 会带着草稿打开 Outlook 撰写窗口；请自行在 Outlook 中检查并发送。
 
-首次搭建环境的分步说明见 [setup.md](./setup.md)；架构与协作约定见 [AGENTS.md](./AGENTS.md)。
+<!-- SCREENSHOT: workbench-draft.png — Workbench 阅读面板，需同时截到邮件正文、分析结果和草稿编辑区 -->
 
-## 许可证
+### 选择 Outlook 文件夹
+
+运行 **EasyMail: Select Outlook Folders**，从正在运行的 classic Outlook 加载文件夹并选择要扫描的目录。选择结果会保存到 `easyMail.folders`；有需要时也可以手动编辑该设置。
+
+<!-- SCREENSHOT: select-outlook-folders.png — Select Outlook Folders QuickPick，需截到可多选文件夹和 Sent Items 标记 -->
+
+完整命令列表和工作流细节见 [user guide.md](./user%20guide.md)。
+
+## Configuration
+
+全部设置位于 VS Code Settings 的 `easyMail.*` 命名空间。常用项包括：
+
+- `easyMail.rangeMode`、`easyMail.recentHours`、`easyMail.maxItems`：采集范围。
+- `easyMail.folders`：Outlook 文件夹，推荐通过 **Select Outlook Folders** 填充。
+- `easyMail.modelFamily`：Copilot 模型标识；推荐在 Sidebar 中加载并选择当前可用模型。
+- `easyMail.outputLanguage`、`easyMail.draftLanguage`：界面与回复语言。
+- `easyMail.autoAnalyzeMaxClassificationLevel`：自动分析门控阈值。
+- `easyMail.bodyExcerptChars`：每封邮件保留给分析的最大正文字符数。
+
+Sidebar 只提供少量常用控件，VS Code Settings 始终是唯一生效源。完整参考见 [user guide.md](./user%20guide.md)。
+
+## FAQ
+
+### 没有 Outlook 也能使用吗？
+
+可以。Sample 模式会创建演示用的邮件和会议数据，便于体验界面；采集真实邮件和会议仍需要 Windows 上的 classic Outlook。
+
+### EasyMail 会自动发送邮件吗？
+
+不会。它可以带着草稿打开 Outlook 撰写窗口，但发送操作始终由你在 Outlook 中完成。
+
+### 为什么有些邮件没有自动分析？
+
+邮件可能仍在 Pending、尚未被选择，或密级高于 `easyMail.autoAnalyzeMaxClassificationLevel`。高密级邮件需要走确认流程。
+
+### 到哪里看完整命令与配置说明？
+
+查看 [user guide.md](./user%20guide.md)。贡献或本地开发可参阅 [setup.md](./setup.md) 与项目结构说明 [AGENTS.md](./AGENTS.md)。
+
+## Known Limitations
+
+- EasyMail 依赖 Windows Script Host 与 Outlook COM 自动化，因此仅支持 Windows。
+- 仅支持 classic 桌面版 Outlook，不支持新版 Outlook 客户端或 Outlook 网页版。
+- Copilot 分析需要有效的 GitHub Copilot 订阅，以及暴露 Language Model API 的 VS Code 运行时；可选模型由该环境决定。
+- `easyMail.bodyExcerptChars` 会在采集时截断每封邮件正文（默认 `1500`，最小 `100`）。很长的新增内容可能导致分析不完整；可调大该设置，或用 **Open in Outlook** 查看完整原文。
+- Outlook 与 Exchange 的行为（包括文件夹枚举和收件人地址解析）会随本地配置而异，需要在目标邮箱中验证。
+
+## Author
+
+Wsr-7
+
+## License
 
 [MIT](./LICENSE)

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderWorkbenchHtml } from "../lib/workbench-render";
+import { renderWorkbenchHtml as renderWorkbenchHtmlWithNonce } from "../lib/workbench-render";
 import { normalizeClassificationCache } from "../lib/classification";
 import { normalizePromptConfig } from "../lib/prompt-config";
 import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/mail-store";
@@ -58,6 +58,10 @@ function stubInput(overrides?: Partial<DashboardRenderInput>): DashboardRenderIn
   };
 }
 
+function renderWorkbenchHtml(input: DashboardRenderInput): string {
+  return renderWorkbenchHtmlWithNonce(input, "workbench-test-nonce");
+}
+
 describe("renderWorkbenchHtml", () => {
   it("returns valid HTML document", () => {
     const html = renderWorkbenchHtml(stubInput());
@@ -86,7 +90,39 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes('data-id="m1"'));
     assert.ok(html.includes("Hello"));
-    assert.ok(html.includes("wb-detail-card"));
+    assert.ok(html.includes("wb-detail-card wb-with-body wb-mail-with-body"));
+  });
+
+  it("uses a nonce CSP and no inline event handlers", () => {
+    const first = renderWorkbenchHtmlWithNonce(stubInput(), "workbench-nonce-1");
+    const second = renderWorkbenchHtmlWithNonce(stubInput(), "workbench-nonce-2");
+    assert.match(first, /Content-Security-Policy/);
+    assert.match(first, /script-src 'nonce-workbench-nonce-1'/);
+    assert.match(first, /<script nonce="workbench-nonce-1">/);
+    assert.doesNotMatch(first, /\son[a-z]+=/i);
+    assert.notEqual(first, second);
+  });
+
+  it("renders Analyze before Open in Outlook for an allowed unanalysed mail", () => {
+    const html = renderWorkbenchHtml(stubInput({
+      queue: { pending: [], blocked: [], analysed: [], allowed: [stubMail({ mailId: "pending-1" })], ignoredPending: [] }
+    }));
+
+    const analyze = '<button class="wb-btn" data-action="analyzeSelected" data-mail-id="pending-1">Analyze</button>';
+    const open = '<button class="wb-btn" data-action="openInOutlook" data-mail-id="pending-1">Open in Outlook</button>';
+    assert.ok(html.includes(analyze));
+    assert.ok(html.indexOf(analyze) < html.indexOf(open));
+  });
+
+  it("renders Re-analyze before Open in Outlook for an analysed mail", () => {
+    const html = renderWorkbenchHtml(stubInput({
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "analysed-1" })] }])
+    }));
+
+    const reanalyze = '<button class="wb-btn" data-action="analyzeSelected" data-mail-id="analysed-1">Re-analyze</button>';
+    const open = '<button class="wb-btn" data-action="openInOutlook" data-mail-id="analysed-1">Open in Outlook</button>';
+    assert.ok(html.includes(reanalyze));
+    assert.ok(html.indexOf(reanalyze) < html.indexOf(open));
   });
 
   it("renders confirm analyze action for manual-confirm mail detail only", () => {
@@ -114,6 +150,8 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(!html.includes('data-action="analyzeSelected" data-mail-id="block-1"'));
     assert.ok(html.includes("Manual Confirmation Required"));
     assert.ok(html.includes("Requires manual confirmation"));
+    assert.ok(html.includes("Blocked by security gate"));
+    assert.ok(html.includes("Hard block"));
     assert.ok(html.includes("wb-gate-reason"));
     assert.ok(html.includes("post('analyzeSelected', { mailIds: [t.getAttribute('data-mail-id') || ''] })"));
   });
@@ -149,6 +187,143 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("Urgent task"));
   });
 
+  it("renders a due date in analyzed metadata only when present", () => {
+    const withDue = renderWorkbenchHtml(stubInput({
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem({ dueDate: "2026-07-20" })] }])
+    }));
+    const withoutDue = renderWorkbenchHtml(stubInput({
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem()] }])
+    }));
+
+    assert.ok(withDue.includes("Due:</strong> 2026-07-20"));
+    assert.ok(!withoutDue.includes("Due:</strong>"));
+  });
+
+  it("shows attachment metadata for pending and analyzed mails only when present", () => {
+    const pending = stubMail({ mailId: "pending-attachment", attachmentCount: 2, attachmentNames: ["contract.pdf", "budget.xlsx"] });
+    const analyzed = stubMail({ mailId: "a1", attachmentCount: 1, attachmentNames: ["notes.txt"] });
+    const withAttachments = renderWorkbenchHtml(stubInput({
+      queue: { pending: [pending], blocked: [], analysed: [], allowed: [pending], ignoredPending: [] },
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" })] }]),
+      store: { generatedAt: "", lastPullAt: "", items: [pending, analyzed] }
+    }));
+    const withoutAttachments = renderWorkbenchHtml(stubInput({
+      queue: { pending: [stubMail()], blocked: [], analysed: [], allowed: [stubMail()], ignoredPending: [] }
+    }));
+
+    assert.ok(withAttachments.includes("Attachments:</strong> 2 (contract.pdf; budget.xlsx)"));
+    assert.ok(withAttachments.includes("Attachments:</strong> 1 (notes.txt)"));
+    assert.ok(!withoutAttachments.includes("Attachments:</strong>"));
+  });
+
+  it("does not show a thread internal id in an analyzed mail reader", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" })] }
+      ]),
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "", items: [{
+          threadId: "conversation:private-id", conversationId: "private-id", normalizedSubject: "thread",
+          subject: "Thread subject", participants: [], folders: [], startTime: "", lastTime: "",
+          messageCount: 2, unreadCount: 0, hasAttachments: false, sourceMailIds: ["a1", "a2"], timeline: [], contentStatus: "available"
+        }]
+      }
+    });
+
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(!html.includes("<strong>Thread:</strong> conversation:private-id"));
+  });
+
+  it("fills the active reader width for short content", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes(".wb-reader.active { display: flex; width: 100%; height: 100%; min-height: 0; }"));
+  });
+
+  it("hides the selection placeholder with display none while a reader is active", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes(".wb-reader.active ~ .wb-placeholder { display: none; }"));
+  });
+
+  it("lets analyzed original mail grow with the reading pane", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes(".wb-reader.active { display: flex; width: 100%; height: 100%; min-height: 0; }"));
+    assert.ok(html.includes(".wb-reader.active .wb-with-body { display: flex; flex-direction: column; min-height: 100%; width: 100%; }"));
+    assert.ok(!html.includes(".wb-reader.active .wb-mail-with-body"));
+    assert.ok(html.includes(".wb-original-section { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; }"));
+    assert.ok(html.includes(".wb-body { flex: 1 0 auto; min-height: 140px; width: 100%;"));
+    assert.ok(!html.includes("max-height: 400px"));
+  });
+
+  it("uses one separator before and after detail actions", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes(".wb-meta-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px 0; }"));
+    assert.ok(html.includes(".wb-actions { display: flex; gap: 8px; margin: 0 0 12px; padding: 12px 0; border-top: 1px solid"));
+    assert.ok(html.includes("border-bottom: 1px solid var(--vscode-panel-border"));
+    assert.ok(html.includes(".wb-thread-analysis { margin-top: 12px; padding-top: 0; }"));
+    assert.ok(html.includes(".wb-timeline-section { margin-top: 20px; padding-top: 0; }"));
+  });
+
+  it("labels the pending original body after the action separator", () => {
+    const html = renderWorkbenchHtml(stubInput({
+      queue: { pending: [], blocked: [], analysed: [], allowed: [stubMail({ mailId: "pending-body", bodyExcerpt: "Pending original body" })], ignoredPending: [] }
+    }));
+
+    const actionIndex = html.indexOf('data-action="openInOutlook" data-mail-id="pending-body"');
+    const bodyLabelIndex = html.indexOf("<strong>Body:</strong></div><div class=\"wb-body\">Pending original body");
+    assert.ok(actionIndex !== -1 && bodyLabelIndex !== -1 && actionIndex < bodyLabelIndex);
+    assert.ok(html.includes('<div class="wb-section wb-original-section"><div class="wb-field"><strong>Body:</strong>'));
+  });
+
+  it("marks a timeline body truncated by collection", () => {
+    const truncatedBody = `${"x".repeat(100)}...`;
+    const input = stubInput({
+      state: stubState({ bodyExcerptChars: 100 }),
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "", items: [{
+          threadId: "conversation:thread-1", conversationId: "thread-1", normalizedSubject: "thread",
+          subject: "Thread subject", participants: [], folders: [], startTime: "", lastTime: "",
+          messageCount: 2, unreadCount: 0, hasAttachments: false, sourceMailIds: ["m1"], contentStatus: "available",
+          security: { totalMessages: 1, allowedMessages: 1, manualConfirmMessages: 0, blockedMessages: 0, highestClassificationLevel: 0, partialContext: false, reasons: [] },
+          timeline: [{
+            mailId: "m1", internetMessageId: "", entryId: "", conversationId: "thread-1", conversationIndex: "",
+            subject: "Thread subject", from: "Alice", senderName: "Alice", senderEmail: "", receivedTime: "", sentTime: "", folder: "Inbox",
+            bodyPreview: truncatedBody, bodyClean: truncatedBody, bodyDelta: truncatedBody, bodyHash: "", isDuplicateBody: false,
+            contentAvailable: true, attachmentCount: 0, attachmentNames: []
+          }]
+        }]
+      }
+    });
+
+    assert.ok(renderWorkbenchHtml(input).includes("Content truncated"));
+  });
+
+  it("does not mark a naturally ellipsized timeline body as truncated", () => {
+    const input = stubInput({
+      state: stubState({ bodyExcerptChars: 100 }),
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "", items: [{
+          threadId: "conversation:thread-2", conversationId: "thread-2", normalizedSubject: "thread",
+          subject: "Thread subject", participants: [], folders: [], startTime: "", lastTime: "",
+          messageCount: 2, unreadCount: 0, hasAttachments: false, sourceMailIds: ["m2"], contentStatus: "available",
+          security: { totalMessages: 1, allowedMessages: 1, manualConfirmMessages: 0, blockedMessages: 0, highestClassificationLevel: 0, partialContext: false, reasons: [] },
+          timeline: [{
+            mailId: "m2", internetMessageId: "", entryId: "", conversationId: "thread-2", conversationIndex: "",
+            subject: "Thread subject", from: "Alice", senderName: "Alice", senderEmail: "", receivedTime: "", sentTime: "", folder: "Inbox",
+            bodyPreview: "Natural ending...", bodyClean: "Natural ending...", bodyDelta: "Natural ending...", bodyHash: "", isDuplicateBody: false,
+            contentAvailable: true, attachmentCount: 0, attachmentNames: []
+          }]
+        }]
+      }
+    });
+
+    assert.ok(!renderWorkbenchHtml(input).includes("Content truncated"));
+  });
+
   it("binds single-mail draft actions to the mail draft key", () => {
     const input = stubInput({
       state: stubState({}, [
@@ -162,6 +337,20 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("var itemId = box ? box.getAttribute('data-item-id') || '' : '';"));
     assert.ok(html.includes("getAttribute('data-source-id') || ''"));
     assert.ok(!html.includes("itemId: currentId || ''"));
+  });
+
+  it("uses the working draft as the escaped textarea initial value", () => {
+    const input = stubInput({
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1", draftReply: "Model draft" })] }
+      ]),
+      workingDrafts: new Map([["mail:a1", "Saved & <draft>"]])
+    });
+
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes('<textarea class="draft-textarea">Saved &amp; &lt;draft&gt;</textarea>'));
+    assert.ok(!html.includes('<textarea class="draft-textarea">Model draft</textarea>'));
   });
 
   it("renders generate draft action for empty single-mail drafts", () => {
@@ -184,7 +373,7 @@ describe("renderWorkbenchHtml", () => {
         items: [{
           threadId: "t1", conversationId: "c1", normalizedSubject: "thread",
           subject: "Thread Subject",
-          participants: ["alice@test.com"],
+          participants: ["Alice <alice@test.com>"],
           folders: ["Inbox"], startTime: "2024-01-01", lastTime: "2024-01-02",
           messageCount: 2, unreadCount: 0, hasAttachments: false,
           sourceMailIds: ["m1", "m2"], timeline: [],
@@ -196,6 +385,9 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes("Thread Subject"));
     assert.ok(html.includes('data-id="t1"'));
+    assert.ok(html.includes('data-action="analyzeThread" data-thread-id="t1">Analyze Full Thread</button>'));
+    assert.ok(html.includes("Participants:</strong> Alice</div>"));
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'));
   });
 
   it("renders thread spotlight fields in thread detail", () => {
@@ -237,7 +429,7 @@ describe("renderWorkbenchHtml", () => {
           sourceMailIds: ["m1", "m2"],
           timeline: [{
             mailId: "m1", internetMessageId: "", entryId: "entry-1", conversationId: "c1",
-            conversationIndex: "", subject: "Thread Subject", from: "Alice", senderName: "Alice",
+            conversationIndex: "", subject: "Thread Subject", from: "Alice <alice@test.com>", senderName: "Alice",
             senderEmail: "alice@test.com", receivedTime: "2024-01-02", sentTime: "",
             folder: "Inbox", bodyPreview: "Please confirm.", bodyClean: "Please confirm.",
             bodyDelta: "Please confirm.", bodyHash: "", isDuplicateBody: false,
@@ -253,6 +445,7 @@ describe("renderWorkbenchHtml", () => {
     const html = renderWorkbenchHtml(input);
 
     assert.ok(html.includes("Thread Spotlight"));
+    assert.ok(html.includes('data-action="analyzeThread" data-thread-id="t1">Re-analyze</button>'));
     assert.ok(html.includes("Approval is not confirmed."));
     assert.ok(html.includes("Move release to Thursday."));
     assert.ok(!html.includes("Open Questions"));
@@ -262,6 +455,23 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("Reply asking Bob to confirm."));
     assert.ok(html.includes("Partial context; verify against original mail"));
     assert.ok(html.includes('data-action="openInOutlook" data-mail-id="m1"'));
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'), "thread senders should retain full addresses in tooltips");
+    assert.ok(html.includes("<strong title=\"Alice &lt;alice@test.com&gt;\">Alice</strong>"), "timeline should show display name only");
+    assert.ok(html.includes('class="wb-timeline-sort" data-action="toggleTimelineOrder" data-thread-id="t1" data-order="asc"'));
+    assert.ok(html.includes('Timeline (1) <span class="wb-timeline-arrow" aria-hidden="true">↑</span>'));
+    assert.ok(html.includes('class="wb-timeline-list"'));
+  });
+
+  it("toggles and persists each thread timeline order in the webview", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes("function setTimelineOrder(button, order, persist)"));
+    assert.ok(html.includes("list.appendChild(items[i])"));
+    assert.ok(html.includes("timelineOrders[threadId] = order"));
+    assert.ok(html.includes("if (a === 'toggleTimelineOrder')"));
+    assert.ok(html.includes("setTimelineOrder(t, t.getAttribute('data-order') === 'asc' ? 'desc' : 'asc', true)"));
+    assert.ok(html.includes("restoreTimelineOrders()"));
+    assert.ok(html.includes("background: var(--vscode-button-hoverBackground, #1177bb)"));
   });
 
   it("handles focusItem message via client-side JS", () => {
@@ -295,20 +505,27 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("data-action=\"composeMail\""));
   });
 
-  it("persists in-progress draft text to webview state and restores it after a rebuild", () => {
+  it("reports in-progress draft text to the extension after a debounce", () => {
     const html = renderWorkbenchHtml(stubInput());
-    assert.ok(html.includes("function restoreDraftState()"));
-    assert.ok(html.includes("draftState"));
-    assert.ok(html.includes("draftState.itemId !== currentId"));
-    assert.ok(html.includes("ta.value !== draftState.draft"));
-    assert.ok(html.includes("itemId: itemId, draft: target.value"));
+    assert.ok(html.includes("var draftReportTimer"));
+    assert.ok(html.includes("clearTimeout(draftReportTimer)"));
+    assert.ok(html.includes("post('updateWorkingDraft', { itemId: itemId, draftText: target.value })"));
+    assert.ok(html.includes("}, 500)"));
+    assert.ok(!html.includes("function restoreDraftState()"));
   });
 
-  it("persists updateDraft messages so restored state does not overwrite generated drafts", () => {
+  it("flushes all current drafts when the extension requests a rebuild", () => {
+    const html = renderWorkbenchHtml(stubInput());
+    assert.ok(html.includes("msg.type === 'requestWorkingDraftFlush'"));
+    assert.ok(html.includes("document.querySelectorAll('.draft-box-editable')"));
+    assert.ok(html.includes("post('workingDraftsFlushed', { requestId: msg.requestId, drafts: drafts })"));
+  });
+
+  it("updates the textarea directly when the extension generates a draft", () => {
     const html = renderWorkbenchHtml(stubInput());
     assert.ok(html.includes("msg.type === 'updateDraft'"));
-    assert.ok(html.includes("draftState = { itemId: msg.itemId, draft: msg.text || '' }"));
-    assert.ok(html.includes("setPersistedState({ draftState: draftState })"));
+    assert.ok(html.includes("if (box) { var ta = box.querySelector('.draft-textarea'); if (ta) ta.value = msg.text || '';"));
+    assert.ok(!html.includes("draftState"));
   });
 
   it("does not include filterQueue or selectItem (no list column)", () => {
@@ -332,8 +549,8 @@ describe("renderWorkbenchHtml", () => {
   it("renders recipients and classification in workbench mail detail", () => {
     const input = stubInput({
       queue: {
-        pending: [stubMail({ mailId: "m1", subject: "Hello", from: "alice@test.com", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })],
-        blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Hello", from: "alice@test.com", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })], ignoredPending: []
+        pending: [stubMail({ mailId: "m1", subject: "Hello", from: "Alice <alice@test.com>", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })],
+        blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Hello", from: "Alice <alice@test.com>", to: "bob@test.com", cc: "carol@test.com", receivedTime: "2024-01-01 14:30" })], ignoredPending: []
       },
       classifications: normalizeClassificationCache({ items: [{ mailId: "m1", level: 2, label: "REGISTERED" }] })
     });
@@ -341,10 +558,39 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("bob@test.com"), "should show To recipients");
     assert.ok(html.includes("carol@test.com"), "should show Cc recipients");
     assert.ok(html.includes("REGISTERED"), "should show classification");
-    assert.ok(html.includes("alice@test.com"), "should show sender");
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'), "sender should retain the full address in a tooltip");
+    assert.ok(html.includes("From:</strong> Alice</div>"), "should show sender name only");
     assert.ok(html.includes("14:30"), "should show time");
     assert.ok(html.includes(".wb-meta-grid { display: grid;"));
     assert.ok(html.includes("grid-template-columns: 1fr;"));
+  });
+
+  it("renders pending and analyzed recipients as names with full-address tooltips", () => {
+    const pendingTo = "Bob <bob@test.com>;Carol <carol@test.com>";
+    const pendingCc = "Dan <dan@test.com>;Eve <eve@test.com>";
+    const analyzedTo = "Frank <frank@test.com>; Grace <grace@test.com>";
+    const analyzedCc = "Hank <hank@test.com>; Irene <irene@test.com>";
+    const input = stubInput({
+      queue: {
+        pending: [stubMail({ mailId: "m1", to: pendingTo, cc: pendingCc })],
+        blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", to: pendingTo, cc: pendingCc })], ignoredPending: []
+      },
+      state: stubState({}, [
+        { id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" })] }
+      ]),
+      store: { ...emptyMailStore(), items: [stubMail({ mailId: "a1", to: analyzedTo, cc: analyzedCc })] }
+    });
+
+    const html = renderWorkbenchHtml(input);
+
+    assert.ok(html.includes(`title="${pendingTo.replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`));
+    assert.ok(html.includes(`title="${analyzedTo.replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`));
+    assert.ok(html.includes(`title="${pendingCc.replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`));
+    assert.ok(html.includes(`title="${analyzedCc.replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`));
+    assert.ok(html.includes("To:</strong> Bob; Carol</div>"));
+    assert.ok(html.includes("Cc:</strong> Dan; Eve</div>"));
+    assert.ok(html.includes("To:</strong> Frank; Grace</div>"));
+    assert.ok(html.includes("Cc:</strong> Hank; Irene</div>"));
   });
 
   it("renders Outlook actions as a collapsed popover menu", () => {
@@ -365,6 +611,15 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes('data-mode="forward"'));
   });
 
+  it("closes open Outlook action menus before any draft action", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes("function closeDraftOutlookActions()"));
+    assert.ok(html.includes("document.querySelectorAll('details.draft-outlook-actions[open]')"));
+    assert.ok(html.includes("['polishDraft', 'refineDraft', 'composeMail', 'generateDraft'].includes(a)"));
+    assert.ok(html.includes("closeDraftOutlookActions();"));
+  });
+
   it("renders analyzed mail with original body from mail store", () => {
     const input = stubInput({
       state: stubState({}, [
@@ -374,6 +629,7 @@ describe("renderWorkbenchHtml", () => {
     });
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes("Original body text here"), "analyzed mail should show original body");
+    assert.ok(html.includes('data-id="a1" data-queue="mustHandleToday"><div class="wb-detail-card wb-with-body wb-mail-with-body">'));
   });
 
   it("places Open in Outlook and Ignore above summary in analyzed detail", () => {
@@ -395,15 +651,38 @@ describe("renderWorkbenchHtml", () => {
       meetingId: "mtg-1", entryId: "e-mtg-1", subject: "Standup", organizer: "Alice",
       start: "2026-07-01 09:00", end: "2026-07-01 09:30", location: "Room A",
       isAllDay: false, isRecurring: false, requiredAttendees: "bob@test.com",
-      optionalAttendees: "", responseStatus: "notResponded", meetingSource: "calendar",
-      importance: "Normal", bodyExcerpt: "", pulledAt: "2026-07-01"
+      optionalAttendees: "dave@test.com", responseStatus: "notResponded", meetingSource: "calendar",
+      importance: "Normal", bodyExcerpt: "Agenda details", pulledAt: "2026-07-01"
     };
     const input = stubInput({ meetingStore: { generatedAt: "", lastPullAt: "", items: [mtg] } });
     const html = renderWorkbenchHtml(input);
     assert.ok(html.includes("Standup"));
     assert.ok(html.includes("Alice"));
+    assert.ok(html.includes("bob@test.com"));
+    assert.ok(html.includes("dave@test.com"));
+    assert.ok(html.includes("Agenda details"));
     assert.ok(html.includes("openMeetingInOutlook"));
+    assert.ok(html.includes('data-meeting-id="e-mtg-1"'));
     assert.ok(html.includes("wb-mtg-notResponded"));
+    assert.ok(html.indexOf('data-action="openMeetingInOutlook"') < html.indexOf("Agenda details"), "meeting action should follow metadata before body content");
+  });
+
+  it("orders meetings with unanswered invitations first, then newest start time", () => {
+    const meeting = (entryId: string, start: string, responseStatus: StoredMeetingItem["responseStatus"]): StoredMeetingItem => ({
+      meetingId: entryId, entryId, subject: entryId, organizer: "Alice", start, end: start,
+      location: "", isAllDay: false, isRecurring: false, requiredAttendees: "", optionalAttendees: "",
+      responseStatus, meetingSource: "calendar", importance: "Normal", bodyExcerpt: "", pulledAt: "2026-07-01"
+    });
+    const html = renderWorkbenchHtml(stubInput({ meetingStore: {
+      generatedAt: "", lastPullAt: "", items: [
+        meeting("accepted-old", "2026-07-01 09:00", "accepted"),
+        meeting("unanswered", "2026-07-02 09:00", "notResponded"),
+        meeting("accepted-new", "2026-07-03 09:00", "accepted")
+      ]
+    } }));
+
+    assert.ok(html.indexOf('data-id="unanswered"') < html.indexOf('data-id="accepted-new"'));
+    assert.ok(html.indexOf('data-id="accepted-new"') < html.indexOf('data-id="accepted-old"'));
   });
 
   it("renders ignore button on thread detail", () => {

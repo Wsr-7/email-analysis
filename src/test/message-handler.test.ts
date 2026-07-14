@@ -38,6 +38,8 @@ function stubContext(overrides?: Partial<MessageHandlerContext>): MessageHandler
     openPromptConfig: mock.fn(async () => {}),
     clearLocalCache: mock.fn(async () => {}),
     openWorkbench: mock.fn(async () => {}),
+    updateWorkingDraft: mock.fn(),
+    completeWorkingDraftFlush: mock.fn(),
     generateDraft: mock.fn(async () => {}),
     polishDraft: mock.fn(async () => {}),
     refineDraft: mock.fn(async () => {}),
@@ -56,10 +58,10 @@ describe("handleWebviewMessage", () => {
     assert.equal((ctx.log as any).mock.callCount(), 0);
   });
 
-  it("dispatches refresh", async () => {
+  it("ignores removed refresh messages", async () => {
     const ctx = stubContext();
     await handleWebviewMessage(ctx, { type: "refresh" });
-    assert.equal((ctx.refresh as any).mock.callCount(), 1);
+    assert.equal((ctx.refresh as any).mock.callCount(), 0);
   });
 
   it("dispatches pullMail", async () => {
@@ -207,11 +209,11 @@ describe("saveConfigFromMessage", () => {
     assert.equal((ctx.showInfo as any).mock.callCount(), 0);
   });
 
-  it("saves the registered folders setting when saving", async () => {
+  it("preserves an explicit Inbox-only folder setting when saving", async () => {
     const ctx = stubContext();
     await saveConfigFromMessage(ctx, { config: { folders: "Inbox" }, silent: true });
     const saved = (ctx.updateSettings as any).mock.calls[0].arguments[0];
-    assert.deepEqual(saved.folders, ["Inbox", "Sent Items"]);
+    assert.deepEqual(saved.folders, ["Inbox"]);
     assert.equal(Object.prototype.hasOwnProperty.call(saved, "fetchFolders"), false);
   });
 
@@ -224,6 +226,16 @@ describe("saveConfigFromMessage", () => {
 });
 
 describe("polishDraft", () => {
+  it("updates the working draft reported by the workbench", async () => {
+    const updateWorkingDraft = mock.fn();
+    const ctx = stubContext({ updateWorkingDraft } as any);
+
+    await handleWebviewMessage(ctx, { type: "updateWorkingDraft", itemId: "mail:m1", draftText: "Handwritten draft" });
+
+    assert.equal(updateWorkingDraft.mock.callCount(), 1);
+    assert.deepEqual(updateWorkingDraft.mock.calls[0].arguments, ["mail:m1", "Handwritten draft"]);
+  });
+
   it("dispatches generate draft with item and source ids", async () => {
     const ctx = stubContext();
     await handleWebviewMessage(ctx, { type: "generateDraft", itemId: "mail:m1", sourceId: "m1" } as any);

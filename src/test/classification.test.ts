@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildQueueState, ensureClassifications, normalizeClassificationCache } from "../lib/classification";
+import { buildClassificationKeywords } from "../lib/config-utils";
+import { buildMailGateDecision, canAnalyzeMail } from "../lib/security-gate";
 import type { StoredMail } from "../lib/mail-store";
 
 const mails: StoredMail[] = [
@@ -69,6 +71,49 @@ test("buildQueueState uses max classification level, not obsolete auto analyze f
   assert.equal(queue.allowed[0].mailId, "mail-1");
 });
 
+test("buildQueueState puts a hard-block mail in the blocked queue", () => {
+  const cache = ensureClassifications(mails, normalizeClassificationCache({}));
+  const queue = buildQueueState(
+    mails,
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    [],
+    cache,
+    true,
+    2,
+    [],
+    new Map([["mail-1", { decision: "block" } as any]])
+  );
+
+  assert.deepEqual(queue.allowed.map((item) => item.mailId), []);
+  assert.deepEqual(queue.blocked.map((item) => item.mailId).sort(), ["mail-1", "mail-2"]);
+});
+
+test("buildQueueState routes keyword manual confirmation to blocked and permits explicit analysis", () => {
+  const contractMail = { ...mails[0], subject: "Contract renewal" };
+  const cache = ensureClassifications([contractMail], normalizeClassificationCache({}));
+  const decision = buildMailGateDecision(contractMail, cache.items[0], {
+    maxAutoClassificationLevel: 3,
+    maxManualClassificationLevel: 3,
+    manualConfirmKeywords: ["contract"]
+  });
+  const decisions = new Map([[contractMail.mailId, decision]]);
+  const queue = buildQueueState(
+    [contractMail],
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    [],
+    cache,
+    true,
+    3,
+    [],
+    decisions
+  );
+
+  assert.equal(decision.decision, "manual_confirm");
+  assert.deepEqual(queue.allowed.map((item) => item.mailId), []);
+  assert.deepEqual(queue.blocked.map((item) => item.mailId), [contractMail.mailId]);
+  assert.equal(canAnalyzeMail(contractMail, decisions, true), true);
+});
+
 test("buildQueueState accepts classification level labels from settings", () => {
   const registeredMail: StoredMail = {
     ...mails[0],
@@ -91,6 +136,44 @@ test("buildQueueState accepts classification level labels from settings", () => 
   assert.deepEqual(queue.blocked.map((item) => item.mailId), ["mail-2"]);
 });
 
+test("buildQueueState routes display-name and email ignored sender matches to ignored pending", () => {
+  const senderMails: StoredMail[] = [
+    { ...mails[0], mailId: "manual-ignore", from: "Alice <alice@example.com>" },
+    { ...mails[0], mailId: "display-name-match", from: "System Notifications <no-reply@example.com>" },
+    { ...mails[0], mailId: "email-match", from: "Alerts <service@alerts.example.com>" }
+  ];
+  const cache = ensureClassifications(senderMails, normalizeClassificationCache({}));
+
+  const queue = buildQueueState(
+    senderMails,
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    ["manual-ignore"],
+    cache,
+    true,
+    2,
+    ["notifications", "ALERTS.EXAMPLE.COM"]
+  );
+
+  assert.deepEqual(queue.ignoredPending.map((item) => item.mailId).sort(), ["display-name-match", "email-match", "manual-ignore"]);
+  assert.deepEqual(queue.pending.map((item) => item.mailId), []);
+  assert.deepEqual(queue.allowed.map((item) => item.mailId), []);
+});
+
+test("buildQueueState keeps senders pending when ignored sender configuration is empty", () => {
+  const cache = ensureClassifications(mails, normalizeClassificationCache({}));
+  const queue = buildQueueState(
+    mails,
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    [],
+    cache,
+    true,
+    2,
+    []
+  );
+
+  assert.deepEqual(queue.pending.map((item) => item.mailId), ["mail-1", "mail-2"]);
+});
+
 test("classification keyword reasons include the matched keyword", () => {
   const cache = ensureClassifications(mails, normalizeClassificationCache({}));
   assert.equal(cache.items.find((item) => item.mailId === "mail-2")?.reason, "keyword match: high registered");
@@ -109,4 +192,32 @@ test("ensureClassifications refreshes old default keyword reasons", () => {
   }));
 
   assert.equal(cache.items.find((item) => item.mailId === "mail-2")?.reason, "keyword match: high registered");
+});
+
+test("custom classification keywords apply and empty arrays disable keyword levels", () => {
+  const atlasMail = { ...mails[0], mailId: "mail-atlas", subject: "Project Atlas" };
+  const custom = ensureClassifications([atlasMail], normalizeClassificationCache({}), buildClassificationKeywords({
+    classificationLevel3Keywords: ["atlas"],
+    classificationLevel2Keywords: []
+  }));
+  const disabled = ensureClassifications([atlasMail], normalizeClassificationCache({}), buildClassificationKeywords({
+    classificationLevel3Keywords: [],
+    classificationLevel2Keywords: []
+  }));
+
+  assert.equal(custom.items[0].level, 3);
+  assert.equal(disabled.items[0].level, 1);
+});
+
+test("classification keyword hash changes trigger a full cache recompute", () => {
+  const atlasMail = { ...mails[0], mailId: "mail-atlas", subject: "Project Atlas" };
+  const initial = ensureClassifications([atlasMail], normalizeClassificationCache({}));
+  const next = ensureClassifications([atlasMail], initial, buildClassificationKeywords({
+    classificationLevel3Keywords: ["atlas"],
+    classificationLevel2Keywords: []
+  }));
+
+  assert.notEqual(next.keywordsHash, initial.keywordsHash);
+  assert.equal(next.items[0].level, 3);
+  assert.equal(next.items[0].reason, "keyword match: atlas");
 });

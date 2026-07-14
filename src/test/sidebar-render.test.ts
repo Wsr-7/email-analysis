@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderSidebarHtml } from "../lib/sidebar-render";
+import fs from "node:fs";
+import path from "node:path";
+import { renderSidebarHtml as renderSidebarHtmlWithNonce } from "../lib/sidebar-render";
 import { normalizeClassificationCache } from "../lib/classification";
 import { normalizePromptConfig } from "../lib/prompt-config";
 import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/mail-store";
@@ -9,6 +11,7 @@ import { emptyMeetingStore, type StoredMeeting as StoredMeetingItem } from "../l
 import type { DashboardRenderInput } from "../lib/dashboard-render";
 import type { DashboardState } from "../lib/dashboard-state";
 import type { AnalysisItem } from "../lib/analysis-schema";
+import { buildDashboardState } from "../lib/dashboard-state";
 
 function stubMail(overrides?: Partial<StoredMail>): StoredMail {
   return {
@@ -57,6 +60,10 @@ function stubInput(overrides?: Partial<DashboardRenderInput>): DashboardRenderIn
   };
 }
 
+function renderSidebarHtml(input: DashboardRenderInput): string {
+  return renderSidebarHtmlWithNonce(input, "sidebar-test-nonce");
+}
+
 describe("renderSidebarHtml", () => {
   it("returns valid HTML document", () => {
     const html = renderSidebarHtml(stubInput());
@@ -73,7 +80,7 @@ describe("renderSidebarHtml", () => {
 
   it("renders action buttons", () => {
     const html = renderSidebarHtml(stubInput());
-    assert.ok(html.includes("post('pullMail')"));
+    assert.ok(html.includes('data-message-type="pullMail"'));
     assert.ok(html.includes("post('analyze', { batchSize: Number(sel) })"));
   });
 
@@ -99,6 +106,47 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('data-queue="pending"'));
     assert.ok(html.includes("Hello"));
     assert.ok(html.includes("bob@test.com"));
+  });
+
+  it("uses a nonce CSP and no inline event handlers", () => {
+    const first = renderSidebarHtmlWithNonce(stubInput(), "sidebar-nonce-1");
+    const second = renderSidebarHtmlWithNonce(stubInput(), "sidebar-nonce-2");
+    assert.match(first, /Content-Security-Policy/);
+    assert.match(first, /script-src 'nonce-sidebar-nonce-1'/);
+    assert.match(first, /<script nonce="sidebar-nonce-1">/);
+    assert.doesNotMatch(first, /\son[a-z]+=/i);
+    assert.notEqual(first, second);
+  });
+
+  it("groups pending mail by configured folder, including empty and legacy folders", () => {
+    const input = stubInput({
+      state: stubState({ folders: ["Inbox", "Sent Items", "Archive"] }),
+      queue: {
+        pending: [],
+        allowed: [
+          stubMail({ mailId: "inbox-1", folder: "Inbox", subject: "Inbox mail" }),
+          stubMail({ mailId: "sent-1", folder: "Sent Items", subject: "Sent mail" }),
+          stubMail({ mailId: "legacy-1", folder: "Legacy Folder", subject: "Legacy mail" })
+        ],
+        blocked: [], analysed: [], ignoredPending: []
+      }
+    });
+
+    const html = renderSidebarHtml(input);
+
+    assert.ok(html.includes('data-pending-folder="Inbox"'));
+    assert.ok(html.includes('>Inbox (1)</button>'));
+    assert.ok(html.includes('>Sent Items (1)</button>'));
+    assert.ok(html.includes('>Archive (0)</button>'));
+    assert.ok(html.includes('>Legacy Folder (1)</button>'));
+  });
+
+  it("uses a stronger shared style for collapsible group headers", () => {
+    const html = renderSidebarHtml(stubInput());
+
+    assert.ok(html.includes("color: var(--vscode-sideBarSectionHeader-foreground"));
+    assert.ok(html.includes("font-size: 11px; font-weight: 700"));
+    assert.ok(html.includes("letter-spacing: 0.02em"));
   });
 
   it("renders blocked items with reason", () => {
@@ -134,6 +182,11 @@ describe("renderSidebarHtml", () => {
     assert.ok(!html.includes("Confirm and Analyze"));
     assert.ok(!html.includes("post('analyzeSelected',{mailIds:['manual-1']})"));
     assert.ok(!html.includes("post('analyzeSelected',{mailIds:['block-1']})"));
+  });
+
+  it("shows immediate cancelling feedback while a task is still winding down", () => {
+    const html = renderSidebarHtml(stubInput({ isBusy: true, busyKind: "cancelling" }));
+    assert.ok(html.includes("Cancelling…"));
   });
 
   it("renders analyzed items in category queues", () => {
@@ -194,7 +247,7 @@ describe("renderSidebarHtml", () => {
 
   it("renders bottom bar with reports and settings", () => {
     const html = renderSidebarHtml(stubInput());
-    assert.ok(html.includes("post('generateReports')"));
+    assert.ok(html.includes('data-message-type="generateReports"'));
     assert.ok(html.includes("toggleSettings"));
     assert.ok(html.includes("confirmClear"));
   });
@@ -206,10 +259,68 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("openItem"));
   });
 
+  it("navigates only visible rows with ArrowUp and ArrowDown", () => {
+    const html = renderSidebarHtml(stubInput());
+    assert.ok(html.includes('id="itemList" tabindex="0"'));
+    assert.ok(html.includes("addEventListener('keydown'"));
+    assert.ok(html.includes("e.key !== 'ArrowDown' && e.key !== 'ArrowUp'"));
+    assert.ok(html.includes("!row.hidden && row.offsetParent !== null"));
+    assert.ok(html.includes("scrollIntoView({ block: 'nearest' })"));
+    assert.ok(html.includes("openItem(id, activeId)"));
+  });
+
+  it("keeps sidebar focus when opening or revealing the workbench", () => {
+    const extensionSource = fs.readFileSync(path.join(process.cwd(), "src", "extension.ts"), "utf8");
+
+    assert.match(extensionSource, /workbenchPanel\.reveal\(vscode\.ViewColumn\.One, true\)/);
+    assert.match(extensionSource, /createWebviewPanel\([\s\S]*?"easyMail\.workbench",[\s\S]*?\{ viewColumn: vscode\.ViewColumn\.One, preserveFocus: Boolean\(focusId\) \}/);
+  });
+
   it("renders settings panel hidden by default", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes('id="settingsPanel"'));
     assert.ok(html.includes("hidden"));
+  });
+
+  it("keeps sidebar settings to range and model controls without a no-op refresh", () => {
+    const html = renderSidebarHtml(stubInput());
+
+    assert.ok(html.includes(".sb-settings-grid { display: grid; grid-template-columns: 1fr;"));
+    assert.ok(html.includes('id="rangeMode"'));
+    assert.ok(html.includes('id="rangeValue"'));
+    assert.ok(html.includes('id="modelFamily"'));
+    assert.ok(!html.includes('id="autoAnalyzeMaxClassificationLevel"'));
+    assert.ok(!html.includes("post('openPromptConfig')"));
+    assert.ok(!html.includes("post('refresh')"));
+    assert.ok(html.includes('data-message-type="openSettings"'));
+  });
+
+  it("registers the sidebar-selected model as a free-text fallback setting", () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+    const properties = manifest.contributes.configuration.properties;
+
+    assert.equal(properties["easyMail.modelFamily"].type, "string");
+    assert.equal(properties["easyMail.modelFamily"].enum, undefined);
+    assert.equal(properties["easyMail.modelFamily"].enumItemLabels, undefined);
+    assert.match(properties["easyMail.modelFamily"].description, /Load Copilot Models.*dashboard.*Settings.*fallback/i);
+    assert.equal(properties["easyMail.folders"].order, 4);
+    assert.equal(properties["easyMail.importantSenders"].order, 4.1);
+    assert.equal(properties["easyMail.ignoredSenders"].order, 4.2);
+    assert.ok(properties["easyMail.collectorTimeoutSeconds"].order < properties["easyMail.modelFamily"].order);
+    assert.ok(properties["easyMail.modelFamily"].order < properties["easyMail.outputLanguage"].order);
+    assert.ok(properties["easyMail.outputLanguage"].order < properties["easyMail.autoAnalyzeMaxClassificationLevel"].order);
+    assert.ok(properties["easyMail.autoAnalyzeMaxClassificationLevel"].order < properties["easyMail.mailStoreRetentionDays"].order);
+    assert.ok(!manifest.contributes.commands.some((command: { command: string }) => command.command === "easyMail.refreshDashboard"));
+  });
+
+  it("keeps configuration enum labels aligned and uses Auto consistently", () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+    const properties = manifest.contributes.configuration.properties as Record<string, { enum?: unknown[]; enumItemLabels?: string[] }>;
+
+    for (const property of Object.values(properties)) {
+      if (property.enumItemLabels) assert.equal(property.enumItemLabels.length, property.enum?.length);
+    }
+    assert.deepEqual(properties["easyMail.draftGeneration"].enumItemLabels, ["Auto", "On demand"]);
   });
 
   it("renders language globe icon with dropdown", () => {
@@ -225,11 +336,11 @@ describe("renderSidebarHtml", () => {
   it("marks active language in dropdown", () => {
     const inputEn = stubInput({ state: stubState({ outputLanguage: "en-US" }) });
     const htmlEn = renderSidebarHtml(inputEn);
-    assert.ok(htmlEn.includes('setLanguage(\'en-US\')'));
+    assert.ok(htmlEn.includes('class="sb-lang-option active" data-action="setLanguage" data-language="en-US"'));
 
     const inputZh = stubInput({ state: stubState({ outputLanguage: "zh-CN" }) });
     const htmlZh = renderSidebarHtml(inputZh);
-    assert.ok(htmlZh.includes('setLanguage(\'zh-CN\')'));
+    assert.ok(htmlZh.includes('class="sb-lang-option active" data-action="setLanguage" data-language="zh-CN"'));
   });
 
   it("renders empty state element", () => {
@@ -247,10 +358,50 @@ describe("renderSidebarHtml", () => {
     assert.ok(!html.includes('id="folders"'));
   });
 
+  it("flushes live sidebar settings before top configuration-dependent actions", () => {
+    const html = renderSidebarHtml(stubInput());
+
+    assert.match(html, /data-message-type="pullMail"[^>]*data-save-config-before-action="true"/);
+    assert.match(html, /data-action="runAnalyze"[^>]*data-save-config-before-action="true"/);
+    assert.match(html, /data-message-type="loadMore"[^>]*data-save-config-before-action="true"/);
+    assert.ok(html.includes("if (target.getAttribute('data-save-config-before-action') === 'true') saveConfig(true, true);"));
+    assert.ok(html.indexOf("saveConfig(true, true)") < html.indexOf("if (action === 'post')"));
+  });
+
+  it("opens the first visible item when the user selects a non-empty queue", () => {
+    const html = renderSidebarHtml(stubInput());
+
+    assert.ok(html.includes("showQueue(target.getAttribute('data-queue-id') || '', true)"));
+    assert.ok(html.includes("function focusFirstQueueItem()"));
+    assert.ok(html.includes("!row.hidden && row.offsetParent !== null"));
+    assert.ok(html.includes("openItem(rowItemId(first), first.getAttribute('data-next-action-id') || '')"));
+    assert.ok(html.includes("first.scrollIntoView({ block: 'nearest' })"));
+  });
+
   it("can highlight the selected sidebar row from extension messages", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes("setActiveRow(msg.id)"));
     assert.ok(html.includes(".sb-row.active"));
+  });
+
+  it("uses the unique next-action id to select actions from the same thread", () => {
+    const input = stubInput({
+      nextActionsStore: {
+        items: [
+          { id: "thread:t1:review", sourceType: "thread", sourceId: "t1", sourceMailId: "m1", sourceTime: "", owner: "", task: "Review", deadline: "", status: "open", createdAt: "", updatedAt: "" },
+          { id: "thread:t1:reply", sourceType: "thread", sourceId: "t1", sourceMailId: "m2", sourceTime: "", owner: "", task: "Reply", deadline: "", status: "open", createdAt: "", updatedAt: "" }
+        ]
+      }
+    });
+
+    const html = renderSidebarHtml(input);
+
+    assert.ok(html.includes('data-next-action-id="thread:t1:review"'));
+    assert.ok(html.includes('data-next-action-id="thread:t1:reply"'));
+    assert.ok(html.includes("openItem(id, target.getAttribute('data-next-action-id') || '')"));
+    assert.ok(html.includes("row.getAttribute('data-thread-id')"));
+    assert.ok(html.includes("var preservedNextActionId = ''"));
+    assert.ok(html.includes("? rowNextActionId === selectionId"));
   });
 
   it("renders compact rows for ignored items without action buttons", () => {
@@ -264,6 +415,23 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('data-queue="ignored"'));
     assert.ok(html.includes("Old mail"));
     assert.ok(!html.includes('data-action="unignore"'), "compact sidebar should not have action buttons");
+  });
+
+  it("shows model-ignored analysis in the ignored queue and count", () => {
+    const state = buildDashboardState(
+      {},
+      { metadata: { generatedAt: "", rangeMode: "", recentHours: 24, maxItems: 50, folders: ["Inbox"] }, items: [] },
+      {
+        generatedAt: "2026-07-13T10:00:00+08:00",
+        overview: { totalMails: 1, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 },
+        items: [stubAnalysisItem({ mailId: "model-ignored", category: "ignored", subject: "Model ignored mail" })]
+      },
+      []
+    );
+
+    const html = renderSidebarHtml(stubInput({ state }));
+    assert.match(html, /data-queue-id="ignored"[\s\S]*?<span class="sb-queue-count">1<\/span>/);
+    assert.ok(html.includes('data-queue="ignored" data-mail-id="model-ignored"'));
   });
 
   it("can focus the ignored queue from extension messages", () => {
@@ -334,6 +502,18 @@ describe("renderSidebarHtml", () => {
     assert.ok(pendingIdx < mustHandleIdx, "pending should come before mustHandleToday");
   });
 
+  it("places important senders after must-handle and ignored after uncertain", () => {
+    const html = renderSidebarHtml(stubInput());
+    const mustHandleIdx = html.indexOf('data-queue-id="mustHandleToday"');
+    const importantIdx = html.indexOf('data-queue-id="importantSender"');
+    const riskIdx = html.indexOf('data-queue-id="risk"');
+    const uncertainIdx = html.indexOf('data-queue-id="uncertain"');
+    const ignoredIdx = html.indexOf('data-queue-id="ignored"');
+
+    assert.ok(mustHandleIdx < importantIdx && importantIdx < riskIdx);
+    assert.ok(uncertainIdx < ignoredIdx);
+  });
+
   it("renders compact meeting rows in meetings queue", () => {
     const mtg: StoredMeetingItem = {
       meetingId: "mtg-1", entryId: "e-mtg-1", subject: "Standup", organizer: "Alice",
@@ -349,6 +529,33 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("Standup"));
     assert.ok(html.includes("sb-mtg-warn"), "should show status badge");
     assert.ok(!html.includes("sb-detail"), "compact row should not have detail section");
+    assert.ok(html.includes("Meeting Invites"));
+  });
+
+  it("renders unanswered invitations directly and future accepted schedules in a collapsed group", () => {
+    const meeting = (entryId: string, start: string, responseStatus: StoredMeetingItem["responseStatus"]): StoredMeetingItem => ({
+      meetingId: entryId, entryId, subject: entryId, organizer: "Alice", start, end: start,
+      location: "", isAllDay: false, isRecurring: false, requiredAttendees: "", optionalAttendees: "",
+      responseStatus, meetingSource: "calendar", importance: "Normal", bodyExcerpt: "", pulledAt: "2026-07-01"
+    });
+    const html = renderSidebarHtml(stubInput({ meetingStore: {
+      generatedAt: "", lastPullAt: "", items: [
+        meeting("accepted-old", "2099-07-01 09:00", "accepted"),
+        meeting("unanswered", "2026-07-02 09:00", "notResponded"),
+        meeting("accepted-new", "2099-07-03 09:00", "accepted"),
+        meeting("declined", "2099-07-04 09:00", "declined")
+      ]
+    } }));
+
+    assert.ok(html.indexOf('data-meeting-id="unanswered"') < html.indexOf('data-meeting-id="accepted-new"'));
+    assert.ok(html.indexOf('data-meeting-id="accepted-new"') < html.indexOf('data-meeting-id="accepted-old"'));
+    assert.match(html, /data-queue-id="meetings"[\s\S]*?<span class="sb-queue-count">1<\/span>/);
+    assert.ok(html.includes('class="sb-meeting-schedule"'));
+    assert.ok(html.includes('aria-expanded="false"'));
+    assert.ok(html.includes("Accepted schedule (2)"));
+    assert.ok(html.includes('class="sb-meeting-schedule-items" hidden'));
+    assert.ok(!html.includes('data-meeting-id="declined"'));
+    assert.ok(html.includes("acceptedScheduleOpen"));
   });
 
   it("shows meetings queue in nav even when empty", () => {
@@ -356,27 +563,42 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('data-queue-id="meetings"'));
   });
 
-  it("renders two-line rows with tooltip on subject", () => {
+  it("renders only the sender display name and keeps the full address in a tooltip", () => {
     const input = stubInput({
-      queue: { pending: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "alice@test.com", receivedTime: "2024-01-01 14:30" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "alice@test.com", receivedTime: "2024-01-01 14:30" })], ignoredPending: [] }
+      queue: { pending: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "Alice <alice@test.com>", receivedTime: "2024-01-01 14:30:45" })], blocked: [], analysed: [], allowed: [stubMail({ mailId: "m1", subject: "Long subject line for testing", from: "Alice <alice@test.com>", receivedTime: "2024-01-01 14:30:45" })], ignoredPending: [] }
     });
     const html = renderSidebarHtml(input);
     assert.ok(html.includes('title="Long subject line for testing"'), "subject should have tooltip");
     assert.ok(html.includes("sb-line2"), "should have second line");
-    assert.ok(html.includes("alice@test.com"), "second line should show sender");
-    assert.ok(html.includes("14:30"), "second line should show time");
+    assert.ok(html.includes('title="Alice &lt;alice@test.com&gt; · 2024-01-01 14:30:45"'), "tooltip should retain the full address and time");
+    assert.ok(html.includes("Alice ·"), "second line should show the sender name only");
+    assert.ok(html.includes("2024-01-01 14:30:45"), "second line should show the full time");
+  });
+
+  it("shows an attachment icon with count and file names on mail rows", () => {
+    const pending = stubMail({ mailId: "m1", attachmentCount: 2, attachmentNames: ["contract.pdf", "budget.xlsx"] });
+    const analyzed = stubMail({ mailId: "a1", attachmentCount: 1, attachmentNames: ["notes.txt"] });
+    const html = renderSidebarHtml(stubInput({
+      queue: { pending: [pending], blocked: [], analysed: [], allowed: [pending], ignoredPending: [] },
+      state: stubState({}, [{ id: "mustHandleToday", items: [stubAnalysisItem({ mailId: "a1" })] }]),
+      store: { generatedAt: "", lastPullAt: "", items: [pending, analyzed] }
+    }));
+
+    assert.ok(html.includes('title="2: contract.pdf; budget.xlsx"'));
+    assert.ok(html.includes('title="1: notes.txt"'));
+    assert.equal((html.match(/>📎<\/span>/g) || []).length, 2);
   });
 
   it("renders analysis rows with sender and priority on second line", () => {
     const input = stubInput({
       state: stubState({}, [
-        { id: "mustHandleToday", items: [stubAnalysisItem({ subject: "Urgent", sender: "ceo@test.com", receivedTime: "2024-01-01 09:15" })] }
+        { id: "mustHandleToday", items: [stubAnalysisItem({ subject: "Urgent", sender: "ceo@test.com", receivedTime: "2024-01-01 09:15:30" })] }
       ])
     });
     const html = renderSidebarHtml(input);
     assert.ok(html.includes("sb-line2"), "should have second line");
     assert.ok(html.includes("ceo@test.com"), "second line should show sender");
-    assert.ok(html.includes("09:15"), "second line should show time");
+    assert.ok(html.includes("2024-01-01 09:15:30"), "second line should show the full time");
     assert.ok(html.includes("sb-badge"), "second line should show priority badge");
   });
 
@@ -390,5 +612,32 @@ describe("renderSidebarHtml", () => {
     const html = renderSidebarHtml(input);
     assert.ok(html.includes("sb-cls-badge"), "analyzed row should show classification badge");
     assert.ok(html.includes("INTERNAL"), "badge should show classification level name");
+  });
+
+  it("renders due-date badges and marks overdue or today as urgent", () => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const html = renderSidebarHtml(stubInput({
+      state: stubState({}, [{ id: "mustHandleToday", items: [
+        stubAnalysisItem({ mailId: "past", dueDate: "2000-01-01" }),
+        stubAnalysisItem({ mailId: "today", dueDate: today }),
+        stubAnalysisItem({ mailId: "future", dueDate: "2099-01-01" })
+      ] }])
+    }));
+
+    assert.equal((html.match(/sb-due-badge sb-due-urgent/g) || []).length, 2);
+    assert.match(html, /sb-due-badge">2099-01-01<\/span>/);
+  });
+
+  it("uses the renamed important senders label in both locales", () => {
+    const categories = [{ id: "importantSender", items: [stubAnalysisItem()] }];
+    const oldPromptLabel = normalizePromptConfig({
+      categories: [{ id: "importantSender", labelZh: "重点发件人/邮件组", labelEn: "Important Sender or Group", description: "" }]
+    });
+    const htmlEn = renderSidebarHtml(stubInput({ state: stubState({ outputLanguage: "en-US" }, categories), promptConfig: oldPromptLabel }));
+    const htmlZh = renderSidebarHtml(stubInput({ state: stubState({ outputLanguage: "zh-CN" }, categories), promptConfig: oldPromptLabel }));
+
+    assert.ok(htmlEn.includes("Important Senders"));
+    assert.ok(htmlZh.includes("重点发件人"));
   });
 });

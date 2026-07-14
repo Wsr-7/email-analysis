@@ -33,6 +33,18 @@ describe("getLabels", () => {
   it("returns en-US labels", () => {
     assert.equal(getLabels("en-US").toolbar.pullMail, "Fetch New");
   });
+
+  it("labels the meetings queue as invitations with an accepted schedule subgroup", () => {
+    assert.equal(getLabels("zh-CN").meetings.title, "会议邀请");
+    assert.equal(getLabels("zh-CN").meetings.acceptedSchedule, "已接受的日程");
+    assert.equal(getLabels("en-US").meetings.title, "Meeting Invites");
+    assert.equal(getLabels("en-US").meetings.acceptedSchedule, "Accepted schedule");
+  });
+
+  it("uses explicit mark-done action labels", () => {
+    assert.equal(getLabels("zh-CN").nextActions.markDone, "标记已完成");
+    assert.equal(getLabels("en-US").nextActions.markDone, "Mark Done");
+  });
 });
 
 describe("buildCategoryLabels", () => {

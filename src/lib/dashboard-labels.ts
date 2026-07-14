@@ -36,12 +36,12 @@ export type DashboardLabels = {
   meta: Record<"range" | "folders" | "generated" | "requestedModel" | "lastUsedModel" | "lastPull" | "lastImport", string>;
   stats: Record<"pulled" | "pending" | "analysed" | "blocked" | "mustHandle" | "risk" | "waiting" | "notice" | "threads", string>;
   categories: Record<string, string>;
-  card: Record<"from" | "to" | "cc" | "body" | "received" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "openInOutlook" | "noItems" | "thread", string>;
+  card: Record<"from" | "to" | "cc" | "body" | "received" | "due" | "summary" | "reason" | "suggestedAction" | "copyDraft" | "draftHint" | "generateDraft" | "polish" | "refine" | "instructionPlaceholder" | "outlookActions" | "openReply" | "openReplyAll" | "openForward" | "ignore" | "restore" | "analyze" | "reanalyze" | "openInOutlook" | "noItems" | "thread", string>;
   pending: Record<"title" | "blockedTitle" | "classification" | "autoAllowed" | "manualRequired" | "gateBlocked" | "securityReason" | "select" | "confirmAnalyze", string>;
-  threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "attachments" | "mailIds", string>;
-  meetings: Record<"title" | "organizer" | "time" | "location" | "attendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
+  threads: Record<"title" | "participants" | "messages" | "lastTime" | "folders" | "contentStatus" | "security" | "analysis" | "analyzeThread" | "spotlight" | "currentStatus" | "keyDecisions" | "openQuestions" | "actionItems" | "waitingOn" | "risks" | "needMyReply" | "suggestedAction" | "partialContext" | "yes" | "no" | "draftReply" | "timeline" | "contentTruncated" | "attachments" | "mailIds", string>;
+  meetings: Record<"title" | "acceptedSchedule" | "organizer" | "time" | "location" | "attendees" | "requiredAttendees" | "optionalAttendees" | "status" | "allDay" | "recurring" | "openInOutlook" | "notResponded" | "accepted" | "tentative" | "declined" | "organizer_status", string>;
   nextActions: Record<"title" | "owner" | "task" | "deadline" | "source" | "markDone" | "markIgnored" | "reopen" | "noActions", string>;
-  progress: Record<"pullMail" | "loadMore" | "sampleDigest" | "analyze" | "reports" | "loadModels" | "translate", string> & { detail: string };
+  progress: Record<"pullMail" | "loadMore" | "sampleDigest" | "analyze" | "reports" | "loadModels" | "translate" | "cancelling", string> & { detail: string };
   model: Record<"fallback" | "preferred", string>;
 };
 
@@ -117,6 +117,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       threads: "邮件线程"
     },
     categories: {
+      importantSender: "重点发件人",
       mustHandleToday: "今天必须处理",
       risk: "风险邮件",
       waitingForMe: "等待我回复",
@@ -131,6 +132,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       cc: "抄送",
       body: "原文",
       received: "收到时间",
+      due: "期限",
       summary: "摘要",
       reason: "判断原因",
       suggestedAction: "建议动作",
@@ -146,6 +148,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       openForward: "Outlook 转发",
       ignore: "忽略",
       restore: "恢复",
+      analyze: "分析",
+      reanalyze: "重新分析",
       openInOutlook: "在 Outlook 打开",
       noItems: "暂无邮件",
       thread: "线程"
@@ -185,15 +189,19 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       no: "否",
       draftReply: "回复草稿",
       timeline: "时间线",
+      contentTruncated: "内容已截断",
       attachments: "附件",
       mailIds: "邮件 ID"
     },
     meetings: {
-      title: "会议",
+      title: "会议邀请",
+      acceptedSchedule: "已接受的日程",
       organizer: "组织者",
       time: "时间",
       location: "地点",
       attendees: "参会人",
+      requiredAttendees: "必选参会人",
+      optionalAttendees: "可选参会人",
       status: "出席状态",
       allDay: "全天",
       recurring: "周期性",
@@ -210,7 +218,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       task: "任务",
       deadline: "截止日期",
       source: "来源",
-      markDone: "完成",
+      markDone: "标记已完成",
       markIgnored: "忽略",
       reopen: "重新打开",
       noActions: "暂无待办",
@@ -223,6 +231,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       reports: "正在生成报告",
       loadModels: "正在加载 Copilot 模型",
       translate: "正在翻译已有分析",
+      cancelling: "正在取消…",
       detail: "任务进行中，请稍候..."
     },
     model: {
@@ -301,6 +310,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       threads: "Threads"
     },
     categories: {
+      importantSender: "Important Senders",
       mustHandleToday: "Must Handle Today",
       risk: "Risk",
       waitingForMe: "Waiting For Me",
@@ -315,6 +325,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       cc: "Cc",
       body: "Body",
       received: "Received",
+      due: "Due",
       summary: "Summary",
       reason: "Reason",
       suggestedAction: "Suggested Action",
@@ -330,6 +341,8 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       openForward: "Open Forward",
       ignore: "Ignore",
       restore: "Restore",
+      analyze: "Analyze",
+      reanalyze: "Re-analyze",
       openInOutlook: "Open in Outlook",
       noItems: "No items",
       thread: "Thread"
@@ -369,15 +382,19 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       no: "No",
       draftReply: "Draft Reply",
       timeline: "Timeline",
+      contentTruncated: "Content truncated",
       attachments: "Attachments",
       mailIds: "Mail IDs"
     },
     meetings: {
-      title: "Meetings",
+      title: "Meeting Invites",
+      acceptedSchedule: "Accepted schedule",
       organizer: "Organizer",
       time: "Time",
       location: "Location",
       attendees: "Attendees",
+      requiredAttendees: "Required attendees",
+      optionalAttendees: "Optional attendees",
       status: "Status",
       allDay: "All Day",
       recurring: "Recurring",
@@ -394,7 +411,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       task: "Task",
       deadline: "Deadline",
       source: "Source",
-      markDone: "Done",
+      markDone: "Mark Done",
       markIgnored: "Ignore",
       reopen: "Reopen",
       noActions: "No actions",
@@ -407,6 +424,7 @@ export const LABELS: Record<Locale, DashboardLabels> = {
       reports: "Generating reports",
       loadModels: "Loading Copilot models",
       translate: "Translating existing analysis",
+      cancelling: "Cancelling…",
       detail: "Task is running. Please wait..."
     },
     model: {

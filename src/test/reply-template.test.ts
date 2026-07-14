@@ -68,3 +68,26 @@ test("applyReplyTemplateToAnalysis updates only items with draft parts", () => {
   assert.match(result.items[0].draftReply, /Hi Alice,/);
   assert.equal(result.items[1].draftReply, "");
 });
+
+test("applyReplyTemplateToAnalysis keeps an empty on-demand draft empty", () => {
+  const analysis: AnalysisResult = {
+    generatedAt: "2026-06-18T00:00:00.000Z",
+    overview: { totalMails: 1, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 1 },
+    items: [{
+      mailId: "mail-1",
+      category: "notice",
+      priority: "P3",
+      subject: "Notice",
+      sender: "System",
+      receivedTime: "2026-06-18 10:00:00",
+      summary: "",
+      reason: "",
+      suggestedAction: "",
+      draftReply: "",
+      confidence: 0.9,
+      needsOriginalMailCheck: false
+    }]
+  };
+
+  assert.equal(applyReplyTemplateToAnalysis(analysis, defaultReplyTemplate()).items[0].draftReply, "");
+});

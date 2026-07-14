@@ -40,7 +40,6 @@ Pull Mail -> 生成 digest -> Analyze -> 生成 JSON / Summary -> Dashboard 展�
 - 提供命令：
   - `Easy Mail: Pull Mail`
   - `Easy Mail: Analyze with Copilot`
-  - `Easy Mail: Refresh Dashboard`
   - `Easy Mail: Open Digest`
   - `Easy Mail: Open Summary`
   - `Easy Mail: Open Settings`

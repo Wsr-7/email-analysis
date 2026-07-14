@@ -27,6 +27,7 @@ Required item fields:
 - needsOriginalMailCheck (boolean)
 
 Optional item fields:
+- dueDate (YYYY-MM-DD or empty string; use a non-empty value only when the mail explicitly states a deadline, otherwise leave it empty)
 - source (mailId, internetMessageId, entryId, folder)
 - evidence (array of {sourceMailId, quote, reason} — short excerpts that directly support the classification)
 - draftReplyParts (GREETING, MAIN_MESSAGE, REQUESTED_ACTION, CLOSING)

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, normalizeMailStore, pruneMailIndex, pruneMailStore, stableMailId } from "../lib/mail-store";
+import { buildBatchDigestMarkdown, emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, normalizeMailStore, pruneMailIndex, pruneMailStore, stableMailId } from "../lib/mail-store";
 
 test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () => {
   const digest = {
@@ -50,6 +50,20 @@ test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () 
   assert.equal(second.store.items[0].cc, "Legal <legal@example.com>");
   assert.equal(second.store.items[0].attachmentCount, 2);
   assert.deepEqual(second.store.items[0].attachmentNames, ["contract.pdf", "budget.xlsx"]);
+});
+
+test("buildBatchDigestMarkdown includes attachment metadata without empty name fields", () => {
+  const store = normalizeMailStore({
+    items: [
+      { mailId: "with-attachments", subject: "Files", attachmentCount: 2, attachmentNames: ["contract.pdf", "budget.xlsx"] },
+      { mailId: "without-attachments", subject: "No files", attachmentCount: 0, attachmentNames: [] }
+    ]
+  });
+
+  const markdown = buildBatchDigestMarkdown(store.items);
+  assert.match(markdown, /## Mail: with-attachments[\s\S]*AttachmentCount: 2[\s\S]*AttachmentNames: contract\.pdf; budget\.xlsx/);
+  assert.match(markdown, /## Mail: without-attachments[\s\S]*AttachmentCount: 0/);
+  assert.doesNotMatch(markdown, /AttachmentNames:\s*(?:\r?\n|$)/);
 });
 
 test("mergeDigestIntoStore skips mail with impossible Outlook dates", () => {

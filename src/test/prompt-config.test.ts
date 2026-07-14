@@ -47,6 +47,27 @@ test("composeAnalysisPrompt injects one language contract for analysis and draft
   assert.doesNotMatch(prompt, /Draft replies must stay in English/);
 });
 
+test("composeAnalysisPrompt omits draft generation instructions in onDemand mode", () => {
+  const input = {
+    basePrompt: "Base",
+    outputSchemaPrompt: "Schema",
+    replyDraftPrompt: "Fill draftReplyParts.",
+    replyTemplate: "{{GREETING}}",
+    digestText: "Digest",
+    outputLanguage: "en-US",
+    draftLanguage: "auto" as const,
+    promptConfig: normalizePromptConfig({ replyDraftInstruction: "Write a reply." })
+  };
+
+  const onDemand = composeAnalysisPrompt({ ...input, draftGeneration: "onDemand" });
+  const automatic = composeAnalysisPrompt({ ...input, draftGeneration: "auto" });
+
+  assert.match(onDemand, /Set every draftReply to an empty string and omit draftReplyParts/);
+  assert.doesNotMatch(onDemand, /Fill draftReplyParts|Write a reply|{{GREETING}}/);
+  assert.doesNotMatch(automatic, /Set every draftReply to an empty string/);
+  assert.match(automatic, /Fill draftReplyParts|Write a reply|{{GREETING}}/);
+});
+
 test("composeAnalysisPrompt injects today's date in the local timezone", () => {
   const config = normalizePromptConfig({});
   const prompt = composeAnalysisPrompt({

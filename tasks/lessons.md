@@ -3,3 +3,4 @@
 - Do not `await vscode.window.showInformationMessage` inside a `runWithBusy` task body; it keeps the progress task open until the user dismisses the notification and leaves the Dashboard busy state stuck.
 - Do not embed dynamic JSON/string values inside double-quoted inline `onclick` attributes; use `data-*` attributes plus event delegation so mail ids, thread ids, and draft text cannot break button handlers.
 - Packaging preference: only build the normal release VSIX (`npm run package:vsix`). Do not build the dev VSIX unless the user explicitly asks for it.
+- Settings/action race fixes must trace the entire event path: waiting for an extension-side settings write is insufficient when the webview has not emitted `saveConfig`; config-dependent buttons should flush the live form first.
