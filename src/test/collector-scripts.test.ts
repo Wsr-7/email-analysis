@@ -50,3 +50,11 @@ test("attachment metadata excludes hidden inline attachments and preserves read 
   assert.match(count[0], /visibleCount = visibleCount \+ 1[\s\S]*IsVisibleAttachment\(attachment\)/);
   assert.match(names[0], /IsVisibleAttachment\(attachment\)/);
 });
+
+test("compose does not activate a newly displayed Outlook inspector", () => {
+  const source = fs.readFileSync(path.join(process.cwd(), "scripts", "compose-outlook-mail.vbs"), "utf8");
+  const compose = source.match(/Sub ComposeOutlookMail[\s\S]*?End Sub/);
+
+  assert.ok(compose);
+  assert.doesNotMatch(compose[0], /ActivateOutlookItem compose/);
+});

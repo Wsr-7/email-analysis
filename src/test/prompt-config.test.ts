@@ -28,6 +28,23 @@ test("composeAnalysisPrompt includes custom categories and language instruction"
   assert.match(prompt, /Simplified Chinese/);
 });
 
+test("composeAnalysisPrompt requires one result and template parts for every input mail", () => {
+  const prompt = composeAnalysisPrompt({
+    basePrompt: "Base",
+    outputSchemaPrompt: "Schema",
+    replyDraftPrompt: "Reply rules",
+    replyTemplate: "{{GREETING}}\n{{MAIN_MESSAGE}}\n{{REQUESTED_ACTION}}\n{{CLOSING}}",
+    digestText: "## Mail: mail-1",
+    outputLanguage: "en-US",
+    draftLanguage: "auto",
+    promptConfig: normalizePromptConfig({})
+  });
+
+  assert.match(prompt, /exactly one result for every input mail/i);
+  assert.match(prompt, /draftReplyParts/i);
+  assert.match(prompt, /do not return a populated draftReply/i);
+});
+
 test("composeAnalysisPrompt injects one language contract for analysis and draft fields", () => {
   const prompt = composeAnalysisPrompt({
     basePrompt: "Base",

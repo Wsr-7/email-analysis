@@ -14,12 +14,23 @@ test("renderEasyMailGuideHtml renders guide content and command buttons", () => 
     }
   }, "guide-test-nonce");
 
-  assert.match(html, /从第一封邮件开始，建立自己的处理节奏/);
+  assert.match(html, /EasyMail 使用指南/);
   assert.match(html, /data-action="openDashboard"/);
   assert.match(html, /data-action="loadModels"/);
   assert.match(html, /guideAction/);
   assert.match(html, />4<\/strong>/);
   assert.match(html, /重点和忽略发件人、关键词安全规则与保留期都在 Settings 中配置/);
+});
+
+test("renderEasyMailGuideHtml keeps the normal title and status above first use", () => {
+  const html = renderEasyMailGuideHtml({
+    locale: "zh-CN",
+    version: "0.4.0",
+    stats: { pulled: 1, pending: 2, analysed: 3, threads: 4 }
+  }, "guide-test-nonce");
+
+  assert.match(html, /EasyMail 使用指南/);
+  assert.ok(html.indexOf('id="impact"') < html.indexOf('id="first-use"'));
 });
 
 test("renderEasyMailGuideHtml presents a first-use path and restores completed steps", () => {

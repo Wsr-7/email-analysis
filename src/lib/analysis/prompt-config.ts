@@ -137,6 +137,7 @@ export function composeAnalysisPrompt(input: {
       draftAutoDescription: "the source mail language",
       analysisFields: "all natural-language analysis fields, including summary, reason, suggestedAction, and evidence.reason"
     }),
+    "Return exactly one result for every input mail. Preserve each mailId exactly; never omit a mail. If uncertain, return an uncertain item.",
     "Allowed categories:",
     renderCategories(input.promptConfig.categories),
     "Important sender/group rules:",
@@ -146,6 +147,7 @@ export function composeAnalysisPrompt(input: {
       ? input.promptConfig.replyDraftInstruction
       : "Set every draftReply to an empty string and omit draftReplyParts for every item. Drafts will be generated on demand.",
     generateDrafts ? input.replyDraftPrompt?.trim() : "",
+    generateDrafts ? "When a reply is needed, return all draftReplyParts and leave draftReply empty. Do not return a populated draftReply; EasyMail renders the final draft locally." : "",
     generateDrafts && input.replyTemplate ? `Reply draft template:\n${input.replyTemplate.trim()}` : "",
     input.outputSchemaPrompt.trim(),
     [

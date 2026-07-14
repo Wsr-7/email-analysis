@@ -172,10 +172,10 @@ export function renderEasyMailGuideHtml(options: EasyMailGuideOptions, nonce: st
   <div class="layout">
     <nav>
       <h2>EasyMail</h2>
-      <h3>${escapeHtml(labels.firstUseTitle)}</h3>
-      <a href="#first-use">${escapeHtml(labels.firstUseTitle)}</a>
       <h3>${escapeHtml(labels.statsTitle)}</h3>
       <a href="#impact">${escapeHtml(labels.statsTitle)}</a>
+      <h3>${escapeHtml(labels.firstUseTitle)}</h3>
+      <a href="#first-use">${escapeHtml(labels.firstUseTitle)}</a>
       <h3>${escapeHtml(labels.referenceTitle)}</h3>
       ${labels.sections.map((section) => `<a href="#${escapeAttr(section.id)}">${escapeHtml(section.title)}</a>`).join("")}
     </nav>
@@ -184,6 +184,9 @@ export function renderEasyMailGuideHtml(options: EasyMailGuideOptions, nonce: st
         <div class="eyebrow">EasyMail ${escapeHtml(options.version)}</div>
         <h1>${escapeHtml(labels.title)}</h1>
         <p>${escapeHtml(labels.subtitle)}</p>
+      </div>
+      <div id="impact" class="stats">
+        ${labels.cards.map((card) => `<div class="stat"><strong>${escapeHtml(card.value)}</strong><span>${escapeHtml(card.label)}</span><small>${escapeHtml(card.hint)}</small></div>`).join("")}
       </div>
       <section id="first-use" class="onboarding">
         <h2>${escapeHtml(labels.firstUseTitle)}</h2>
@@ -204,9 +207,6 @@ export function renderEasyMailGuideHtml(options: EasyMailGuideOptions, nonce: st
           }).join("")}
         </div>
       </section>
-      <div id="impact" class="stats">
-        ${labels.cards.map((card) => `<div class="stat"><strong>${escapeHtml(card.value)}</strong><span>${escapeHtml(card.label)}</span><small>${escapeHtml(card.hint)}</small></div>`).join("")}
-      </div>
       <section id="actions">
         <h2>${escapeHtml(options.locale === "zh-CN" ? "其他常用动作" : "Other Common Actions")}</h2>
         <div class="actions">
@@ -238,7 +238,7 @@ export function renderEasyMailGuideHtml(options: EasyMailGuideOptions, nonce: st
 function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
   if (options.locale === "zh-CN") {
     return {
-      title: "从第一封邮件开始，建立自己的处理节奏",
+      title: "EasyMail 使用指南",
       subtitle: "EasyMail 在本地读取 classic Outlook 邮件，再用 Copilot 协助分类、摘要、回复草稿和线程分析。它保持只读：不会自动发送、删除、移动、归档或标记邮件。",
       statsTitle: "当前状态",
       firstUseTitle: "首次使用",
@@ -276,7 +276,7 @@ function buildGuideLabels(options: EasyMailGuideOptions): GuideLabels {
   }
 
   return {
-    title: "Start with one message. Build your own rhythm.",
+    title: "EasyMail User Guide",
     subtitle: "EasyMail collects classic Outlook mail locally, then uses Copilot for triage, summaries, draft replies, and thread analysis. It stays read-only: it never sends, deletes, moves, archives, or marks Outlook messages.",
     statsTitle: "Current Status",
     firstUseTitle: "Getting Started",

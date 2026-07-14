@@ -474,6 +474,7 @@ test("Generate and Polish keep their non-empty working drafts", async () => {
   (app as any).readConfig = async () => ({ modelFamily: "test" });
   ((app as any).data as any).readCachedAvailableModels = async () => [{ id: "test", family: "test", name: "Test", vendor: "test" }];
   ((app as any).data as any).writeModelInfo = async () => {};
+  ((app as any).data as any).readReplyTemplate = async () => "{{GREETING}}\n\n{{MAIN_MESSAGE}}\n\n{{REQUESTED_ACTION}}\n\n{{CLOSING}}";
   (app as any).buildDraftGenerationPrompt = async () => "draft prompt";
   const model = { id: "test", family: "test", name: "Test", vendor: "test" };
   (app as any).llmProvider = { sendPrompt: async () => ({ rawText: '{"draftReply":"Generated draft"}', model, usedFallback: false }) };

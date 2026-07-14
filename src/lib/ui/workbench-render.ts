@@ -170,7 +170,7 @@ function renderThreadDetail(
   ignoredIds?: Set<string>,
   workingDrafts?: Map<string, string>
 ): string {
-  const timelineItems = [...(thread.timeline || [])].sort(compareTimelineMessagesForDisplay);
+  const timelineItems = [...(thread.timeline || [])].sort(compareTimelineMessagesForDisplay).reverse();
   const timeline = timelineItems.map((msg) =>
     `<div class="wb-tl-item">
       <div class="wb-tl-head">
@@ -196,7 +196,7 @@ function renderThreadDetail(
     </div>
     ${renderThreadSpotlight(analysis, labels, workingDrafts)}
     ${timelineItems.length ? `<div class="wb-timeline-section">
-      <button class="wb-timeline-sort" data-action="toggleTimelineOrder" data-thread-id="${escapeAttr(thread.threadId)}" data-order="asc">${escapeHtml(labels.threads.timeline)} (${timelineItems.length}) <span class="wb-timeline-arrow" aria-hidden="true">↑</span></button>
+      <button class="wb-timeline-sort" data-action="toggleTimelineOrder" data-thread-id="${escapeAttr(thread.threadId)}" data-order="desc">${escapeHtml(labels.threads.timeline)} (${timelineItems.length}) <span class="wb-timeline-arrow" aria-hidden="true">↓</span></button>
       <div class="wb-timeline-list">${timeline}</div>
     </div>` : ""}
   </div>`;
@@ -553,7 +553,7 @@ function restoreTimelineOrders() {
   var timelineOrders = prev.timelineOrders || {};
   for (var button of document.querySelectorAll('.wb-timeline-sort')) {
     var threadId = button.getAttribute('data-thread-id') || '';
-    if (timelineOrders[threadId] === 'desc') setTimelineOrder(button, 'desc', false);
+    if (timelineOrders[threadId] === 'asc') setTimelineOrder(button, 'asc', false);
   }
 }
 

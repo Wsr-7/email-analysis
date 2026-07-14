@@ -17,8 +17,8 @@ export type ReplyDraftParts = Partial<Record<ReplyTemplatePlaceholder, string>>;
 export function renderReplyDraftFromTemplate(template: string, parts: ReplyDraftParts, fallbackDraft = ""): string {
   const normalizedParts = normalizeReplyDraftParts(parts);
   const hasParts = Object.values(normalizedParts).some((value) => value.trim());
-  if (!hasParts) {
-    return fallbackDraft;
+  if (!hasParts && fallbackDraft.trim()) {
+    normalizedParts.MAIN_MESSAGE = fallbackDraft.trim();
   }
 
   let rendered = String(template || defaultReplyTemplate());
@@ -37,10 +37,10 @@ export function applyReplyTemplateToAnalysis(analysis: AnalysisResult, template:
   return {
     ...analysis,
     items: analysis.items.map((item) => {
-      if (!item.draftReplyParts) {
+      if (!item.draftReplyParts && !item.draftReply.trim()) {
         return item;
       }
-      const draftReply = renderReplyDraftFromTemplate(template, item.draftReplyParts, item.draftReply);
+      const draftReply = renderReplyDraftFromTemplate(template, item.draftReplyParts || {}, item.draftReply);
       return {
         ...item,
         draftReply

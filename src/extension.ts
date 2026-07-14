@@ -24,7 +24,8 @@ import { renderSidebarHtml } from "./lib/ui/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisBatchResult, type AnalysisContext } from "./lib/analysis/app-analysis";
 import { handleWebviewMessage, saveConfigFromMessage, type MessageHandlerContext } from "./lib/ui/message-handler";
 import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/analysis/language-contract";
-import { buildPolishDraftPrompt, buildRefineDraftPrompt } from "./lib/analysis/draft-prompt";
+import { buildPolishDraftPrompt, buildRefineDraftPrompt, templateDraftOutputInstruction } from "./lib/analysis/draft-prompt";
+import { renderReplyDraftFromTemplate, type ReplyDraftParts } from "./lib/analysis/reply-template";
 import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/shared/process-runner";
 import { AppDataStore } from "./lib/storage/app-data";
 import { DashboardProvider } from "./lib/ui/dashboard-provider";
@@ -135,20 +136,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 export function deactivate(): void {}
 
-function extractDraftText(raw: string): string {
+function extractDraftText(raw: string, template: string): string {
   const text = String(raw || "").trim().replace(/^```(?:json|text)?\s*/i, "").replace(/\s*```$/, "").trim();
+  let fallbackDraft = text;
+  let parts: ReplyDraftParts = {};
   if (!text.startsWith("{")) {
-    return text;
+    return renderReplyDraftFromTemplate(template, parts, fallbackDraft);
   }
   try {
     const parsed = JSON.parse(text) as Record<string, unknown>;
-    if (typeof parsed.draftReply === "string") {
-      return parsed.draftReply.trim();
+    fallbackDraft = typeof parsed.draftReply === "string" ? parsed.draftReply.trim() : "";
+    const rawParts = parsed.draftReplyParts;
+    if (rawParts && typeof rawParts === "object") {
+      const values = rawParts as Record<string, unknown>;
+      parts = {
+        GREETING: typeof values.GREETING === "string" ? values.GREETING : "",
+        MAIN_MESSAGE: typeof values.MAIN_MESSAGE === "string" ? values.MAIN_MESSAGE : "",
+        REQUESTED_ACTION: typeof values.REQUESTED_ACTION === "string" ? values.REQUESTED_ACTION : "",
+        CLOSING: typeof values.CLOSING === "string" ? values.CLOSING : ""
+      };
     }
   } catch {
-    return text;
+    fallbackDraft = text;
   }
-  return text;
+  return renderReplyDraftFromTemplate(template, parts, fallbackDraft);
 }
 
 export class EasyMailApp {
@@ -277,7 +288,8 @@ export class EasyMailApp {
     await this.log("draft:polish", { itemId });
     const config = await this.readConfig();
     const language = resolveDraftLanguage(config.draftLanguage, draftText);
-    const prompt = buildPolishDraftPrompt(draftText, language);
+    const replyTemplate = await this.data.readReplyTemplate((event, data) => this.log(event, data));
+    const prompt = [buildPolishDraftPrompt(draftText, language), templateDraftOutputInstruction(replyTemplate)].join("\n\n");
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Polish draft", cancellable: true },
@@ -286,7 +298,7 @@ export class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "polish")).raw;
         }
       );
-      const result = raw.trim();
+      const result = extractDraftText(raw, replyTemplate);
       this.workingDrafts.set(itemId, result);
       this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId });
       vscode.window.showInformationMessage("Draft polished.");
@@ -299,7 +311,8 @@ export class EasyMailApp {
     await this.log("draft:refine", { itemId });
     const config = await this.readConfig();
     const language = resolveDraftLanguage(config.draftLanguage, draftText);
-    const prompt = buildRefineDraftPrompt(draftText, instruction, language);
+    const replyTemplate = await this.data.readReplyTemplate((event, data) => this.log(event, data));
+    const prompt = [buildRefineDraftPrompt(draftText, instruction, language), templateDraftOutputInstruction(replyTemplate)].join("\n\n");
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Refine draft", cancellable: true },
@@ -308,7 +321,7 @@ export class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "refine")).raw;
         }
       );
-      const result = raw.trim();
+      const result = extractDraftText(raw, replyTemplate);
       this.workingDrafts.set(itemId, result);
       this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId });
       vscode.window.showInformationMessage("Draft refined.");
@@ -327,7 +340,8 @@ export class EasyMailApp {
     await this.log("draft:generate", { itemId: targetItemId, sourceId: targetSourceId });
     const config = await this.readConfig();
     try {
-      const prompt = await this.buildDraftGenerationPrompt(targetItemId, targetSourceId, config.draftLanguage);
+      const replyTemplate = await this.data.readReplyTemplate((event, data) => this.log(event, data));
+      const prompt = await this.buildDraftGenerationPrompt(targetItemId, targetSourceId, config.draftLanguage, replyTemplate);
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Generate draft", cancellable: true },
         async (progress, token) => {
@@ -335,7 +349,7 @@ export class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "draftGenerate")).raw;
         }
       );
-      const result = extractDraftText(raw);
+      const result = extractDraftText(raw, replyTemplate);
       if (!result.trim()) {
         vscode.window.showWarningMessage("No reply draft was generated for this item.");
         return;
@@ -348,7 +362,7 @@ export class EasyMailApp {
     }
   }
 
-  private async buildDraftGenerationPrompt(itemId: string, sourceId: string, draftLanguage: unknown): Promise<string> {
+  private async buildDraftGenerationPrompt(itemId: string, sourceId: string, draftLanguage: unknown, replyTemplate: string): Promise<string> {
     if (itemId.startsWith("thread:")) {
       const threadStore = await this.data.readThreadStore();
       const thread = threadStore.items.find((item) => item.threadId === sourceId);
@@ -359,9 +373,9 @@ export class EasyMailApp {
       const language = resolveDraftLanguage(draftLanguage, latestNonSelfThreadText(thread));
       return [
         "You are an email writing assistant. Generate a concise professional reply draft for the selected Outlook thread.",
-        "Output only the reply draft text. Do not output JSON, Markdown, analysis, or explanation.",
+        templateDraftOutputInstruction(replyTemplate),
         draftOutputInstruction(language),
-        "If no reply is appropriate, output an empty string.",
+        "If no reply is appropriate, return empty strings for every draftReplyParts value.",
         "",
         `Thread subject: ${thread.subject || sourceId}`,
         `Participants: ${(thread.participants || []).join(", ") || "-"}`,
@@ -385,9 +399,9 @@ export class EasyMailApp {
     const language = resolveDraftLanguage(draftLanguage, mail?.bodyExcerpt || analysis?.summary || "");
     return [
       "You are an email writing assistant. Generate a concise professional reply draft for the selected Outlook mail.",
-      "Output only the reply draft text. Do not output JSON, Markdown, analysis, or explanation.",
+      templateDraftOutputInstruction(replyTemplate),
       draftOutputInstruction(language),
-      "If no reply is appropriate, output an empty string.",
+      "If no reply is appropriate, return empty strings for every draftReplyParts value.",
       "",
       `Subject: ${mail?.subject || analysis?.subject || sourceId}`,
       `From: ${mail?.from || analysis?.sender || "-"}`,

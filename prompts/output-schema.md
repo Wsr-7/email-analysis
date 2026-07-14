@@ -22,7 +22,7 @@ Required item fields:
 - summary (2-3 sentences: what, why, action needed)
 - reason (one sentence: why this category and priority were chosen)
 - suggestedAction (specific next step, e.g. "Reply to confirm budget approval by EOD" not just "Reply")
-- draftReply (plain text draft or empty string)
+- draftReply (always an empty string; EasyMail renders the final draft locally)
 - confidence (0.0-1.0)
 - needsOriginalMailCheck (boolean)
 
@@ -30,7 +30,7 @@ Optional item fields:
 - dueDate (YYYY-MM-DD or empty string; use a non-empty value only when the mail explicitly states a deadline, otherwise leave it empty)
 - source (mailId, internetMessageId, entryId, folder)
 - evidence (array of {sourceMailId, quote, reason} — short excerpts that directly support the classification)
-- draftReplyParts (GREETING, MAIN_MESSAGE, REQUESTED_ACTION, CLOSING)
+- draftReplyParts (GREETING, MAIN_MESSAGE, REQUESTED_ACTION, CLOSING; include all four keys when a reply is needed, otherwise use empty strings)
 
 Evidence rules:
 - Only quote text that actually appears in the mail body or metadata.
@@ -38,4 +38,4 @@ Evidence rules:
 - Omit evidence when the classification is self-evident from the subject/sender.
 - If evidence is uncertain, omit it and set `needsOriginalMailCheck: true`.
 
-Return valid JSON only.
+Return exactly one item for every input mail. Return valid JSON only.

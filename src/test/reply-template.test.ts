@@ -14,8 +14,11 @@ test("renderReplyDraftFromTemplate replaces fixed placeholders", () => {
   assert.equal(draft, "Hi Alice,\n\nI reviewed the contract.\n\nPlease send the final copy.\n\nThanks,");
 });
 
-test("renderReplyDraftFromTemplate falls back when model provided no parts", () => {
-  assert.equal(renderReplyDraftFromTemplate(defaultReplyTemplate(), {}, "Fallback draft."), "Fallback draft.");
+test("renderReplyDraftFromTemplate keeps a model fallback inside the configured template", () => {
+  assert.equal(
+    renderReplyDraftFromTemplate("Hello {{GREETING}}\n\n{{MAIN_MESSAGE}}\n\nRegards,\n{{CLOSING}}", {}, "Fallback draft."),
+    "Hello\n\nFallback draft.\n\nRegards,"
+  );
 });
 
 test("validateReplyTemplate reports missing required placeholders", () => {
