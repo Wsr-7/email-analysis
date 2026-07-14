@@ -346,6 +346,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：未发现其他 enum label 的值/数量错位；分类等级全大写和语言本名属于有意文案，不做风格化改写。
   - Commit：`1890870`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8.8 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `9525536`；重新定位确认 `SafeAttachmentCount` 直接返回 COM Count，`SafeAttachmentNames` 无条件枚举全部文件名，内嵌签名图因此与真实附件同等输出。边界：新增单一可见性 helper 读取 PR_ATTACHMENT_HIDDEN，属性/附件读取失败时保守视为可见；count 与 names 复用该 helper；不改 digest 字段、sample 数据、Type/Position/CID 推断或附件内容访问。Action: claim G8.8。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -401,7 +403,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - `easyMail.draftGeneration` 的 enumItemLabels `Automatic` → `Auto`（与 Draft Language 的 Auto 一致）；顺带扫一遍其余枚举 label 用词一致性。
 - **验收**：`npm test` 全绿。
 
-### [ ] G8.8 附件计数过滤内嵌图片（M12 用户"勉强接受"项，P3）
+### [~] G8.8 附件计数过滤内嵌图片（M12 用户"勉强接受"项，P3）
 
 - **现状**：正文内嵌图片（签名 logo 等）被 Outlook 计为附件，导致大量邮件误挂 📎。
 - **做法**：VBS `SafeAttachmentCount`/`SafeAttachmentNames` 过滤隐藏/内嵌附件——用 `Attachment.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")`（PR_ATTACHMENT_HIDDEN）为 True 的跳过；读取失败时保守保留（宁可多算不可漏算真附件）；On Error 守护齐全。sample 不受影响。
