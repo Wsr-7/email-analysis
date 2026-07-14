@@ -200,7 +200,7 @@ rtk npm run package:vsix
 
 Completion Notes（2026-07-14）：用户从多轮候选中确认 N 的斜置双卡片方向，并确认“决策核心”而非“信息路由”。新增 `media/icon-source.svg` 作为透明背景的 SVG 母版；由本地矢量渲染生成 512×512 `media/icon.png`，实测左上角 alpha 为 0。Marketplace 图标使用蓝色卡片、暖白邮件折线与青蓝核心；Activity Bar 使用同结构的单色负形版本，并在不裁边的前提下放大约 10%。深浅主题及 16/20/24px 本地预览已检查。`npm run compile` 通过；最终 `npm test` 为 467 pass / 0 fail；`npm run package:vsix` 为 110 files、271.9 KB。首次全量测试曾出现一次既有 `app-analysis` 并发用例失败，单测连续 5 次与后续完整重跑均通过，未改业务代码。真实 VS Code Activity Bar、Marketplace / Extension Details 仍需用户在实际安装包中确认。
 
-### [ ] H2 · 清理已证明无引用的发布污染
+### [x] H2 · 清理已证明无引用的发布污染
 
 1. 用 `rg` 再次枚举 `workbench-render-v1.ts`、`MockProvider`、`renderDashboardHtml` 的所有 caller。
 2. 删除零 caller 的 `workbench-render-v1.ts`。
@@ -214,6 +214,8 @@ rtk npm run compile
 rtk npm test
 rtk git diff --check
 ```
+
+Completion Notes（2026-07-14）：caller 审计确认 `workbench-render-v1.ts` 与 legacy `renderDashboardHtml` 均为零 caller；只删除后者的单体入口，保留 Sidebar、Workbench 与单测仍复用的 render helper。`MockProvider` 已移至 `src/test/support/`，两处测试 import 及其内部相对 import 已更新。同步稳定了一个既有的并发取消测试：此前并发 chunk 竞争按调用顺序出队的 mock response，导致全量测试偶发错误地假设 `mail-001` 必先进入模型传输；现改为按实际 prompt 返回对应响应，并断言首个完成模型调用的邮件，未改产品逻辑。`npm run compile` 通过；`npm test` 为 467 pass / 0 fail；源代码引用检查零命中，`git diff --check` 通过。
 
 ### [ ] H3 · 一次性完成 `src/lib` 物理分类
 

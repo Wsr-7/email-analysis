@@ -6,7 +6,7 @@ import * as path from "node:path";
 import { AppDataStore } from "../lib/app-data";
 import { analyzeBatchCore, analyzeThreadCore, formatAnalysisProgressStart, formatAnalysisProgressUpdate, sendPromptToModel, splitByTokenBudget } from "../lib/app-analysis";
 import { emptyMailIndex, type StoredMail } from "../lib/mail-store";
-import { MockProvider } from "../lib/mock-provider";
+import { MockProvider } from "./support/mock-provider";
 import type { CancellationTokenLike, LlmProvider, LlmRequestOptions } from "../lib/llm-provider";
 import type { ThreadMessage, ThreadRecord } from "../lib/thread-schema";
 
@@ -717,22 +717,26 @@ describe("analyzeBatchCore", () => {
       await data.writeAvailableModels([{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }]);
 
       const token = { isCancellationRequested: false };
-      const provider = new MockProvider({
-        responses: [analysisResponse("mail-001"), new Error("EasyMail task cancelled.")]
-      });
       let calls = 0;
+      let completedMailId = "";
 
       await assert.rejects(
         () => analyzeBatchCore({
           data,
           llmProvider: {
-            listModels: () => provider.listModels(),
-            sendPrompt: async (prompt, options) => {
+            listModels: async () => [{ vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 }],
+            sendPrompt: async (prompt, _options) => {
               calls += 1;
-              if (calls === 2) {
-                token.isCancellationRequested = true;
+              if (calls === 1) {
+                completedMailId = prompt.includes("mail-001") ? "mail-001" : "mail-002";
+                return {
+                  rawText: analysisResponse(completedMailId),
+                  model: { vendor: "mock", family: "mock-model", id: "mock-model", name: "Mock Model", maxInputTokens: 1000 },
+                  usedFallback: false
+                };
               }
-              return await provider.sendPrompt(prompt, options);
+              token.isCancellationRequested = true;
+              throw new Error("EasyMail task cancelled.");
             }
           },
           extensionPath: process.cwd(),
@@ -751,8 +755,8 @@ describe("analyzeBatchCore", () => {
       );
 
       const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
-      assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001"]);
-      assert.equal(provider.prompts.length, 2);
+      assert.deepEqual(analysis.items.map((item) => item.mailId), [completedMailId]);
+      assert.equal(calls, 2);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });
     }

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { formatModelLabel, isModelRefreshableErrorMessage, modelKey, normalizeAvailableModel, readLlmResponseText, resolveModelSelection, selectConfiguredModel, selectConfiguredModelIndex } from "../lib/llm-provider";
-import { MockProvider } from "../lib/mock-provider";
+import { MockProvider } from "./support/mock-provider";
 
 const models = [
   { vendor: "copilot", family: "gpt-5-mini", id: "copilot-utility", name: "GPT-5 mini" },
