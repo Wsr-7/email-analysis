@@ -320,6 +320,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：不同 VS Code 主题对 `sideBarSectionHeader-foreground` 的对比度定义不同，已保留通用 foreground fallback。
   - Commit：`01843d5`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8.6 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `d848c83`；重新定位确认 DashboardProvider 对每条 webview 消息独立异步 dispatch，`saveConfigFromMessage` 在 `readConfig` 与逐项 `settings.update` 间多次 yield，而下一条 Fetch 可并发进入 `pullMailCore` 并先读旧 config。边界：extension 收到 saveConfig 时立即登记只覆盖该设置保存的 promise，后续会读 config 的 webview 动作先 await 它；保存后的 refresh 不纳入等待链，长任务也不互相串行；不改 UI、消息顺序或设置结构。Action: claim G8.6。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -363,7 +365,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - pending folder 组头与会议"已接受的日程"组头字体存在感不足：font-weight 提到 700、颜色用更亮的前景变量（如 `--vscode-sideBarSectionHeader-foreground`），可加少量 letter-spacing/上下 padding；不加大字号。两处组头样式统一。
 - **验收**：`npm test` 全绿。**needs user validation**：目视组头明显但不突兀。
 
-### [ ] G8.6 设置保存与动作按钮的竞态（额外反馈#4，P2）
+### [~] G8.6 设置保存与动作按钮的竞态（额外反馈#4，P2）
 
 - **现象**：sidebar 改 maxItems 后直接点 Fetch New，本次仍按旧值执行（需先点别处触发保存 toast 才生效）。
 - **根因方向**：webview 消息（settings 更新、fetch）虽按序到达，但 `handleMessage` 异步并发处理——fetch 读 config 时 settings.update 还没落盘。
