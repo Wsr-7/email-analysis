@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 function readVsixManifest(): string {
-  const vsixPath = path.join(process.cwd(), "releases", "easymail-0.3.0.vsix");
+  const vsixPath = path.join(process.cwd(), "releases", "easymail-0.4.0.vsix");
   const script = [
     "Add-Type -AssemblyName System.IO.Compression.FileSystem",
     `$zip = [System.IO.Compression.ZipFile]::OpenRead(${JSON.stringify(vsixPath)})`,
