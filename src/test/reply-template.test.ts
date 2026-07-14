@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyReplyTemplateToAnalysis, defaultReplyTemplate, renderReplyDraftFromTemplate, validateReplyTemplate } from "../lib/reply-template";
-import type { AnalysisResult } from "../lib/analysis-schema";
+import { applyReplyTemplateToAnalysis, defaultReplyTemplate, renderReplyDraftFromTemplate, validateReplyTemplate } from "../lib/analysis/reply-template";
+import type { AnalysisResult } from "../lib/analysis/analysis-schema";
 
 test("renderReplyDraftFromTemplate replaces fixed placeholders", () => {
   const draft = renderReplyDraftFromTemplate(defaultReplyTemplate(), {
@@ -14,8 +14,11 @@ test("renderReplyDraftFromTemplate replaces fixed placeholders", () => {
   assert.equal(draft, "Hi Alice,\n\nI reviewed the contract.\n\nPlease send the final copy.\n\nThanks,");
 });
 
-test("renderReplyDraftFromTemplate falls back when model provided no parts", () => {
-  assert.equal(renderReplyDraftFromTemplate(defaultReplyTemplate(), {}, "Fallback draft."), "Fallback draft.");
+test("renderReplyDraftFromTemplate keeps a model fallback inside the configured template", () => {
+  assert.equal(
+    renderReplyDraftFromTemplate("Hello {{GREETING}}\n\n{{MAIN_MESSAGE}}\n\nRegards,\n{{CLOSING}}", {}, "Fallback draft."),
+    "Hello\n\nFallback draft.\n\nRegards,"
+  );
 });
 
 test("validateReplyTemplate reports missing required placeholders", () => {

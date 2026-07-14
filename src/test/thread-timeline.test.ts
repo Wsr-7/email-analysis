@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanMailBody, extractReplyDelta, hashBody, markDuplicateBodies } from "../lib/thread-timeline";
+import { cleanMailBody, extractReplyDelta, hashBody, markDuplicateBodies } from "../lib/domain/thread-timeline";
 
 test("cleanMailBody normalizes line endings and trims noisy whitespace", () => {
   const body = "  Hello team,  \r\n\r\n\r\nPlease review this.   \r\n\r\n";

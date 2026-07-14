@@ -37,7 +37,7 @@ const { EasyMailApp, buildSidebarRenderInput } = require("../extension") as {
   EasyMailApp: new (context: unknown) => object;
   buildSidebarRenderInput: (state: any, availableModels: unknown[], nextActionsStore: unknown, busyKind: string, isBusy: boolean) => any;
 };
-const { CopilotProvider } = require("../lib/copilot-provider") as { CopilotProvider: new () => { listModels: () => Promise<unknown[]>; sendPrompt: (prompt: string, options: unknown) => Promise<{ rawText: string }> } };
+const { CopilotProvider } = require("../lib/analysis/copilot-provider") as { CopilotProvider: new () => { listModels: () => Promise<unknown[]>; sendPrompt: (prompt: string, options: unknown) => Promise<{ rawText: string }> } };
 internalModule._load = originalLoad;
 
 async function renderWorkbenchDraft(app: any, draftReply: string): Promise<string> {
@@ -98,7 +98,7 @@ test("folder picker shows one concise English Outlook startup tip", async () => 
   progressMessages.length = 0;
   const globalStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), "easy-mail-test-"));
   const app = new EasyMailApp({ globalStorageUri: { fsPath: globalStoragePath }, extensionPath: "", subscriptions: [] });
-  const processRunner = require("../lib/process-runner") as { runProcess: () => Promise<void> };
+  const processRunner = require("../lib/shared/process-runner") as { runProcess: () => Promise<void> };
   const originalRunProcess = processRunner.runProcess;
   (app as any).readConfig = async () => ({ folders: ["Inbox"] });
   (app as any).findScript = async () => "collector.vbs";
@@ -117,7 +117,7 @@ test("folder picker shows one concise Chinese Outlook startup tip", async () => 
   progressMessages.length = 0;
   const globalStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), "easy-mail-test-"));
   const app = new EasyMailApp({ globalStorageUri: { fsPath: globalStoragePath }, extensionPath: "", subscriptions: [] });
-  const processRunner = require("../lib/process-runner") as { runProcess: () => Promise<void> };
+  const processRunner = require("../lib/shared/process-runner") as { runProcess: () => Promise<void> };
   const originalRunProcess = processRunner.runProcess;
   (app as any).readConfig = async () => ({ folders: ["Inbox"], outputLanguage: "zh-CN" });
   (app as any).findScript = async () => "collector.vbs";
@@ -283,6 +283,29 @@ test("maybeOpenGuide uses install metadata, directory birth time, then version a
   assert.equal(shown.get("easyMail.guideShown.0.3.0"), true, "a stat failure falls back to package version");
   assert.deepEqual(statPaths, ["vsix-a", "vsix-a", "vsix-b", "broken-install", "broken-install"], "metadata must avoid an unnecessary filesystem fallback");
   assert.equal(opened, 4, "each installation signature opens the guide only once");
+});
+
+test("guide records a reviewed optional setup step and refreshes the panel", async () => {
+  const values = new Map<string, unknown>();
+  const app = new EasyMailApp({
+    globalStorageUri: { fsPath: "" },
+    extensionPath: "",
+    extension: { packageJSON: { version: "0.4.0" } },
+    globalState: {
+      get: (key: string) => values.get(key),
+      update: async (key: string, value: unknown) => { values.set(key, value); }
+    },
+    subscriptions: []
+  });
+  let refreshed = 0;
+  (app as any).log = async () => {};
+  (app as any).guidePanel = { webview: {} };
+  (app as any).getGuideHtml = async () => { refreshed += 1; return "guide"; };
+
+  await (app as any).handleGuideMessage({ type: "guideAction", action: "completeOnboardingStep", stepId: "settings" });
+
+  assert.deepEqual(values.get("easyMail.guideProgress.0.4.0"), ["settings"]);
+  assert.equal(refreshed, 1);
 });
 
 test("getDashboardHtml forwards the meeting store attached by loadState", async () => {
@@ -451,6 +474,7 @@ test("Generate and Polish keep their non-empty working drafts", async () => {
   (app as any).readConfig = async () => ({ modelFamily: "test" });
   ((app as any).data as any).readCachedAvailableModels = async () => [{ id: "test", family: "test", name: "Test", vendor: "test" }];
   ((app as any).data as any).writeModelInfo = async () => {};
+  ((app as any).data as any).readReplyTemplate = async () => "{{GREETING}}\n\n{{MAIN_MESSAGE}}\n\n{{REQUESTED_ACTION}}\n\n{{CLOSING}}";
   (app as any).buildDraftGenerationPrompt = async () => "draft prompt";
   const model = { id: "test", family: "test", name: "Test", vendor: "test" };
   (app as any).llmProvider = { sendPrompt: async () => ({ rawText: '{"draftReply":"Generated draft"}', model, usedFallback: false }) };
@@ -464,6 +488,22 @@ test("Generate and Polish keep their non-empty working drafts", async () => {
   assert.deepEqual(warnings, []);
   assert.equal((app as any).workingDrafts.get("mail:m1"), "Polished draft");
   assert.ok((await renderWorkbenchDraft(app, "Model draft")).includes('<textarea class="draft-textarea">Polished draft</textarea>'));
+});
+
+test("Generate Draft always asks for a draft when the user explicitly requests one", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  ((app as any).data as any).readMailStore = async () => ({ items: [{ mailId: "m1", subject: "Status", from: "alice@example.com", bodyExcerpt: "No action needed." }] });
+  ((app as any).data as any).readAnalysisResult = async () => ({ items: [] });
+
+  const prompt = await (app as any).buildDraftGenerationPrompt(
+    "mail:m1",
+    "m1",
+    "en",
+    "{{GREETING}}\n{{MAIN_MESSAGE}}\n{{REQUESTED_ACTION}}\n{{CLOSING}}"
+  );
+
+  assert.match(prompt, /Generate a draft even when no reply appears necessary/i);
+  assert.doesNotMatch(prompt, /If no reply is appropriate/i);
 });
 
 test("flushWorkbenchDrafts times out a missing webview response and permits the next flush", async () => {

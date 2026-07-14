@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildMailGateDecision, buildThreadGateDecision } from "../lib/security-gate";
-import { buildSecuritySettings } from "../lib/config-utils";
-import type { MailClassification } from "../lib/classification";
-import type { StoredMail } from "../lib/mail-store";
-import type { ThreadRecord } from "../lib/thread-schema";
+import { buildMailGateDecision, buildThreadGateDecision } from "../lib/security/security-gate";
+import { buildSecuritySettings } from "../lib/shared/config-utils";
+import type { MailClassification } from "../lib/security/classification";
+import type { StoredMail } from "../lib/storage/mail-store";
+import type { ThreadRecord } from "../lib/domain/thread-schema";
 
 test("buildMailGateDecision allows mail within auto classification threshold", () => {
   const decision = buildMailGateDecision(mail({ mailId: "mail-1", subject: "Public update" }), classification("mail-1", 1), {

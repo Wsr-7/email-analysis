@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { LABELS, getLabels, buildCategoryLabels } from "../lib/dashboard-labels";
+import { LABELS, getLabels, buildCategoryLabels } from "../lib/ui/dashboard-labels";
 
 describe("LABELS", () => {
   it("has both locales", () => {

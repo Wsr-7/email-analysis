@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { redactStoredMails, redactText, redactThreadForPrompt } from "../lib/redaction";
-import type { RedactionPolicy } from "../lib/redaction";
-import type { StoredMail } from "../lib/mail-store";
-import type { ThreadRecord } from "../lib/thread-store";
+import { redactStoredMails, redactText, redactThreadForPrompt } from "../lib/security/redaction";
+import type { RedactionPolicy } from "../lib/security/redaction";
+import type { StoredMail } from "../lib/storage/mail-store";
+import type { ThreadRecord } from "../lib/storage/thread-store";
 
 const basePolicy: RedactionPolicy = {
   enabled: true,

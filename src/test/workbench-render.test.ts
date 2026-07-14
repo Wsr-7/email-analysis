@@ -1,15 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderWorkbenchHtml as renderWorkbenchHtmlWithNonce } from "../lib/workbench-render";
-import { normalizeClassificationCache } from "../lib/classification";
-import { normalizePromptConfig } from "../lib/prompt-config";
-import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/mail-store";
-import { emptyThreadStore } from "../lib/thread-store";
-import type { StoredMeeting as StoredMeetingItem } from "../lib/meeting-store";
-import type { DashboardRenderInput } from "../lib/dashboard-render";
-import type { DashboardState } from "../lib/dashboard-state";
-import type { AnalysisItem } from "../lib/analysis-schema";
-import type { ThreadAnalysisResult } from "../lib/thread-analysis-schema";
+import { renderWorkbenchHtml as renderWorkbenchHtmlWithNonce } from "../lib/ui/workbench-render";
+import { normalizeClassificationCache } from "../lib/security/classification";
+import { normalizePromptConfig } from "../lib/analysis/prompt-config";
+import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/storage/mail-store";
+import { emptyThreadStore } from "../lib/storage/thread-store";
+import type { StoredMeeting as StoredMeetingItem } from "../lib/storage/meeting-store";
+import type { DashboardRenderInput } from "../lib/ui/dashboard-render";
+import type { DashboardState } from "../lib/ui/dashboard-state";
+import type { AnalysisItem } from "../lib/analysis/analysis-schema";
+import type { ThreadAnalysisResult } from "../lib/analysis/thread-analysis-schema";
 
 function stubMail(overrides?: Partial<StoredMail>): StoredMail {
   return {
@@ -457,8 +457,8 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes('data-action="openInOutlook" data-mail-id="m1"'));
     assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'), "thread senders should retain full addresses in tooltips");
     assert.ok(html.includes("<strong title=\"Alice &lt;alice@test.com&gt;\">Alice</strong>"), "timeline should show display name only");
-    assert.ok(html.includes('class="wb-timeline-sort" data-action="toggleTimelineOrder" data-thread-id="t1" data-order="asc"'));
-    assert.ok(html.includes('Timeline (1) <span class="wb-timeline-arrow" aria-hidden="true">↑</span>'));
+    assert.ok(html.includes('class="wb-timeline-sort" data-action="toggleTimelineOrder" data-thread-id="t1" data-order="desc"'));
+    assert.ok(html.includes('Timeline (1) <span class="wb-timeline-arrow" aria-hidden="true">↓</span>'));
     assert.ok(html.includes('class="wb-timeline-list"'));
   });
 
@@ -472,6 +472,25 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes("setTimelineOrder(t, t.getAttribute('data-order') === 'asc' ? 'desc' : 'asc', true)"));
     assert.ok(html.includes("restoreTimelineOrders()"));
     assert.ok(html.includes("background: var(--vscode-button-hoverBackground, #1177bb)"));
+  });
+
+  it("renders thread timelines newest first by default", () => {
+    const html = renderWorkbenchHtml(stubInput({
+      threadStore: {
+        generatedAt: "", lastBuiltAt: "", items: [{
+          threadId: "timeline-order", conversationId: "timeline-order", normalizedSubject: "timeline",
+          subject: "Timeline", participants: [], folders: [], startTime: "", lastTime: "",
+          messageCount: 2, unreadCount: 0, hasAttachments: false, sourceMailIds: ["old", "new"], contentStatus: "available",
+          timeline: [
+            { mailId: "old", internetMessageId: "", entryId: "", conversationId: "", conversationIndex: "", subject: "", from: "", senderName: "", senderEmail: "", receivedTime: "2026-07-01 09:00", sentTime: "", folder: "", bodyPreview: "old message", bodyClean: "", bodyDelta: "old message", bodyHash: "", isDuplicateBody: false, contentAvailable: true, attachmentCount: 0, attachmentNames: [] },
+            { mailId: "new", internetMessageId: "", entryId: "", conversationId: "", conversationIndex: "", subject: "", from: "", senderName: "", senderEmail: "", receivedTime: "2026-07-02 09:00", sentTime: "", folder: "", bodyPreview: "new message", bodyClean: "", bodyDelta: "new message", bodyHash: "", isDuplicateBody: false, contentAvailable: true, attachmentCount: 0, attachmentNames: [] }
+          ]
+        }]
+      }
+    }));
+
+    assert.ok(html.indexOf("new message") < html.indexOf("old message"));
+    assert.match(html, /data-order="desc"[\s\S]*wb-timeline-arrow[^>]*>↓/);
   });
 
   it("handles focusItem message via client-side JS", () => {

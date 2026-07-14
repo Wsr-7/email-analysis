@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSummaryMarkdown } from "../lib/summary";
+import { buildSummaryMarkdown } from "../lib/analysis/summary";
 
 test("buildSummaryMarkdown renders categories and draft blocks", () => {
   const markdown = buildSummaryMarkdown({

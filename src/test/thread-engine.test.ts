@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildThreadRecords, buildThreadStore } from "../lib/thread-engine";
-import { mergeThreadStores, normalizeThreadStore, pruneThreadStore } from "../lib/thread-store";
-import type { StoredMail } from "../lib/mail-store";
+import { buildThreadRecords, buildThreadStore } from "../lib/domain/thread-engine";
+import { mergeThreadStores, normalizeThreadStore, pruneThreadStore } from "../lib/storage/thread-store";
+import type { StoredMail } from "../lib/storage/mail-store";
 
 type ThreadCapableStoredMail = StoredMail & {
   conversationId?: string;

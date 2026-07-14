@@ -9,8 +9,8 @@ import {
   normalizeNextActionsStore,
   type NextActionsStore,
   type NextActionItem,
-} from "../lib/next-actions";
-import type { ThreadAnalysisItem } from "../lib/thread-analysis-schema";
+} from "../lib/storage/next-actions";
+import type { ThreadAnalysisItem } from "../lib/analysis/thread-analysis-schema";
 
 function stubThreadAnalysis(overrides?: Partial<ThreadAnalysisItem>): ThreadAnalysisItem {
   return {

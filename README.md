@@ -43,7 +43,7 @@ Mail content is not uploaded by EasyMail to its own service. The excerpt selecte
 
 <!-- SCREENSHOT: sample-mode-results.png — Generate Sample Digest 后的示例邮件、会议与分诊结果 -->
 
-For source setup and development commands, see [setup.md](./setup.md).
+For source setup and development commands, see [Development](./docs/development.md).
 
 ## Usage
 
@@ -69,7 +69,7 @@ Run **EasyMail: Select Outlook Folders** to load folders from the running classi
 
 <!-- SCREENSHOT: select-outlook-folders.png — Select Outlook Folders QuickPick，需截到可多选文件夹和 Sent Items 标记 -->
 
-See [user guide.md](./user%20guide.md) for the complete command list and workflow details.
+See the [User Guide](./docs/user-guide.md) for the complete command list and workflow details.
 
 ## Configuration
 
@@ -82,7 +82,7 @@ All settings use the `easyMail.*` namespace in VS Code Settings. Common settings
 - `easyMail.autoAnalyzeMaxClassificationLevel` for the automatic-analysis gate.
 - `easyMail.bodyExcerptChars` for the maximum number of body characters retained per mail for analysis.
 
-The Sidebar exposes a small set of common controls. VS Code Settings remains the source of truth; see [user guide.md](./user%20guide.md) for the full reference.
+The Sidebar exposes a small set of common controls. VS Code Settings remains the source of truth; see the [User Guide](./docs/user-guide.md) for the full reference.
 
 ## FAQ
 
@@ -100,7 +100,15 @@ The mail may be pending, not yet selected, or above `easyMail.autoAnalyzeMaxClas
 
 ### Where is the detailed command and configuration reference?
 
-Read [user guide.md](./user%20guide.md). Contributors can use [setup.md](./setup.md) and the project map in [AGENTS.md](./AGENTS.md).
+Read the [User Guide](./docs/user-guide.md). Contributors can use [Development](./docs/development.md) and the project map in [AGENTS.md](./AGENTS.md).
+
+## Documentation
+
+- [User Guide](./docs/user-guide.md) — commands, Sidebar, Workbench, and settings.
+- [Development](./docs/development.md) — build, test, sample validation, and packaging.
+- [Architecture](./docs/architecture.md) — runtime flow, module boundaries, and persistence.
+- [Security](./docs/security.md) — local, Copilot, classification, and redaction boundaries.
+- [Acceptance](./docs/acceptance.md) — automated, installed-VSIX, and real-Outlook checks.
 
 ## Known Limitations
 

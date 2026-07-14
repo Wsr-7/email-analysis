@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDashboardState } from "../lib/dashboard-state";
+import { buildDashboardState } from "../lib/ui/dashboard-state";
 
 test("buildDashboardState filters ignored ids and groups categories", () => {
   const state = buildDashboardState(

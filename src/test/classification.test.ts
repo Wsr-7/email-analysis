@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildQueueState, ensureClassifications, normalizeClassificationCache } from "../lib/classification";
-import { buildClassificationKeywords } from "../lib/config-utils";
-import { buildMailGateDecision, canAnalyzeMail } from "../lib/security-gate";
-import type { StoredMail } from "../lib/mail-store";
+import { buildQueueState, ensureClassifications, normalizeClassificationCache } from "../lib/security/classification";
+import { buildClassificationKeywords } from "../lib/shared/config-utils";
+import { buildMailGateDecision, canAnalyzeMail } from "../lib/security/security-gate";
+import type { StoredMail } from "../lib/storage/mail-store";
 
 const mails: StoredMail[] = [
   {

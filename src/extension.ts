@@ -2,36 +2,37 @@ import * as vscode from "vscode";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomBytes } from "node:crypto";
-import { parseDigest, type DigestData } from "./lib/digest";
-import { buildQueueState, ensureClassifications, normalizeClassificationCache, type ClassificationCache } from "./lib/classification";
-import { buildDashboardState, CATEGORY_ORDER, filterVisibleThreadsForDashboard, type DashboardState } from "./lib/dashboard-state";
-import { allowedCategoryIds, normalizePromptConfig, type PromptConfig } from "./lib/prompt-config";
-import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, pruneMailIndex, pruneMailStore, type MailIndex, type MailStore, type StoredMail } from "./lib/mail-store";
-import { buildThreadStore } from "./lib/thread-engine";
-import { emptyThreadStore, mergeThreadStores, normalizeThreadStore, pruneThreadStore, type ThreadStore } from "./lib/thread-store";
-import { buildThreadGateDecision, buildMailSecurityDecisionMap } from "./lib/security-gate";
-import type { SecurityGateDecisionResult, SecurityGateSettings } from "./lib/security-types";
-import { type ThreadAnalysisResult } from "./lib/thread-analysis-schema";
-import { buildDailyBrief } from "./lib/report-daily";
-import { buildSingleMailReport } from "./lib/report-single-mail";
-import { buildThreadReport } from "./lib/report-thread";
-import { CopilotProvider } from "./lib/copilot-provider";
-import { type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./lib/llm-provider";
-import { renderEasyMailGuideHtml } from "./lib/guide-webview";
-import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, buildClassificationKeywords, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/config-utils";
-import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
-import { renderSidebarHtml } from "./lib/sidebar-render";
-import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisBatchResult, type AnalysisContext } from "./lib/app-analysis";
-import { handleWebviewMessage, saveConfigFromMessage, type MessageHandlerContext } from "./lib/message-handler";
-import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
-import { buildPolishDraftPrompt, buildRefineDraftPrompt } from "./lib/draft-prompt";
-import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/process-runner";
-import { AppDataStore } from "./lib/app-data";
-import { DashboardProvider } from "./lib/dashboard-provider";
-import { renderWorkbenchHtml } from "./lib/workbench-render";
-import { parseMeetingDigest } from "./lib/meeting-digest";
-import { emptyMeetingStore, mergeMeetingDigestIntoStore, pruneMeetingStore, type MeetingStore } from "./lib/meeting-store";
-import { extractNextActions, mergeNextActions, updateNextActionStatus, type NextActionsStore } from "./lib/next-actions";
+import { parseDigest, type DigestData } from "./lib/domain/digest";
+import { buildQueueState, ensureClassifications, normalizeClassificationCache, type ClassificationCache } from "./lib/security/classification";
+import { buildDashboardState, CATEGORY_ORDER, filterVisibleThreadsForDashboard, type DashboardState } from "./lib/ui/dashboard-state";
+import { allowedCategoryIds, normalizePromptConfig, type PromptConfig } from "./lib/analysis/prompt-config";
+import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, pruneMailIndex, pruneMailStore, type MailIndex, type MailStore, type StoredMail } from "./lib/storage/mail-store";
+import { buildThreadStore } from "./lib/domain/thread-engine";
+import { emptyThreadStore, mergeThreadStores, normalizeThreadStore, pruneThreadStore, type ThreadStore } from "./lib/storage/thread-store";
+import { buildThreadGateDecision, buildMailSecurityDecisionMap } from "./lib/security/security-gate";
+import type { SecurityGateDecisionResult, SecurityGateSettings } from "./lib/security/security-types";
+import { type ThreadAnalysisResult } from "./lib/analysis/thread-analysis-schema";
+import { buildDailyBrief } from "./lib/reports/report-daily";
+import { buildSingleMailReport } from "./lib/reports/report-single-mail";
+import { buildThreadReport } from "./lib/reports/report-thread";
+import { CopilotProvider } from "./lib/analysis/copilot-provider";
+import { type AvailableModel, type CancellationTokenLike, type LlmProvider } from "./lib/analysis/llm-provider";
+import { renderEasyMailGuideHtml } from "./lib/ui/guide-webview";
+import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecuritySettings, buildClassificationKeywords, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, positiveNumber, resolveModelFamily, shouldMigrateLegacyModelFamily } from "./lib/shared/config-utils";
+import { getLabels, buildCategoryLabels } from "./lib/ui/dashboard-labels";
+import { renderSidebarHtml } from "./lib/ui/sidebar-render";
+import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisBatchResult, type AnalysisContext } from "./lib/analysis/app-analysis";
+import { handleWebviewMessage, saveConfigFromMessage, type MessageHandlerContext } from "./lib/ui/message-handler";
+import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/analysis/language-contract";
+import { buildPolishDraftPrompt, buildRefineDraftPrompt, templateDraftOutputInstruction } from "./lib/analysis/draft-prompt";
+import { renderReplyDraftFromTemplate, type ReplyDraftParts } from "./lib/analysis/reply-template";
+import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/shared/process-runner";
+import { AppDataStore } from "./lib/storage/app-data";
+import { DashboardProvider } from "./lib/ui/dashboard-provider";
+import { renderWorkbenchHtml } from "./lib/ui/workbench-render";
+import { parseMeetingDigest } from "./lib/domain/meeting-digest";
+import { emptyMeetingStore, mergeMeetingDigestIntoStore, pruneMeetingStore, type MeetingStore } from "./lib/storage/meeting-store";
+import { extractNextActions, mergeNextActions, updateNextActionStatus, type NextActionsStore } from "./lib/storage/next-actions";
 
 type BusyState = {
   label: string;
@@ -46,6 +47,12 @@ const SETTINGS_DEPENDENT_MESSAGE_TYPES = new Set([
   "pullMail", "loadMore", "sampleDigest", "analyze", "analyzeAllAllowed", "analyzeSelected", "analyzeThread",
   "generateDraft", "polishDraft", "refineDraft", "openWorkbench", "openInWorkbench"
 ]);
+
+const GUIDE_ONBOARDING_STEP_IDS = new Set(["sample", "models", "folders", "settings", "firstRun"]);
+
+function guideProgressKey(version: string): string {
+  return `easyMail.guideProgress.${version}`;
+}
 
 type LoadedDashboardState = DashboardState & {
   modelInfo?: Record<string, unknown>;
@@ -129,20 +136,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 export function deactivate(): void {}
 
-function extractDraftText(raw: string): string {
+function extractDraftText(raw: string, template: string): string {
   const text = String(raw || "").trim().replace(/^```(?:json|text)?\s*/i, "").replace(/\s*```$/, "").trim();
+  let fallbackDraft = text;
+  let parts: ReplyDraftParts = {};
   if (!text.startsWith("{")) {
-    return text;
+    return renderReplyDraftFromTemplate(template, parts, fallbackDraft);
   }
   try {
     const parsed = JSON.parse(text) as Record<string, unknown>;
-    if (typeof parsed.draftReply === "string") {
-      return parsed.draftReply.trim();
+    fallbackDraft = typeof parsed.draftReply === "string" ? parsed.draftReply.trim() : "";
+    const rawParts = parsed.draftReplyParts;
+    if (rawParts && typeof rawParts === "object") {
+      const values = rawParts as Record<string, unknown>;
+      parts = {
+        GREETING: typeof values.GREETING === "string" ? values.GREETING : "",
+        MAIN_MESSAGE: typeof values.MAIN_MESSAGE === "string" ? values.MAIN_MESSAGE : "",
+        REQUESTED_ACTION: typeof values.REQUESTED_ACTION === "string" ? values.REQUESTED_ACTION : "",
+        CLOSING: typeof values.CLOSING === "string" ? values.CLOSING : ""
+      };
     }
   } catch {
-    return text;
+    fallbackDraft = text;
   }
-  return text;
+  return renderReplyDraftFromTemplate(template, parts, fallbackDraft);
 }
 
 export class EasyMailApp {
@@ -271,7 +288,8 @@ export class EasyMailApp {
     await this.log("draft:polish", { itemId });
     const config = await this.readConfig();
     const language = resolveDraftLanguage(config.draftLanguage, draftText);
-    const prompt = buildPolishDraftPrompt(draftText, language);
+    const replyTemplate = await this.data.readReplyTemplate((event, data) => this.log(event, data));
+    const prompt = [buildPolishDraftPrompt(draftText, language), templateDraftOutputInstruction(replyTemplate)].join("\n\n");
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Polish draft", cancellable: true },
@@ -280,7 +298,7 @@ export class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "polish")).raw;
         }
       );
-      const result = raw.trim();
+      const result = extractDraftText(raw, replyTemplate);
       this.workingDrafts.set(itemId, result);
       this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId });
       vscode.window.showInformationMessage("Draft polished.");
@@ -293,7 +311,8 @@ export class EasyMailApp {
     await this.log("draft:refine", { itemId });
     const config = await this.readConfig();
     const language = resolveDraftLanguage(config.draftLanguage, draftText);
-    const prompt = buildRefineDraftPrompt(draftText, instruction, language);
+    const replyTemplate = await this.data.readReplyTemplate((event, data) => this.log(event, data));
+    const prompt = [buildRefineDraftPrompt(draftText, instruction, language), templateDraftOutputInstruction(replyTemplate)].join("\n\n");
     try {
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Refine draft", cancellable: true },
@@ -302,7 +321,7 @@ export class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "refine")).raw;
         }
       );
-      const result = raw.trim();
+      const result = extractDraftText(raw, replyTemplate);
       this.workingDrafts.set(itemId, result);
       this.workbenchPanel?.webview.postMessage({ type: "updateDraft", text: result, itemId });
       vscode.window.showInformationMessage("Draft refined.");
@@ -321,7 +340,8 @@ export class EasyMailApp {
     await this.log("draft:generate", { itemId: targetItemId, sourceId: targetSourceId });
     const config = await this.readConfig();
     try {
-      const prompt = await this.buildDraftGenerationPrompt(targetItemId, targetSourceId, config.draftLanguage);
+      const replyTemplate = await this.data.readReplyTemplate((event, data) => this.log(event, data));
+      const prompt = await this.buildDraftGenerationPrompt(targetItemId, targetSourceId, config.draftLanguage, replyTemplate);
       const raw = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: "Generate draft", cancellable: true },
         async (progress, token) => {
@@ -329,7 +349,7 @@ export class EasyMailApp {
           return (await sendPromptToModel(this.analysisContext(token), prompt, String(config.modelFamily || ""), "draftGenerate")).raw;
         }
       );
-      const result = extractDraftText(raw);
+      const result = extractDraftText(raw, replyTemplate);
       if (!result.trim()) {
         vscode.window.showWarningMessage("No reply draft was generated for this item.");
         return;
@@ -342,7 +362,7 @@ export class EasyMailApp {
     }
   }
 
-  private async buildDraftGenerationPrompt(itemId: string, sourceId: string, draftLanguage: unknown): Promise<string> {
+  private async buildDraftGenerationPrompt(itemId: string, sourceId: string, draftLanguage: unknown, replyTemplate: string): Promise<string> {
     if (itemId.startsWith("thread:")) {
       const threadStore = await this.data.readThreadStore();
       const thread = threadStore.items.find((item) => item.threadId === sourceId);
@@ -353,9 +373,9 @@ export class EasyMailApp {
       const language = resolveDraftLanguage(draftLanguage, latestNonSelfThreadText(thread));
       return [
         "You are an email writing assistant. Generate a concise professional reply draft for the selected Outlook thread.",
-        "Output only the reply draft text. Do not output JSON, Markdown, analysis, or explanation.",
+        templateDraftOutputInstruction(replyTemplate),
         draftOutputInstruction(language),
-        "If no reply is appropriate, output an empty string.",
+        "Generate a draft even when no reply appears necessary; provide a concise, courteous acknowledgement or status response.",
         "",
         `Thread subject: ${thread.subject || sourceId}`,
         `Participants: ${(thread.participants || []).join(", ") || "-"}`,
@@ -379,9 +399,9 @@ export class EasyMailApp {
     const language = resolveDraftLanguage(draftLanguage, mail?.bodyExcerpt || analysis?.summary || "");
     return [
       "You are an email writing assistant. Generate a concise professional reply draft for the selected Outlook mail.",
-      "Output only the reply draft text. Do not output JSON, Markdown, analysis, or explanation.",
+      templateDraftOutputInstruction(replyTemplate),
       draftOutputInstruction(language),
-      "If no reply is appropriate, output an empty string.",
+      "Generate a draft even when no reply appears necessary; provide a concise, courteous acknowledgement or status response.",
       "",
       `Subject: ${mail?.subject || analysis?.subject || sourceId}`,
       `From: ${mail?.from || analysis?.sender || "-"}`,
@@ -425,9 +445,11 @@ export class EasyMailApp {
     const queue = (state as DashboardState & { queue?: ReturnType<typeof buildQueueState> }).queue || { pending: [], blocked: [], analysed: [], allowed: [] };
     const threadStore = (state as DashboardState & { threadStore?: ThreadStore }).threadStore || emptyThreadStore();
     const visibleThreadStore = filterVisibleThreadsForDashboard(threadStore);
+    const version = String(this.context.extension.packageJSON?.version || "0.4.0");
     return renderEasyMailGuideHtml({
       locale,
-      version: String(this.context.extension.packageJSON?.version || "0.4.0"),
+      version,
+      completedOnboardingStepIds: this.context.globalState.get<string[]>(guideProgressKey(version)) || [],
       stats: {
         pulled: store.items.length,
         pending: queue.pending.length,
@@ -441,11 +463,27 @@ export class EasyMailApp {
     if (!message || typeof message !== "object") {
       return;
     }
-    const typed = message as { type?: string; action?: string };
+    const typed = message as { type?: string; action?: string; stepId?: string };
     if (typed.type !== "guideAction") {
       return;
     }
     await this.log("guide:action", { action: typed.action || "" });
+    if (typed.action === "completeOnboardingStep") {
+      const stepId = typed.stepId || "";
+      if (!GUIDE_ONBOARDING_STEP_IDS.has(stepId)) {
+        return;
+      }
+      const version = String(this.context.extension.packageJSON?.version || "0.4.0");
+      const key = guideProgressKey(version);
+      const completed = this.context.globalState.get<string[]>(key) || [];
+      if (!completed.includes(stepId)) {
+        await this.context.globalState.update(key, [...completed, stepId]);
+      }
+      if (this.guidePanel) {
+        this.guidePanel.webview.html = await this.getGuideHtml();
+      }
+      return;
+    }
     if (typed.action === "openDashboard") {
       await vscode.commands.executeCommand("workbench.view.extension.easyMail");
       await vscode.commands.executeCommand("easyMail.dashboard.focus");

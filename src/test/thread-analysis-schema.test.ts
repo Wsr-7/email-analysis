@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeThreadAnalysis, parseThreadAnalysisJson } from "../lib/thread-analysis-schema";
+import { normalizeThreadAnalysis, parseThreadAnalysisJson } from "../lib/analysis/thread-analysis-schema";
 
 test("parseThreadAnalysisJson accepts fenced JSON and preserves thread evidence", () => {
   const result = parseThreadAnalysisJson(`\`\`\`json

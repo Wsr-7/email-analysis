@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseDigest } from "../lib/digest";
+import { parseDigest } from "../lib/domain/digest";
 
 test("parseDigest extracts metadata and mail items", () => {
   const result = parseDigest(`# Outlook Mail Digest
