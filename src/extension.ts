@@ -234,7 +234,7 @@ export class EasyMailApp {
         this.workbenchPanel.dispose();
         return;
       }
-      this.workbenchPanel.reveal(vscode.ViewColumn.One);
+      this.workbenchPanel.reveal(vscode.ViewColumn.One, true);
       await this.rebuildWorkbenchHtml();
       this.workbenchPanel.webview.postMessage({ type: "focusItem", id: focusId });
       return;
@@ -242,7 +242,7 @@ export class EasyMailApp {
     const panel = vscode.window.createWebviewPanel(
       "easyMail.workbench",
       "EasyMail",
-      vscode.ViewColumn.One,
+      { viewColumn: vscode.ViewColumn.One, preserveFocus: true },
       { enableScripts: true, retainContextWhenHidden: true }
     );
     this.workbenchPanel = panel;

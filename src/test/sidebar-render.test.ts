@@ -261,6 +261,13 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes("openItem(id, activeId)"));
   });
 
+  it("keeps sidebar focus when opening or revealing the workbench", () => {
+    const extensionSource = fs.readFileSync(path.join(process.cwd(), "src", "extension.ts"), "utf8");
+
+    assert.match(extensionSource, /workbenchPanel\.reveal\(vscode\.ViewColumn\.One, true\)/);
+    assert.match(extensionSource, /createWebviewPanel\([\s\S]*?"easyMail\.workbench",[\s\S]*?\{ viewColumn: vscode\.ViewColumn\.One, preserveFocus: true \}/);
+  });
+
   it("renders settings panel hidden by default", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes('id="settingsPanel"'));
