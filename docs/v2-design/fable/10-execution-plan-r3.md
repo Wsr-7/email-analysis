@@ -167,6 +167,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G8.5 已完成（`01843d5`）：两类折叠组头统一使用更亮的 section header 前景、700 字重和轻微字距/垂直 padding，字号保持 11px。全量测试 459 pass。Next: claim G8.6。
 - 2026-07-14 · G8.6 已完成（`5087a8a`）：saveConfig 到达即登记设置写入链，后续读 config 的 webview 动作只等待该写入，不等待 refresh，也不把长动作彼此串行。全量测试 461 pass。Next: claim G8.7。
 - 2026-07-14 · G8.7 已完成（`1890870`）：draftGeneration 的 auto label 从“Automatic”统一为“Auto”，并检查所有 enum/enumItemLabels 数量一致。全量测试 462 pass。Next: claim G8.8。
+- 2026-07-14 · G8.8 已完成（`f9899df`）：VBS 通过 PR_ATTACHMENT_HIDDEN 过滤隐藏内嵌附件，属性/对象读取失败时保守计入；sample 输出不变。全量测试 463 pass。Next: claim G8.9。
 
 ---
 
@@ -348,6 +349,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.8 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `9525536`；重新定位确认 `SafeAttachmentCount` 直接返回 COM Count，`SafeAttachmentNames` 无条件枚举全部文件名，内嵌签名图因此与真实附件同等输出。边界：新增单一可见性 helper 读取 PR_ATTACHMENT_HIDDEN，属性/附件读取失败时保守视为可见；count 与 names 复用该 helper；不改 digest 字段、sample 数据、Type/Position/CID 推断或附件内容访问。Action: claim G8.8。
 
+- **2026-07-14 · Codex（G8.8 completion）**：Action: 新增 `IsVisibleAttachment`，默认可见并读取 PR_ATTACHMENT_HIDDEN；仅明确为 True 时排除，PropertyAccessor/属性/转换读取失败均保持可见。count 在 Attachment 对象读取失败时仍保守 +1，names 只汇总可见且可读文件名。Validated: TDD RED 锁定 helper、属性 tag、失败默认与 count/names 复用；VBS `--help` 通过；VBS `--sample` 通过；`npm run validate:sample` 17 pass；collector 测试 4 pass；fresh `npm test` 463 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——Fetch 一封只有签名/logo 内嵌图的邮件应无 📎，再 Fetch 一封含真实附件（可同时有签名图）的邮件应只统计真实附件。Next: G8.9。
+
+  **Completion Notes**
+  - 改动文件：`scripts/collect-outlook-mails.vbs`、`src/test/collector-scripts.test.ts`、本计划。
+  - 实现边界：只依据 PR_ATTACHMENT_HIDDEN 过滤；未改 digest 字段/sample 数据，未读取内容，也未增加 CID/Position/Type 猜测。
+  - 验收结果：VBS help/sample、sample 端到端 17 项、collector 静态语义测试和 fresh 全量 463 项均通过。
+  - Manual validation：**needs user validation**，真实 Outlook 对签名图片的 PR_ATTACHMENT_HIDDEN 标记和真附件保留由用户手动确认。
+  - Known issues：首次全量运行出现一次既有 G1 并发测试的时序抖动（期望同时 in-flight=2，瞬时观测为 1）；隔离重跑通过，随后 fresh 全量 463/463 通过，未修改 G1。未被 Outlook 标记 hidden 的内嵌对象仍会保守显示，这是本 step 的明确边界。
+  - Commit：`f9899df`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -403,7 +414,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - `easyMail.draftGeneration` 的 enumItemLabels `Automatic` → `Auto`（与 Draft Language 的 Auto 一致）；顺带扫一遍其余枚举 label 用词一致性。
 - **验收**：`npm test` 全绿。
 
-### [~] G8.8 附件计数过滤内嵌图片（M12 用户"勉强接受"项，P3）
+### [x] G8.8 附件计数过滤内嵌图片（M12 用户"勉强接受"项，P3）— `f9899df`
 
 - **现状**：正文内嵌图片（签名 logo 等）被 Outlook 计为附件，导致大量邮件误挂 📎。
 - **做法**：VBS `SafeAttachmentCount`/`SafeAttachmentNames` 过滤隐藏/内嵌附件——用 `Attachment.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")`（PR_ATTACHMENT_HIDDEN）为 True 的跳过；读取失败时保守保留（宁可多算不可漏算真附件）；On Error 守护齐全。sample 不受影响。
