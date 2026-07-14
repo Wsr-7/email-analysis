@@ -43,7 +43,7 @@ EasyMail 不会把邮件内容上传到自己的服务。用于分析的邮件�
 
 <!-- SCREENSHOT: sample-mode-results.png — Generate Sample Digest 后的示例邮件、会议与分诊结果 -->
 
-源码搭建和开发命令见 [setup.md](./setup.md)。
+源码搭建和开发命令见[开发说明](./docs/development.md)。
 
 ## Usage
 
@@ -69,7 +69,7 @@ EasyMail 不会把邮件内容上传到自己的服务。用于分析的邮件�
 
 <!-- SCREENSHOT: select-outlook-folders.png — Select Outlook Folders QuickPick，需截到可多选文件夹和 Sent Items 标记 -->
 
-完整命令列表和工作流细节见 [user guide.md](./user%20guide.md)。
+完整命令列表和工作流细节见[用户指南](./docs/user-guide.md)。
 
 ## Configuration
 
@@ -82,7 +82,7 @@ EasyMail 不会把邮件内容上传到自己的服务。用于分析的邮件�
 - `easyMail.autoAnalyzeMaxClassificationLevel`：自动分析门控阈值。
 - `easyMail.bodyExcerptChars`：每封邮件保留给分析的最大正文字符数。
 
-Sidebar 只提供少量常用控件，VS Code Settings 始终是唯一生效源。完整参考见 [user guide.md](./user%20guide.md)。
+Sidebar 只提供少量常用控件，VS Code Settings 始终是唯一生效源。完整参考见[用户指南](./docs/user-guide.md)。
 
 ## FAQ
 
@@ -100,7 +100,7 @@ Sidebar 只提供少量常用控件，VS Code Settings 始终是唯一生效源�
 
 ### 到哪里看完整命令与配置说明？
 
-查看 [user guide.md](./user%20guide.md)。贡献或本地开发可参阅 [setup.md](./setup.md) 与项目结构说明 [AGENTS.md](./AGENTS.md)。
+查看[用户指南](./docs/user-guide.md)。贡献或本地开发可参阅[开发说明](./docs/development.md)与项目结构说明 [AGENTS.md](./AGENTS.md)。
 
 ## Known Limitations
 

@@ -10,3 +10,7 @@ dist/
 *.log
 .npm-cache/
 .codex/
+.tmp/
+.local/
+.agents/
+tasks/
