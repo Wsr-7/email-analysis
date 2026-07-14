@@ -160,6 +160,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G6 已完成（`5d48d65`）：Sidebar 列表可聚焦，ArrowUp/ArrowDown 仅遍历当前真实可见 `.sb-row`，跳过两类折叠组隐藏项与组头，复用 openItem 并滚动入视野。全量测试 451 pass。Next: claim G7。
 - 2026-07-14 · G7 已完成（`e323af6`）：pending/analyzed 单封邮件在 Sidebar 与 Workbench 显示附件元数据，batch prompt 含 count/name 且附件名先脱敏，实际 system prompt 明确禁止声称读取附件内容。全量测试 454 pass。Next: 全量收口复验。
 - 2026-07-14 · R3 G 批次收口完成：G1-G7 全部 `[x]`，整体 diff 复核未发现 Critical/Important 问题；最终 `npm run compile`、454 项全量测试与 `git diff --check` 均通过。14 个本地 commit，未 push。
+- 2026-07-14 · G8.1 已完成（`5683136`）：keyword 型 `manual_confirm` 不再落入 Pending，而是进入 Manual Confirm Required；显式确认分析仍可用，两个关键词设置的机制差异已写清。全量测试 455 pass。Next: claim G8.2。
 
 ---
 
@@ -257,6 +258,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.1 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `73897c5`；基线 `npm test` 454 pass / 0 fail。重新定位确认 `src/lib/security-gate.ts:89-106` 已正确生成 keyword 型 `manual_confirm`，设置读取链完整；根因仍在 `src/lib/classification.ts:111-114` 的 allowed filter 只排除 `block`，因此低 level 的 keyword 命中邮件仍落入 Pending。`src/lib/workbench-render.ts:26` 已对任意 `manual_confirm` 渲染 Confirm and Analyze，现有 level 型测试路径可复用。边界：只修共享队列归属、补 keyword 型回归测试并澄清两个 setting description；不改 security gate 判定、阈值语义或其他 G8 step。Action: claim G8.1。
 
+- **2026-07-14 · Codex（G8.1 completion）**：Action: 将 `manual_confirm` 与 `block` 一并排除出 allowed/Pending，使 keyword 型人工确认邮件进入共享 blocked 队列；复用既有显式确认授权链，并澄清 `manualConfirmKeywords` 与 `classificationLevel3Keywords` 的机制差异。Validated: TDD RED 准确复现 keyword 邮件误入 allowed；`npm run compile` 通过；classification/security-gate/workbench 相关测试 64 pass；fresh `npm test` 455 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——在 `manualConfirmKeywords` 加入主题关键词，Fetch 后确认邮件进入 Manual Confirm Required，点击 Confirm and Analyze 后可完成分析。Next: G8.2。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/classification.ts`、`src/test/classification.test.ts`、`package.json`、本计划。
+  - 实现边界：只修共享队列归属和设置说明；未改 security gate 判定、自动阈值语义或 Workbench 消息协议。
+  - 验收结果：keyword 型 `manual_confirm` 进入 blocked 队列、显式确认仍由 `canAnalyzeMail(..., true)` 放行，并与现有 level 型 UI 路径一致；全量 455 pass。
+  - Manual validation：**needs user validation**，真实 Settings、Fetch、Manual Confirm Required 与 Confirm and Analyze 链路仍需扩展宿主确认。
+  - Known issues：首次全量复验出现一次既有 G1 cancellation 测试的完成顺序抖动；该用例隔离重跑 5/5 通过，随后 fresh 全量 455/455 通过，因此未越界修改 G1。
+  - Commit：`5683136`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -271,7 +282,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 > 验证结果已由用户回填至 §2.2 语境（通过：M01-M04/M06-M09/M12-M14；失败：M05 manualConfirm 词表、M10/M11 方向键）。规划者已定位两个失败项根因。协议同 §0。
 
-### [~] G8.1 manualConfirm 关键词命中不进 Manual Confirm 队列（M05，P1，根因已确证）
+### [x] G8.1 manualConfirm 关键词命中不进 Manual Confirm 队列（M05，P1，根因已确证）— `5683136`
 
 - **根因（已确证）**：`security-gate.ts` 的 `decideMail` 对 manualConfirmKeywords 的判定正确（L104-106），设置接线也完整；坏在队列归属——F7.3（`e857db4`）给 `buildQueueState` 的 `allowed` 过滤只加了 `securityDecisions.get(id)?.decision !== "block"`，**漏排 `manual_confirm`**。关键词命中的邮件 level 未超标 → 仍留在 allowed/Pending，永远进不了 blocked（Manual Confirm Required）队列。hardBlock 正常正是因为被排除了。
 - **做法**：`allowed` 过滤改为排除 `decision === "block" || decision === "manual_confirm"`；确认 blocked 队列的 UI 文案/确认按钮对 keyword 型 manual_confirm 与 level 型行为一致（workbench 的 Confirm and Analyze 应可用）。顺带回答用户 M04 的疑问——在两个设置的 description 中写清差异：`classificationLevel3Keywords` 改变邮件**分级**（影响徽标显示与阈值比较，调高 `autoAnalyzeMaxClassificationLevel` 到 3 后可自动分析）；`manualConfirmKeywords` **无视分级强制人工确认**（任何阈值下都要确认）。两者在默认阈值下效果相似但机制不同，不是重复配置。
