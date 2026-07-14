@@ -358,6 +358,26 @@ describe("renderSidebarHtml", () => {
     assert.ok(!html.includes('id="folders"'));
   });
 
+  it("flushes live sidebar settings before top configuration-dependent actions", () => {
+    const html = renderSidebarHtml(stubInput());
+
+    assert.match(html, /data-message-type="pullMail"[^>]*data-save-config-before-action="true"/);
+    assert.match(html, /data-action="runAnalyze"[^>]*data-save-config-before-action="true"/);
+    assert.match(html, /data-message-type="loadMore"[^>]*data-save-config-before-action="true"/);
+    assert.ok(html.includes("if (target.getAttribute('data-save-config-before-action') === 'true') saveConfig(true, true);"));
+    assert.ok(html.indexOf("saveConfig(true, true)") < html.indexOf("if (action === 'post')"));
+  });
+
+  it("opens the first visible item when the user selects a non-empty queue", () => {
+    const html = renderSidebarHtml(stubInput());
+
+    assert.ok(html.includes("showQueue(target.getAttribute('data-queue-id') || '', true)"));
+    assert.ok(html.includes("function focusFirstQueueItem()"));
+    assert.ok(html.includes("!row.hidden && row.offsetParent !== null"));
+    assert.ok(html.includes("openItem(rowItemId(first), first.getAttribute('data-next-action-id') || '')"));
+    assert.ok(html.includes("first.scrollIntoView({ block: 'nearest' })"));
+  });
+
   it("can highlight the selected sidebar row from extension messages", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes("setActiveRow(msg.id)"));

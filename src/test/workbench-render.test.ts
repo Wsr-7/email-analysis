@@ -457,6 +457,21 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes('data-action="openInOutlook" data-mail-id="m1"'));
     assert.ok(html.includes('title="Alice &lt;alice@test.com&gt;"'), "thread senders should retain full addresses in tooltips");
     assert.ok(html.includes("<strong title=\"Alice &lt;alice@test.com&gt;\">Alice</strong>"), "timeline should show display name only");
+    assert.ok(html.includes('class="wb-timeline-sort" data-action="toggleTimelineOrder" data-thread-id="t1" data-order="asc"'));
+    assert.ok(html.includes('Timeline (1) <span class="wb-timeline-arrow" aria-hidden="true">↑</span>'));
+    assert.ok(html.includes('class="wb-timeline-list"'));
+  });
+
+  it("toggles and persists each thread timeline order in the webview", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes("function setTimelineOrder(button, order, persist)"));
+    assert.ok(html.includes("list.appendChild(items[i])"));
+    assert.ok(html.includes("timelineOrders[threadId] = order"));
+    assert.ok(html.includes("if (a === 'toggleTimelineOrder')"));
+    assert.ok(html.includes("setTimelineOrder(t, t.getAttribute('data-order') === 'asc' ? 'desc' : 'asc', true)"));
+    assert.ok(html.includes("restoreTimelineOrders()"));
+    assert.ok(html.includes("background: var(--vscode-button-hoverBackground, #1177bb)"));
   });
 
   it("handles focusItem message via client-side JS", () => {

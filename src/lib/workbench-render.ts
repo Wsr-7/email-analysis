@@ -195,7 +195,10 @@ function renderThreadDetail(
         : `<button class="wb-btn ghost" data-action="ignoreThread" data-thread-id="${escapeAttr(thread.threadId)}">${escapeHtml(labels.card.ignore)}</button>`}
     </div>
     ${renderThreadSpotlight(analysis, labels, workingDrafts)}
-    ${timelineItems.length ? `<div class="wb-timeline-section"><h4>${escapeHtml(labels.threads.timeline)} (${timelineItems.length})</h4>${timeline}</div>` : ""}
+    ${timelineItems.length ? `<div class="wb-timeline-section">
+      <button class="wb-timeline-sort" data-action="toggleTimelineOrder" data-thread-id="${escapeAttr(thread.threadId)}" data-order="asc">${escapeHtml(labels.threads.timeline)} (${timelineItems.length}) <span class="wb-timeline-arrow" aria-hidden="true">↑</span></button>
+      <div class="wb-timeline-list">${timeline}</div>
+    </div>` : ""}
   </div>`;
 }
 
@@ -354,7 +357,8 @@ export function renderWorkbenchHtml(input: DashboardRenderInput, nonce: string):
 
   /* Timeline */
   .wb-timeline-section { margin-top: 20px; padding-top: 0; }
-  .wb-timeline-section > h4 { font-size: 13px; font-weight: 600; margin-bottom: 12px; opacity: 0.7; }
+  .wb-timeline-sort { padding: 4px 6px; margin: 0 0 8px -6px; border-radius: 4px; background: transparent; color: var(--vscode-editor-foreground, #ccc); font-size: 13px; font-weight: 600; opacity: 0.7; }
+  .wb-timeline-sort:hover { opacity: 1; background: var(--vscode-button-hoverBackground, #1177bb); color: var(--vscode-button-foreground, #fff); }
   .wb-tl-item { padding: 10px 0 10px 14px; border-left: 2px solid var(--vscode-panel-border, rgba(128,128,128,0.25)); margin-bottom: 2px; }
   .wb-tl-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   .wb-tl-head strong { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -427,6 +431,7 @@ var prev = vscode.getState() || {};
 var currentId = prev.currentId || '';
 var draftReportTimer;
 
+restoreTimelineOrders();
 if (currentId) showReader(currentId);
 
 function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, extra || {})); }
@@ -525,10 +530,38 @@ function closeDraftOutlookActions() {
   }
 }
 
+function setTimelineOrder(button, order, persist) {
+  var section = button.closest('.wb-timeline-section');
+  var list = section ? section.querySelector('.wb-timeline-list') : null;
+  if (!list) return;
+  if (button.getAttribute('data-order') !== order) {
+    var items = Array.prototype.slice.call(list.children);
+    for (var i = items.length - 1; i >= 0; i--) list.appendChild(items[i]);
+  }
+  button.setAttribute('data-order', order);
+  var arrow = button.querySelector('.wb-timeline-arrow');
+  if (arrow) arrow.textContent = order === 'asc' ? '↑' : '↓';
+  if (!persist) return;
+  var state = vscode.getState() || {};
+  var timelineOrders = Object.assign({}, state.timelineOrders || {});
+  var threadId = button.getAttribute('data-thread-id') || '';
+  if (threadId) timelineOrders[threadId] = order;
+  setPersistedState({ timelineOrders: timelineOrders });
+}
+
+function restoreTimelineOrders() {
+  var timelineOrders = prev.timelineOrders || {};
+  for (var button of document.querySelectorAll('.wb-timeline-sort')) {
+    var threadId = button.getAttribute('data-thread-id') || '';
+    if (timelineOrders[threadId] === 'desc') setTimelineOrder(button, 'desc', false);
+  }
+}
+
 document.addEventListener('click', function(e) {
   var t = e.target && e.target.closest ? e.target.closest('button[data-action]') : null;
   if (!t) return;
   var a = t.getAttribute('data-action');
+  if (a === 'toggleTimelineOrder') setTimelineOrder(t, t.getAttribute('data-order') === 'asc' ? 'desc' : 'asc', true);
   if (['polishDraft', 'refineDraft', 'composeMail', 'generateDraft'].includes(a)) closeDraftOutlookActions();
   if (a === 'copyDraft') { var ta = t.closest('.draft-box-editable'); var v = ta ? ta.querySelector('.draft-textarea') : null; post('copyDraft', { draftReply: v ? v.value : (t.getAttribute('data-draft-reply') || '') }); }
   if (a === 'polishDraft' || a === 'refineDraft') { clearTimeout(draftReportTimer); var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; var itemId = box ? box.getAttribute('data-item-id') || '' : ''; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: itemId }); }

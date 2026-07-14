@@ -543,9 +543,9 @@ export function renderSidebarHtml(input: DashboardRenderInput, nonce: string): s
     </div>
 
     <div class="sb-actions-bar">
-      <button class="sb-primary${pullMailBusy ? " is-busy" : ""}" data-action="post" data-message-type="pullMail"${busyDisabled}>${escapeHtml(labels.toolbar.pullMail)}${renderButtonSpinner(pullMailBusy)}</button>
+      <button class="sb-primary${pullMailBusy ? " is-busy" : ""}" data-action="post" data-message-type="pullMail" data-save-config-before-action="true"${busyDisabled}>${escapeHtml(labels.toolbar.pullMail)}${renderButtonSpinner(pullMailBusy)}</button>
       <div class="sb-analyze-group">
-        <button class="sb-primary${analyzeNextBusy ? " is-busy" : ""}" data-action="runAnalyze"${analysisDisabled}>${escapeHtml(locale === "zh-CN" ? "分析" : "Analyze")}${renderButtonSpinner(analyzeNextBusy)}</button>
+        <button class="sb-primary${analyzeNextBusy ? " is-busy" : ""}" data-action="runAnalyze" data-save-config-before-action="true"${analysisDisabled}>${escapeHtml(locale === "zh-CN" ? "分析" : "Analyze")}${renderButtonSpinner(analyzeNextBusy)}</button>
         <select class="sb-batch-select" id="batchSelect"${analysisDisabled}>
           <option value="5"${batchSize === 5 ? " selected" : ""}>5</option>
           <option value="10"${batchSize === 10 ? " selected" : ""}>10</option>
@@ -554,7 +554,7 @@ export function renderSidebarHtml(input: DashboardRenderInput, nonce: string): s
           <option value="all">${escapeHtml(locale === "zh-CN" ? "全部" : "All")}</option>
         </select>
       </div>
-      <button class="sb-secondary" data-action="post" data-message-type="loadMore"${!hasHistoryAnchors ? " disabled" : busyDisabled} title="${escapeAttr(labels.toolbar.loadMore)}">+</button>
+      <button class="sb-secondary" data-action="post" data-message-type="loadMore" data-save-config-before-action="true"${!hasHistoryAnchors ? " disabled" : busyDisabled} title="${escapeAttr(labels.toolbar.loadMore)}">+</button>
     </div>
     ${!canAnalyze ? `<div class="sb-model-hint"><svg viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M7.5 1a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM6.3 11c0-.5.4-.9.9-.9s.9.4.9.9-.4.9-.9.9-.9-.4-.9-.9zM6.5 4h2v5h-2V4z"/></svg>${escapeHtml(locale === "zh-CN" ? "请先在下方设置中加载模型" : "Load models in settings below to analyze")}</div>` : ""}
   </div>
@@ -621,10 +621,11 @@ if (prev.currentItemId) setActiveRow(prev.currentItemId);
 
 function post(type, extra) { vscode.postMessage(Object.assign({ type: type }, extra || {})); }
 
-function showQueue(queueId) {
+function showQueue(queueId, focusFirst) {
   currentQueue = queueId;
   applyQueue(queueId, true);
   vscode.setState(Object.assign({}, vscode.getState() || {}, { currentQueue: queueId }));
+  if (focusFirst) focusFirstQueueItem();
 }
 
 window.addEventListener('message', function(e) {
@@ -644,6 +645,17 @@ function applyQueue(queueId, smooth) {
     if (match) anyVisible = true;
   }
   document.getElementById('emptyState').hidden = anyVisible;
+}
+
+function focusFirstQueueItem() {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.sb-row')).filter(function(row) {
+    return !row.hidden && row.offsetParent !== null;
+  });
+  if (!rows.length) return;
+  var first = rows[0];
+  document.getElementById('itemList').focus({ preventScroll: true });
+  openItem(rowItemId(first), first.getAttribute('data-next-action-id') || '');
+  first.scrollIntoView({ block: 'nearest' });
 }
 
 function restorePendingFolders() {
@@ -733,8 +745,9 @@ document.addEventListener('click', function(e) {
   var target = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
   if (!target) return;
   var action = target.getAttribute('data-action') || '';
+  if (target.getAttribute('data-save-config-before-action') === 'true') saveConfig(true, true);
   if (action === 'post') post(target.getAttribute('data-message-type') || '');
-  if (action === 'showQueue') showQueue(target.getAttribute('data-queue-id') || '');
+  if (action === 'showQueue') showQueue(target.getAttribute('data-queue-id') || '', true);
   if (action === 'togglePendingFolder') togglePendingFolder(target);
   if (action === 'toggleAcceptedSchedule') toggleAcceptedSchedule(target);
   if (action === 'openItem') {

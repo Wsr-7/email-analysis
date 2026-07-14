@@ -170,6 +170,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G8.8 已完成（`f9899df`）：VBS 通过 PR_ATTACHMENT_HIDDEN 过滤隐藏内嵌附件，属性/对象读取失败时保守计入；sample 输出不变。全量测试 463 pass。Next: claim G8.9。
 - 2026-07-14 · G8.9 已完成（`08ce54c`）：Polish/Refine/Compose/Generate 任一草稿动作都会先立即收起全部已打开的 Outlook Actions 菜单。全量测试 464 pass。Next: G8 全批次收口复验。
 - 2026-07-14 · G8 全批次收口完成：G8.1-G8.9 全部 `[x]`；fresh `npm test` 464 pass / 0 fail，VBS help/sample 与 sample 端到端通过，`git diff --check` 通过；已重打 `releases/easymail-0.3.0.vsix`，本地 commit，未 push。
+- 2026-07-14 · G9 已 claim：确认 G8.6 未覆盖输入框尚未触发 `change` 的前端消息缺口；合并处理顶部动作前保存、分类首项双栏联动和线程 Timeline 排序。Next: TDD RED → 最小实现 → 全量验证。
 
 ---
 
@@ -365,6 +366,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.9 completion）**：Action: 新增 `closeDraftOutlookActions`，统一枚举 `details.draft-outlook-actions[open]` 并移除 open；Polish/Refine/Compose/Generate 在 post 前调用。Validated: TDD RED 锁定 helper、选择器与四类动作；workbench 44 pass；fresh `npm test` 464 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——展开 Outlook Actions 后点击 Polish 或 Refine，菜单应在任务开始瞬间收起；Compose/Generate 同样收起。Next: G8 全批次收口复验。
 
+- **2026-07-14 · Codex（G9 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `1f38783`。重新定位确认 Sidebar 设置只在 `change` 后 debounce 发送 `saveConfig`，因此未失焦输入在 G8.6 写入链之前就丢失；queue 点击目前只执行过滤；Workbench Timeline 固定 ASC 且标题不可交互。边界：复用现有保存、`openItem`、ASC 排序和 webview state，只补三个前端交互缺口；不改 extension 消息协议、数据排序/store、空分类详情语义或 Outlook 动作。Action: 合并 claim G9.1-G9.3。
+
   **Completion Notes**
   - 改动文件：`src/lib/workbench-render.ts`、`src/test/workbench-render.test.ts`、本计划。
   - 实现边界：只收起 class 精确匹配的 Outlook draft details；未改草稿文本、按钮状态、消息 payload 或其他 details。
@@ -440,6 +443,13 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - workbench 点击 Polish/Refine（或任何草稿动作）时，立即关闭处于展开态的 `details.draft-outlook-actions`（`document.querySelectorAll('details[open]')` 收起），不等任务结束由重渲染关闭。
 - **验收**：单测断言收起逻辑存在；`npm test` 全绿。**needs user validation**：点 Polish 瞬间下拉收起。
+
+### [~] G9 人工验证第二轮交互反馈（G8.6 补根因 + 分类首项联动 + Timeline 排序，S 级合并 claim）
+
+- **G9.1 根因修正**：G8.6 只覆盖 `saveConfig` 已到达 extension 后的异步写入竞态；`rangeValue` 仍只在 `change`（通常需失焦）时发送保存消息。Sidebar 顶部 Fetch / Analyze / Load More 在原动作前统一调用现有 `saveConfig`，直接读取当前表单并静默发送；沿用 G8.6 的 extension 写入链保证后续动作等待落盘。不改设置结构或保存 toast。
+- **G9.2 分类首项联动**：用户点击 queue/category 后，完成过滤并聚焦列表，在当前真实可见行中选择第一条，复用 `openItem` 同步 Sidebar 高亮与 Workbench；空分类不改变现有 Workbench 内容，extension 主动发来的 `focusQueue` 仍只切队列、不擅自打开邮件。
+- **G9.3 Timeline 排序**：线程 Timeline 标题改为可点击按钮，默认显示 `Timeline (N) ↑`（旧→新）；点击切换 `↓`（新→旧）并反转该线程 timeline DOM，hover 使用与 Outlook 跳转按钮一致的蓝色变量；排序偏好按 thread id 写入现有 webview state，HTML 刷新后恢复。
+- **验收**：TDD 覆盖三条交互脚本与关键 markup/CSS；`npm test` 全绿。**needs user validation**：不失焦改 maxItems/recentHours 后直接 Fetch/Analyze/Load More；点击有内容的分类时两栏同步第一条；Timeline 箭头、排序、蓝色 hover 与刷新后记忆均符合预期。
 
 ---
 
