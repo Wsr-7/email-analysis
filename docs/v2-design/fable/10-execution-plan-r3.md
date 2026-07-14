@@ -294,6 +294,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：Workbench 独立聚焦一个线程且此前没有选中 action 时，不会猜测应高亮哪个 Next Action；会优先匹配普通线程行，这是有意避免多选。
   - Commit：`1dac69c`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8.4 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `8e9f5a4`；重新定位确认 `app-analysis.ts` 在 chunk 划分后掌握 batch/chunk 总数，但初始 progress 固定为 `Completed 0/N chunks.`，后续完成进度也固定英文；`analyze:chunkStart` 在 transport 前、`analyze:response` 在返回后记录，足以供真实日志判断两个请求是否重叠。边界：只恢复含邮件数/chunk 数的本地化初始 toast，并保持现有完成数/预计剩余时间语义；不改并发池、日志事件、估时算法或模型调用。真实 Copilot 并发实效按用户要求留给人工日志验证。Action: claim G8.4。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -326,7 +328,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 用 sample 线程数据复现"多个 action 同时高亮"（F7.2 修过一次，线程来源的 action 疑似再破）；修复并补覆盖线程场景的单测。按钮 label：`Done/完成` → `Mark Done/标记已完成`（中英文）。
 - **验收**：单测 + `npm test` 全绿。**needs user validation**：sample 线程下单选高亮正确。
 
-### [ ] G8.4 分析进度 toast 恢复丰富文案 + 并发实效核查（M01 附带要求 + 额外反馈#2，P2）
+### [~] G8.4 分析进度 toast 恢复丰富文案 + 并发实效核查（M01 附带要求 + 额外反馈#2，P2）
 
 - 文案回滚增强：初始行恢复上一版信息量——`Analyzing 20 emails in 2 chunks…`（含邮件总数与 chunk 总数，替换现在干瘪的 `Completed 0/2 chunks.`）；进行中保留 `Completed x/N chunks (about X minutes remaining)`。中英文同步。
 - **并发实效核查（用户反馈提速无感）**：在日志中对比同一次分析里两个 chunk 的 `analyze:chunkStart`/`analyze:response` 时间戳是否重叠——若 vscode.lm 对同会话请求内部串行化导致并发无效，如实记入 Completion Notes 的 Known issues（属平台限制，不强行绕），并在 §7 汇报给规划者。
