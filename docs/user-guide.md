@@ -27,13 +27,17 @@ EasyMail never sends mail automatically. Outlook compose actions only open a dra
 | `EasyMail: Analyze Thread with Copilot` | Analyzes the selected thread. |
 | `EasyMail: Analyze All Allowed with Copilot` | Analyzes all mail currently allowed by the security gate. |
 | `EasyMail: Load Copilot Models` | Refreshes selectable VS Code Language Model API models. |
-| `EasyMail: Open Digest` / `Open Summary` | Opens the locally stored digest or summary. |
+| `EasyMail: Open Digest` | Opens the locally stored digest. |
+| `EasyMail: Open Summary` | Opens the locally stored summary. |
 | `EasyMail: Generate Reports` | Rebuilds Markdown reports from current results. |
-| `EasyMail: Open Daily Brief` / `Open Thread Report` / `Open Single Mail Report` | Opens the corresponding report. |
+| `EasyMail: Open Daily Brief` | Opens the current daily brief report. |
+| `EasyMail: Open Thread Report` | Opens the selected thread report. |
+| `EasyMail: Open Single Mail Report` | Opens the selected mail report. |
 | `EasyMail: Select Outlook Folders` | Chooses Outlook folders used by collection. |
 | `EasyMail: Open Settings` | Opens the EasyMail settings page. |
 | `EasyMail: Open User Guide` | Opens this guide inside VS Code. |
-| `EasyMail: Open Reply Template` / `Open Prompt Config` | Opens the local editable template or prompt configuration. |
+| `EasyMail: Open Reply Template` | Opens the local editable reply template. |
+| `EasyMail: Open Prompt Config` | Opens the local editable prompt configuration. |
 | `EasyMail: Clear Local Cache` | Clears EasyMail's locally stored data. |
 | `EasyMail: Open Workbench` | Opens the reading pane. |
 
@@ -56,7 +60,9 @@ VS Code Settings is the source of truth. The Sidebar only exposes the high-frequ
 | `easyMail.meetingDaysAhead` | Number of future calendar days to collect. |
 | `easyMail.modelFamily` | Preferred Copilot model identity. |
 | `easyMail.outputLanguage` / `easyMail.draftLanguage` | Output and draft language selection. |
+| `easyMail.draftGeneration` | Generates drafts automatically or on demand. |
 | `easyMail.bodyExcerptChars` | Maximum collected body characters per mail. |
+| `easyMail.sampleMode` | Uses generated sample data instead of Outlook collection. |
 | `easyMail.mailStoreRetentionDays` | Mail body retention; default is seven days. |
 | `easyMail.analysisRetentionDays` / `easyMail.mailIndexRetentionDays` | Retention for results and pagination/dedup metadata. |
 | `easyMail.autoAnalyzeMaxClassificationLevel` | Highest classification level that can be analyzed automatically. |
