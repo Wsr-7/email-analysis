@@ -162,7 +162,7 @@ docs/
 
 ## 6. 执行步骤
 
-### [~] H0 · 建立已通过验收后的整理基线
+### [x] H0 · 建立已通过验收后的整理基线 — `develop@7498836`
 
 用户已明确回复 #10 全部通过；从最新 `main` 创建 `develop` 后执行本基线。
 
@@ -177,6 +177,8 @@ rtk npx vsce ls --readme-path docs/marketplace-details.md
 ```
 
 要求：工作树干净、全量测试通过、现有 VSIX 可生成，并保存 package listing 作为前后对照。
+
+Completion Notes（2026-07-14）：基线 `npm test` 为 467 pass / 0 fail；`npm run package:vsix` 生成 109 files、534.55 KB 的 `easymail-0.4.0.vsix`。`vsce ls` 确认当前包仍含 37 个 `out/test/**`、`workbench-render-v1.js`、`mock-provider.js`、8 个 scripts、`AGENTS.md`、`setup.md` 与根目录 `user guide.md`，作为 H2/H5 的前后对照。用户已确认 #10 全部人工通过；H0 无未决 blocker。
 
 ### [ ] H1 · 重做统一的 AI 邮件图标系统
 
