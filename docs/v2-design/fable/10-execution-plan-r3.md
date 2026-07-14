@@ -166,6 +166,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G8.4 已完成（`c807e46`）：批量分析初始 toast 恢复邮件数与 chunk 数，初始/进行中文案均按 zh-CN/en-US 本地化；代码级并发测试继续通过。全量测试 458 pass。Next: claim G8.5。
 - 2026-07-14 · G8.5 已完成（`01843d5`）：两类折叠组头统一使用更亮的 section header 前景、700 字重和轻微字距/垂直 padding，字号保持 11px。全量测试 459 pass。Next: claim G8.6。
 - 2026-07-14 · G8.6 已完成（`5087a8a`）：saveConfig 到达即登记设置写入链，后续读 config 的 webview 动作只等待该写入，不等待 refresh，也不把长动作彼此串行。全量测试 461 pass。Next: claim G8.7。
+- 2026-07-14 · G8.7 已完成（`1890870`）：draftGeneration 的 auto label 从“Automatic”统一为“Auto”，并检查所有 enum/enumItemLabels 数量一致。全量测试 462 pass。Next: claim G8.8。
 
 ---
 
@@ -335,6 +336,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.7 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `ff1f567`；扫描 `package.json` 全部 enum/enumItemLabels，长度与顺序均一致；唯一同义不一致是 `draftLanguage.auto` 显示“Auto”，而 `draftGeneration.auto` 显示“Automatic”。边界：只把后者改为“Auto”并加 manifest 一致性测试；不改 enum value、默认值、description 或运行时逻辑。Action: claim G8.7。
 
+- **2026-07-14 · Codex（G8.7 completion）**：Action: 将 `easyMail.draftGeneration` 的 `auto` 枚举 label 改为“Auto”，与 `draftLanguage.auto` 对齐；增加 manifest 级枚举 label 数量一致性断言。Validated: TDD RED 精确显示旧“Automatic”；fresh `npm test` 462 pass / 0 fail（含 compile）；`git diff --check` 通过。Manual: **needs user validation**——Settings 中 Draft Generation 下拉应显示“Auto / On demand”。Next: G8.8。
+
+  **Completion Notes**
+  - 改动文件：`package.json`、`src/test/sidebar-render.test.ts`、本计划。
+  - 实现边界：只改 UI label 与 manifest 测试；enum value 仍为 `auto`，默认值、description 和运行时逻辑不变。
+  - 验收结果：全部带 enumItemLabels 的设置均与 enum 等长，draftGeneration 精确为“Auto / On demand”；全量 462 pass。
+  - Manual validation：**needs user validation**，VS Code Settings 实际下拉文案由用户手动确认。
+  - Known issues：未发现其他 enum label 的值/数量错位；分类等级全大写和语言本名属于有意文案，不做风格化改写。
+  - Commit：`1890870`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -385,7 +396,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **做法**：extension 侧跟踪"最近一次设置写入"的 promise（`updateSettings` 赋值），`pullMail`/`analyze` 等读取 config 的动作入口先 `await` 它再读配置。不改 UI、不加额外点击。注意别把长任务本身串进链里（只 await 设置写入，不 await 其他动作）。
 - **验收**：单测——改设置消息后立刻发 fetch 消息，fetch 读到新值；`npm test` 全绿。**needs user validation**：改 maxItems 后直接点 Fetch New 即按新值工作。
 
-### [~] G8.7 设置枚举文案统一（额外反馈#5，P3）
+### [x] G8.7 设置枚举文案统一（额外反馈#5，P3）— `1890870`
 
 - `easyMail.draftGeneration` 的 enumItemLabels `Automatic` → `Auto`（与 Draft Language 的 Auto 一致）；顺带扫一遍其余枚举 label 用词一致性。
 - **验收**：`npm test` 全绿。
