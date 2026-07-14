@@ -313,6 +313,16 @@ describe("renderSidebarHtml", () => {
     assert.ok(!manifest.contributes.commands.some((command: { command: string }) => command.command === "easyMail.refreshDashboard"));
   });
 
+  it("keeps configuration enum labels aligned and uses Auto consistently", () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+    const properties = manifest.contributes.configuration.properties as Record<string, { enum?: unknown[]; enumItemLabels?: string[] }>;
+
+    for (const property of Object.values(properties)) {
+      if (property.enumItemLabels) assert.equal(property.enumItemLabels.length, property.enum?.length);
+    }
+    assert.deepEqual(properties["easyMail.draftGeneration"].enumItemLabels, ["Auto", "On demand"]);
+  });
+
   it("renders language globe icon with dropdown", () => {
     const html = renderSidebarHtml(stubInput());
     assert.ok(html.includes("toggleLangMenu"));
