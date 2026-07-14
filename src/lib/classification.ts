@@ -110,7 +110,8 @@ export function buildQueueState(
   const pending = storeItems.filter((item) => !analysedIds.has(item.mailId) && !ignored.has(item.mailId) && !ignoredBySender.has(item.mailId));
   const allowed = pending.filter((item) => {
     const classification = classificationById.get(item.mailId);
-    return Number(classification?.level || 0) <= allowedMaxLevel && securityDecisions.get(item.mailId)?.decision !== "block";
+    const securityDecision = securityDecisions.get(item.mailId)?.decision;
+    return Number(classification?.level || 0) <= allowedMaxLevel && securityDecision !== "block" && securityDecision !== "manual_confirm";
   });
   const blocked = pending.filter((item) => !allowed.includes(item));
   const analysed = storeItems.filter((item) => analysedIds.has(item.mailId) && !ignored.has(item.mailId));

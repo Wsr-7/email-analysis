@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildQueueState, ensureClassifications, normalizeClassificationCache } from "../lib/classification";
 import { buildClassificationKeywords } from "../lib/config-utils";
+import { buildMailGateDecision, canAnalyzeMail } from "../lib/security-gate";
 import type { StoredMail } from "../lib/mail-store";
 
 const mails: StoredMail[] = [
@@ -85,6 +86,32 @@ test("buildQueueState puts a hard-block mail in the blocked queue", () => {
 
   assert.deepEqual(queue.allowed.map((item) => item.mailId), []);
   assert.deepEqual(queue.blocked.map((item) => item.mailId).sort(), ["mail-1", "mail-2"]);
+});
+
+test("buildQueueState routes keyword manual confirmation to blocked and permits explicit analysis", () => {
+  const contractMail = { ...mails[0], subject: "Contract renewal" };
+  const cache = ensureClassifications([contractMail], normalizeClassificationCache({}));
+  const decision = buildMailGateDecision(contractMail, cache.items[0], {
+    maxAutoClassificationLevel: 3,
+    maxManualClassificationLevel: 3,
+    manualConfirmKeywords: ["contract"]
+  });
+  const decisions = new Map([[contractMail.mailId, decision]]);
+  const queue = buildQueueState(
+    [contractMail],
+    { generatedAt: "", overview: { totalMails: 0, mustHandleToday: 0, risks: 0, waitingForMe: 0, notices: 0 }, items: [] },
+    [],
+    cache,
+    true,
+    3,
+    [],
+    decisions
+  );
+
+  assert.equal(decision.decision, "manual_confirm");
+  assert.deepEqual(queue.allowed.map((item) => item.mailId), []);
+  assert.deepEqual(queue.blocked.map((item) => item.mailId), [contractMail.mailId]);
+  assert.equal(canAnalyzeMail(contractMail, decisions, true), true);
 });
 
 test("buildQueueState accepts classification level labels from settings", () => {

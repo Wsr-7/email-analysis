@@ -178,14 +178,14 @@
           "order": 13.2,
           "items": { "type": "string" },
           "default": [],
-          "markdownDescription": "Case-insensitive substring matches that require manual confirmation before Copilot analysis. An empty array disables this layer."
+          "markdownDescription": "Case-insensitive substring matches that force manual confirmation before Copilot analysis, regardless of the mail classification or automatic-analysis threshold. An empty array disables this layer."
         },
         "easyMail.classificationLevel3Keywords": {
           "type": "array",
           "order": 13.3,
           "items": { "type": "string" },
           "default": ["high registered", "highly restricted", "secret"],
-          "markdownDescription": "Case-insensitive substring matches that classify mail as HIGH REGISTERED (level 3). An empty array disables keyword elevation to this level."
+          "markdownDescription": "Case-insensitive substring matches that classify mail as HIGH REGISTERED (level 3), affecting its badge and threshold comparison. Setting easyMail.autoAnalyzeMaxClassificationLevel to 3 allows automatic analysis unless another security gate requires confirmation. An empty array disables keyword elevation to this level."
         },
         "easyMail.classificationLevel2Keywords": {
           "type": "array",
