@@ -1,12 +1,13 @@
-# 11 · 仓库结构与文档洁净计划（等待 #10 人工验收）
+# 11 · 仓库结构、图标与文档洁净计划
 
-> 状态：`[!]` **未开始，硬门槛是用户明确确认 #10 的真实 VS Code / Copilot / Outlook 人工验收通过。** 在此之前不得 claim、移动、删除或重写任何现有文件。
+> 状态：`[~]` **执行中。用户已明确确认 #10 全部人工验收通过；以 `main` 合并 `release-0.4.0` 后创建的 `develop` 为执行分支。**
 
 ## 1. 目标
 
 在不改变 EasyMail 实际逻辑、配置语义、数据格式和 UI 行为的前提下，让仓库达到以下状态：
 
 - `src/lib` 按稳定职责分成少量子目录，不再由 42 个平铺文件组成。
+- Marketplace / Extension Details 与 Activity Bar 使用同一套清晰、可辨识的线条型“AI 邮件”图标语言，不再依赖带毛边的复杂位图或右上角小徽标。
 - Git 只保留用户、贡献者和发布真正需要的文档；本地规划、截图、handover 和历史执行记录进入不跟踪的本地区域。
 - VSIX 只包含运行时文件与必要用户文档，不再包含编译测试、旧版实现、agent 指令和开发脚本。
 - README、User Guide、Development、Security、Architecture 与当前 `package.json`、命令和实现保持一致。
@@ -15,7 +16,7 @@
 ## 2. 本轮不做
 
 - 不拆分 `extension.ts`、`sidebar-render.ts`、`dashboard-render.ts` 或其他大文件。
-- 不改业务逻辑、UI、prompt、schema、settings、命令、数据路径或 Outlook 脚本行为。
+- 除本计划新增的图标资产外，不改业务逻辑、UI、prompt、schema、settings、命令、数据路径或 Outlook 脚本行为。
 - 不引入 TypeScript path alias、barrel `index.ts`、新构建器、新依赖或新测试框架。
 - 不重排 `src/test`；测试目录继续保持现状，避免同时扩大 import 与 test runner 的改动面。
 - 不清理 Git 历史，不使用 history rewrite；被移出当前树的历史文档仍可从 Git 历史恢复。
@@ -46,6 +47,12 @@
 - 当前 `scripts/**` 会把 `clean-out.js`、`run-sample-validation.ps1`、sample classifier 和 `scripts/README.md` 一起打包；运行时实际只需要 4 个 `.vbs`。
 - 当前 VSIX 还包含 `AGENTS.md`、`setup.md` 等开发材料。
 - 2026-07-14 实测当前包为 109 个文件、530.9 KB；其中 `out/` 有 80 个文件，证明测试产物确实进入发布包，而不只是静态推测。
+
+### 3.4 图标现状
+
+- Marketplace 图标 `media/icon.png` 是 512×512 的拟物信封位图，缩放后边缘与细节容易发毛，右上角 AI 徽标与主体割裂。
+- Activity Bar 图标 `media/activity-icon.svg` 把 AI 语义压缩在右上角小块内；VS Code 的 24px 容器中主体占比不足，最终只剩“邮件 + 小圆点/小块”的弱辨识度。
+- 两个图标不是同一套几何语言，无法形成稳定的产品识别。
 
 ## 4. 方案比较与选择
 
@@ -155,9 +162,9 @@ docs/
 
 ## 6. 执行步骤
 
-### [!] H0 · 等待 #10 人工验收
+### [~] H0 · 建立已通过验收后的整理基线
 
-只有用户明确回复 #10 通过后，才允许把本项改为 `[~]`。
+用户已明确回复 #10 全部通过；从最新 `main` 创建 `develop` 后执行本基线。
 
 开工基线：
 
@@ -171,7 +178,25 @@ rtk npx vsce ls --readme-path docs/marketplace-details.md
 
 要求：工作树干净、全量测试通过、现有 VSIX 可生成，并保存 package listing 作为前后对照。
 
-### [ ] H1 · 清理已证明无引用的发布污染
+### [ ] H1 · 重做统一的 AI 邮件图标系统
+
+1. 以“信封轮廓 + 位于主体内部的 AI 星芒/电路线”为唯一核心符号；不使用头像、文字、右上角小圆点/徽标、拟物材质、阴影或依赖高分辨率才能看清的细节。
+2. `media/activity-icon.svg` 使用 24×24 视口、单色线条、足够粗的主轮廓和 2px 左右安全边距；AI 特征必须位于信封主体内并在 16/20/24px 下仍可辨识。
+3. 为 Marketplace 图标建立可编辑 SVG 母版，并从同一几何符号导出透明背景的 512×512 `media/icon.png`；允许使用少量品牌色，但保持扁平线条设计，不用生成式纹理。
+4. 通过本地矢量渲染导出 PNG，检查 alpha、尺寸与缩小后的边缘；`package.json` 继续引用 `media/icon.png` 与 `media/activity-icon.svg`。
+5. 本任务是用户对 §2“UI 不改”的明确例外；只替换品牌资产，不改任何 Webview 布局或交互。
+
+验证：
+
+```powershell
+rtk npm run compile
+rtk npm test
+rtk npm run package:vsix
+```
+
+人工验证：Marketplace / Extension Details 图标边缘平滑；Activity Bar 图标在常用缩放下主体足够大，能直接识别为“AI 驱动的邮件工具”。
+
+### [ ] H2 · 清理已证明无引用的发布污染
 
 1. 用 `rg` 再次枚举 `workbench-render-v1.ts`、`MockProvider`、`renderDashboardHtml` 的所有 caller。
 2. 删除零 caller 的 `workbench-render-v1.ts`。
@@ -186,7 +211,7 @@ rtk npm test
 rtk git diff --check
 ```
 
-### [ ] H2 · 一次性完成 `src/lib` 物理分类
+### [ ] H3 · 一次性完成 `src/lib` 物理分类
 
 1. 按 §5.1 使用 `git mv` 移动文件。
 2. 用 `rg` 枚举并更新 `src/extension.ts`、`src/lib/**`、`src/test/**` 的直接相对 import。
@@ -205,7 +230,7 @@ rtk git diff --check
 
 预期：编译零错误，全量测试零失败，引用检查零命中。
 
-### [ ] H3 · 分离公开文档与本地开发资料
+### [ ] H4 · 分离公开文档与本地开发资料
 
 1. 创建 `.local/docs/archive/` 与 `.local/tasks/`，确认解析后的绝对路径仍位于仓库根目录内。
 2. 把历史设计资料和 tasks 复制到 `.local/`，逐项比较文件数量和 hash 后再从 Git 当前树删除。
@@ -224,7 +249,7 @@ tasks/
 
 注意：`.gitignore` 只影响未跟踪文件；已跟踪的 `docs/v2-design/**` 和 `tasks/**` 必须通过 Git 删除记录移出当前树，不能误以为加 ignore 就完成了。
 
-### [ ] H4 · 收紧 VSIX 内容
+### [ ] H5 · 收紧 VSIX 内容
 
 继续使用 `package.json.files`，不新增 `.vscodeignore`。allow-list 改为只包含：
 
@@ -237,7 +262,8 @@ tasks/
   "scripts/compose-outlook-mail.vbs",
   "scripts/open-outlook-mail.vbs",
   "prompts/**",
-  "media/**",
+  "media/icon.png",
+  "media/activity-icon.svg",
   "LICENSE",
   "README_zh.md",
   "docs/user-guide.md",
@@ -257,7 +283,7 @@ rtk npm run package:vsix
 rtk npx vsce ls --readme-path docs/marketplace-details.md
 ```
 
-### [ ] H5 · 更新说明性文档
+### [ ] H6 · 更新说明性文档
 
 逐项以代码和 manifest 为准核对，不从旧设计文档复制结论：
 
@@ -278,7 +304,7 @@ rtk npm test
 
 预期：不存在指向已移除文件或旧 `src/lib` 平铺路径的有效引用；代码块中的历史示例若保留，必须显式标成历史。
 
-### [ ] H6 · 最终收口
+### [ ] H7 · 最终收口
 
 ```powershell
 rtk npm run compile
@@ -302,18 +328,20 @@ rtk git status --short --branch
 
 按以下顺序保持可回滚：
 
-1. `chore remove obsolete and test-only artifacts Generated with AI`
-2. `refactor organize library modules without behavior changes Generated with AI`
-3. `docs separate public and local development material Generated with AI`
-4. `build trim VSIX package contents Generated with AI`
-5. `docs refresh repository guidance Generated with AI`
-6. `build package repository hygiene release Generated with AI`
+1. `design replace product and activity icons Generated with AI`
+2. `chore remove obsolete and test-only artifacts Generated with AI`
+3. `refactor organize library modules without behavior changes Generated with AI`
+4. `docs separate public and local development material Generated with AI`
+5. `build trim VSIX package contents Generated with AI`
+6. `docs refresh repository guidance Generated with AI`
+7. `build package repository hygiene release Generated with AI`
 
-每个 commit 前至少运行与该阶段相符的 compile/test；H2、H5、H6 必须跑全量测试。未得到用户明确指示不得 push。
+每个 commit 前至少运行与该阶段相符的 compile/test；H1、H3、H6、H7 必须跑全量测试。未得到用户明确指示不得 push。
 
 ## 8. 完成标准
 
 - #10 已由用户人工确认，不再存在未决的功能验收阻塞。
+- Marketplace 与 Activity Bar 图标共享清晰的 AI 邮件线条符号，小尺寸可辨且 PNG 边缘平滑。
 - `src/lib` 符合 §5.1，且没有 alias、barrel 或业务代码改写。
 - 当前树中只保留 §5.2 的公开文档集合；本地资料已复制校验并由 `.local/` 保护。
 - VSIX listing 不包含测试、历史实现、agent 文件、内部设计资料或开发脚本。
@@ -335,7 +363,7 @@ rtk git status --short --branch
 
 本计划经规划者审核**批准**（分阶段 commit、vsce files/.vscodeignore 互斥认知、`.gitignore` 不影响已跟踪文件、先复制校验再删除等关键防线齐备）。补充修订：
 
-1. **H1 追加事实**：`dashboard-render.ts` 的 legacy `renderDashboardHtml` 已由 G5 复审确认无生产 caller，且其模板内残留 14 处 `onclick=` 内联属性（G5 已把三个运行时页面清零，这是最后的死代码残留）——若 H1 函数级审计确认其私有调用链（含 `renderPendingPanel` 等仅被它使用的函数）不被共用 helper 依赖，应连同删除，使全仓 `onclick=` 归零并可加回归断言；若确有共用，保留部分必须在 Notes 列出保留函数清单与理由。
-2. **H3/H5 追加检查**：文档改名/移动后，除计划已列的 README/AGENTS/docs/package.json 一致性 grep 外，**必须补 `rg -n "user guide|setup\.md|vsix-build|docs/v2-design" src/` 确认零命中**（规划者已预核实 `user guide.md` 当前无运行时代码引用，Guide 命令走 webview 渲染而非打开 md 文件——此检查是防回归，不是已知问题）。
-3. **H4 追加验证**：收紧 `files` 后的首次打包，除 `vsce ls` 对照外，**必须安装该 vsix 并跑一次 Generate Sample Digest + 打开 Guide**——`files` 漏掉运行时资源（prompts/media/default-config）的故障只有装包才能暴露，listing 看不出加载失败。
+1. **H2 追加事实**：`dashboard-render.ts` 的 legacy `renderDashboardHtml` 已由 G5 复审确认无生产 caller，且其模板内残留 14 处 `onclick=` 内联属性（G5 已把三个运行时页面清零，这是最后的死代码残留）——若 H2 函数级审计确认其私有调用链（含 `renderPendingPanel` 等仅被它使用的函数）不被共用 helper 依赖，应连同删除，使全仓 `onclick=` 归零并可加回归断言；若确有共用，保留部分必须在 Notes 列出保留函数清单与理由。
+2. **H4/H6 追加检查**：文档改名/移动后，除计划已列的 README/AGENTS/docs/package.json 一致性 grep 外，**必须补 `rg -n "user guide|setup\.md|vsix-build|docs/v2-design" src/` 确认零命中**（规划者已预核实 `user guide.md` 当前无运行时代码引用，Guide 命令走 webview 渲染而非打开 md 文件——此检查是防回归，不是已知问题）。
+3. **H5 追加验证**：收紧 `files` 后的首次打包，除 `vsce ls` 对照外，**必须安装该 vsix 并跑一次 Generate Sample Digest + 打开 Guide**——`files` 漏掉运行时资源（prompts/media/default-config）的故障只有装包才能暴露，listing 看不出加载失败。
 4. **执行时机确认**：H0 的硬门槛以用户在对话中明确回复"#10（R3）人工验证通过"为准；R3 验证清单见 `10-execution-plan-r3.md` §5。
