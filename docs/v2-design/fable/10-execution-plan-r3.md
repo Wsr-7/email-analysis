@@ -262,3 +262,70 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 **复审结论：G1-G7 全部通过**（复审范围 `fc062db..24e2906`）。独立验证：`npm test` 全绿；双 VBS `--help` 通过；`run-sample-validation.ps1` 端到端通过；vsix 拆包确认含 G1 并发常量与 G5 CSP。逐项要点：G1 共享游标 worker pool + `serializeMerge` promise 链串行化 + 取消不启新块 + 预估除以并行度，全部符合处方；G3 `keywordsHash` 变更触发全量重算已实现；G5 三个运行时模板 onclick 清零、CSP meta + nonce 齐备（`dashboard-render.ts` 残留的 14 处 onclick 经核实全部位于无生产 caller 的死代码路径 `renderDashboardHtml`，无运行时暴露，留待 11 计划 H1 处理）；G7 `redactStoredMails` 已覆盖附件名。已知可接受边界：G1 的 merge 串行链在写盘失败时会污染后续合并（磁盘故障场景，本就是灾难态，不另行处理）。
 
 **人工验证以 §2.2 的 R3-M01~M14 表为准**（worker 制作的版本比规划者初版更全面，含环境记录与逐步操作，已采纳为唯一清单）。R3 验证通过后，11 号仓库整理计划的 H0 门槛解锁。
+
+---
+
+## 6. Milestone G8 — R3 人工验证反馈批（2026-07-14，M01-M14 结果：11 项通过、#5/#10-11 失败、若干小优化）
+
+> 验证结果已由用户回填至 §2.2 语境（通过：M01-M04/M06-M09/M12-M14；失败：M05 manualConfirm 词表、M10/M11 方向键）。规划者已定位两个失败项根因。协议同 §0。
+
+### [ ] G8.1 manualConfirm 关键词命中不进 Manual Confirm 队列（M05，P1，根因已确证）
+
+- **根因（已确证）**：`security-gate.ts` 的 `decideMail` 对 manualConfirmKeywords 的判定正确（L104-106），设置接线也完整；坏在队列归属——F7.3（`e857db4`）给 `buildQueueState` 的 `allowed` 过滤只加了 `securityDecisions.get(id)?.decision !== "block"`，**漏排 `manual_confirm`**。关键词命中的邮件 level 未超标 → 仍留在 allowed/Pending，永远进不了 blocked（Manual Confirm Required）队列。hardBlock 正常正是因为被排除了。
+- **做法**：`allowed` 过滤改为排除 `decision === "block" || decision === "manual_confirm"`；确认 blocked 队列的 UI 文案/确认按钮对 keyword 型 manual_confirm 与 level 型行为一致（workbench 的 Confirm and Analyze 应可用）。顺带回答用户 M04 的疑问——在两个设置的 description 中写清差异：`classificationLevel3Keywords` 改变邮件**分级**（影响徽标显示与阈值比较，调高 `autoAnalyzeMaxClassificationLevel` 到 3 后可自动分析）；`manualConfirmKeywords` **无视分级强制人工确认**（任何阈值下都要确认）。两者在默认阈值下效果相似但机制不同，不是重复配置。
+- **验收**：单测——keyword 命中进 blocked 队列、Confirm and Analyze 可分析、与 level 型行为一致；`npm test` 全绿。**needs user validation**：manualConfirmKeywords 加词后邮件进入 Manual Confirm Required 队列且可确认分析。
+
+### [ ] G8.2 方向键导航真机无反应（M10/M11，P1，高概率根因已定位）
+
+- **现状**：G6 实现存在（`#itemList` tabindex=0 + keydown 监听，sidebar-render.ts ~L567/L742），单测通过但真机零反应。
+- **首要假设**：点击邮件行触发 `openInWorkbench` → workbench panel `reveal()` **抢走焦点** → sidebar webview 失焦，方向键从此进不来。修法：workbench reveal 加 `preserveFocus: true`（sidebar 发起的打开/跟随不抢焦点；用户主动点 workbench 时焦点自然过去）。次要排查点：VS Code webview 中点击非聚焦子元素是否真的把焦点给到 tabindex 容器（必要时在行 mousedown 里显式 `itemList.focus()`）。
+- **要求**：必须在 Extension Development Host 实测复现 → 修复 → 再实测 ↑/↓ 全流程（含折叠跳过），把观察写进 Completion Notes——G6 的教训是单测过了不等于真机可用。
+- **验收**：`npm test` 全绿 + dev host 实测记录。**needs user validation**：点击邮件后直接 ↑/↓ 可切换且 workbench 跟随。
+
+### [ ] G8.3 Next Actions 多项高亮回归 + 按钮改名（额外反馈#1，P2）
+
+- 用 sample 线程数据复现"多个 action 同时高亮"（F7.2 修过一次，线程来源的 action 疑似再破）；修复并补覆盖线程场景的单测。按钮 label：`Done/完成` → `Mark Done/标记已完成`（中英文）。
+- **验收**：单测 + `npm test` 全绿。**needs user validation**：sample 线程下单选高亮正确。
+
+### [ ] G8.4 分析进度 toast 恢复丰富文案 + 并发实效核查（M01 附带要求 + 额外反馈#2，P2）
+
+- 文案回滚增强：初始行恢复上一版信息量——`Analyzing 20 emails in 2 chunks…`（含邮件总数与 chunk 总数，替换现在干瘪的 `Completed 0/2 chunks.`）；进行中保留 `Completed x/N chunks (about X minutes remaining)`。中英文同步。
+- **并发实效核查（用户反馈提速无感）**：在日志中对比同一次分析里两个 chunk 的 `analyze:chunkStart`/`analyze:response` 时间戳是否重叠——若 vscode.lm 对同会话请求内部串行化导致并发无效，如实记入 Completion Notes 的 Known issues（属平台限制，不强行绕），并在 §7 汇报给规划者。
+- **验收**：单测锁初始文案；`npm test` 全绿。**needs user validation**：初始 toast 含邮件数与 chunk 数。
+
+### [ ] G8.5 折叠组头视觉强化（额外反馈#3，P2）
+
+- pending folder 组头与会议"已接受的日程"组头字体存在感不足：font-weight 提到 700、颜色用更亮的前景变量（如 `--vscode-sideBarSectionHeader-foreground`），可加少量 letter-spacing/上下 padding；不加大字号。两处组头样式统一。
+- **验收**：`npm test` 全绿。**needs user validation**：目视组头明显但不突兀。
+
+### [ ] G8.6 设置保存与动作按钮的竞态（额外反馈#4，P2）
+
+- **现象**：sidebar 改 maxItems 后直接点 Fetch New，本次仍按旧值执行（需先点别处触发保存 toast 才生效）。
+- **根因方向**：webview 消息（settings 更新、fetch）虽按序到达，但 `handleMessage` 异步并发处理——fetch 读 config 时 settings.update 还没落盘。
+- **做法**：extension 侧跟踪"最近一次设置写入"的 promise（`updateSettings` 赋值），`pullMail`/`analyze` 等读取 config 的动作入口先 `await` 它再读配置。不改 UI、不加额外点击。注意别把长任务本身串进链里（只 await 设置写入，不 await 其他动作）。
+- **验收**：单测——改设置消息后立刻发 fetch 消息，fetch 读到新值；`npm test` 全绿。**needs user validation**：改 maxItems 后直接点 Fetch New 即按新值工作。
+
+### [ ] G8.7 设置枚举文案统一（额外反馈#5，P3）
+
+- `easyMail.draftGeneration` 的 enumItemLabels `Automatic` → `Auto`（与 Draft Language 的 Auto 一致）；顺带扫一遍其余枚举 label 用词一致性。
+- **验收**：`npm test` 全绿。
+
+### [ ] G8.8 附件计数过滤内嵌图片（M12 用户"勉强接受"项，P3）
+
+- **现状**：正文内嵌图片（签名 logo 等）被 Outlook 计为附件，导致大量邮件误挂 📎。
+- **做法**：VBS `SafeAttachmentCount`/`SafeAttachmentNames` 过滤隐藏/内嵌附件——用 `Attachment.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")`（PR_ATTACHMENT_HIDDEN）为 True 的跳过；读取失败时保守保留（宁可多算不可漏算真附件）；On Error 守护齐全。sample 不受影响。
+- **验收**：VBS `--help`/`--sample` 通过；`npm test` 全绿。**needs user validation**：带签名图片的普通邮件不再显示 📎，真附件仍显示。
+
+### [ ] G8.9 草稿动作时收起 Outlook Actions 下拉（额外反馈#8，P3）
+
+- workbench 点击 Polish/Refine（或任何草稿动作）时，立即关闭处于展开态的 `details.draft-outlook-actions`（`document.querySelectorAll('details[open]')` 收起），不等任务结束由重渲染关闭。
+- **验收**：单测断言收起逻辑存在；`npm test` 全绿。**needs user validation**：点 Polish 瞬间下拉收起。
+
+---
+
+## 7. 问答记录（2026-07-14 验证反馈随附问题）
+
+- **M04 疑问（level3 词表 vs manualConfirm 词表是否重复）**：不重复，机制不同——前者改**分级**（徽标+阈值比较，受 `autoAnalyzeMaxClassificationLevel` 调节），后者**无视分级强制确认**。默认阈值 2 下两者效果相似；把阈值调到 3 时差异立现（level3 邮件自动分析、manualConfirm 命中仍要确认）。已在 G8.1 中要求写进设置 description。
+- **额外#6（一次性 toast 存活时长）**：VS Code 无官方配置或 API 可延长 information message 的显示时长（只有 modal 阻塞式或 withProgress 常驻式两种替代，都不适合"设置已保存"这类轻提示）。按用户规则：不自造，放弃。补充：通知中心（右下角铃铛）可回看错过的历史通知。
+- **额外#7（analysis incomplete toast 何时出现）**：这是 F1.2 对账兜底的提示——模型返回的 JSON 里**漏掉了某封送析邮件**（`0 chunk(s) skipped` 说明传输/解析都正常，纯属模型少返了一条）。该邮件被强制落入 Uncertain 并标注 "analysis incomplete: model omitted this mail"，保证不消失。处理：对该邮件单独点 Re-analyze 通常即可；若某模型频繁漏返可换模型。
+- **M12 疑问（正文图片算附件）**：是 Outlook 的行为——内嵌图片（含签名 logo）在 COM 层就是 Attachment 对象。已立项 G8.8 过滤隐藏/内嵌附件。
