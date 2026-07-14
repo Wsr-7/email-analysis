@@ -20,6 +20,8 @@ test("renderEasyMailGuideHtml renders guide content and command buttons", () => 
   assert.match(html, /guideAction/);
   assert.match(html, />4<\/strong>/);
   assert.match(html, /重点和忽略发件人、关键词安全规则与保留期都在 Settings 中配置/);
+  assert.match(html, /Prompt 分类决定模型可返回哪些邮件分类/);
+  assert.match(html, /回复模板决定四个固定草稿段落在本地如何排版/);
 });
 
 test("renderEasyMailGuideHtml keeps the normal title and status above first use", () => {

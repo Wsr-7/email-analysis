@@ -84,6 +84,12 @@ VS Code Settings is the source of truth. The Sidebar only exposes the high-frequ
 
 Prompt categories, reply templates, model choices, and cached analysis are saved under VS Code global storage. They are local to the VS Code user profile, not this repository.
 
+## Reply templates and prompt categories
+
+**Reply Template** controls the local layout of a generated draft. It has four required fixed placeholders: `{{GREETING}}`, `{{MAIN_MESSAGE}}`, `{{REQUESTED_ACTION}}`, and `{{CLOSING}}`. EasyMail asks the model for those four parts, then fills the template locally, so fixed headings, spacing, and sign-off text remain under your control. Automatic analysis may leave a draft empty when no reply is needed. **Generate Draft** is different: clicking it is an explicit request and always asks the model to produce a draft, even for a notification or no-action mail.
+
+**Prompt Categories** controls the classification vocabulary used in analysis. Open it with **EasyMail: Open Prompt Config**. Each category contains an `id`, Chinese and English labels, a `description` sent to the model, and an optional `priorityHint`. You can add categories for future analyses or adjust their labels and guidance. Changes are read on the next refresh or analysis; they do not reclassify existing results. Removing a category does not delete historical results; an existing result with that ID remains visible but falls back to displaying the raw ID if its custom label no longer exists.
+
 ## Security and privacy
 
 Collection and storage are local. When you start analysis, the selected prompt payload is sent to the Copilot model selected through VS Code. Classification, keyword rules, and redaction are applied before that request. Mail above the automatic threshold may require confirmation or be blocked.
