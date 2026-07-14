@@ -596,6 +596,15 @@ describe("renderWorkbenchHtml", () => {
     assert.ok(html.includes('data-mode="forward"'));
   });
 
+  it("closes open Outlook action menus before any draft action", () => {
+    const html = renderWorkbenchHtml(stubInput());
+
+    assert.ok(html.includes("function closeDraftOutlookActions()"));
+    assert.ok(html.includes("document.querySelectorAll('details.draft-outlook-actions[open]')"));
+    assert.ok(html.includes("['polishDraft', 'refineDraft', 'composeMail', 'generateDraft'].includes(a)"));
+    assert.ok(html.includes("closeDraftOutlookActions();"));
+  });
+
   it("renders analyzed mail with original body from mail store", () => {
     const input = stubInput({
       state: stubState({}, [

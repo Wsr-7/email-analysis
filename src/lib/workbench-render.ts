@@ -519,13 +519,20 @@ function showGenerateDraftButton(box) {
   actions.innerHTML = '<button class="wb-btn" data-action="generateDraft">' + ${toJsLiteral(labels.card.generateDraft)} + '</button>';
 }
 
+function closeDraftOutlookActions() {
+  for (var menu of document.querySelectorAll('details.draft-outlook-actions[open]')) {
+    menu.removeAttribute('open');
+  }
+}
+
 document.addEventListener('click', function(e) {
   var t = e.target && e.target.closest ? e.target.closest('button[data-action]') : null;
   if (!t) return;
   var a = t.getAttribute('data-action');
+  if (['polishDraft', 'refineDraft', 'composeMail', 'generateDraft'].includes(a)) closeDraftOutlookActions();
   if (a === 'copyDraft') { var ta = t.closest('.draft-box-editable'); var v = ta ? ta.querySelector('.draft-textarea') : null; post('copyDraft', { draftReply: v ? v.value : (t.getAttribute('data-draft-reply') || '') }); }
   if (a === 'polishDraft' || a === 'refineDraft') { clearTimeout(draftReportTimer); var box = t.closest('.draft-box-editable'); var txt = box ? box.querySelector('.draft-textarea') : null; var ins = box ? box.querySelector('.draft-instruction') : null; var itemId = box ? box.getAttribute('data-item-id') || '' : ''; post(a, { draftText: txt ? txt.value : '', instruction: ins ? ins.value : '', itemId: itemId }); }
-  if (a === 'composeMail') { var menu = t.closest('.draft-outlook-actions'); if (menu) menu.removeAttribute('open'); var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
+  if (a === 'composeMail') { var box2 = t.closest('.draft-box-editable'); var txt2 = box2 ? box2.querySelector('.draft-textarea') : null; var sourceId2 = box2 ? box2.getAttribute('data-source-id') || '' : ''; post('composeMail', { mode: t.getAttribute('data-mode') || '', draftText: txt2 ? txt2.value : '', itemId: sourceId2 }); }
   if (a === 'generateDraft') { clearTimeout(draftReportTimer); var box3 = t.closest('.draft-box-editable'); var sourceId = box3 ? box3.getAttribute('data-source-id') || '' : ''; var itemId3 = box3 ? box3.getAttribute('data-item-id') || '' : ''; post('generateDraft', { itemId: itemId3, sourceId: sourceId }); }
   if (a === 'ignore') { var reader = t.closest('.wb-reader'); var removedId = reader ? reader.getAttribute('data-id') || '' : t.getAttribute('data-mail-id') || ''; focusAfterRemoving(removedId); post('ignore', { mailId: t.getAttribute('data-mail-id') || '' }); }
   if (a === 'unignore') { var reader2 = t.closest('.wb-reader'); var restoredId = reader2 ? reader2.getAttribute('data-id') || '' : t.getAttribute('data-mail-id') || ''; focusAfterRemoving(restoredId); post('unignore', { mailId: t.getAttribute('data-mail-id') || '' }); }
