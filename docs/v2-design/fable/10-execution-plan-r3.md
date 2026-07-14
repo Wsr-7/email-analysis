@@ -114,6 +114,39 @@
 
 G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立可并行。全部完成后：规划者全量复审 → 重打 vsix → 用户按规划者汇总的验证清单做 R3 验证轮。R4 候选池（09 §4 延后项）待 R3 落地后按需重启。
 
+### 2.1 人工验证环境记录
+
+| 项目 | 填写值 |
+|---|---|
+| 验证日期 |  |
+| VSIX 文件 / SHA-256 |  |
+| VS Code 版本 |  |
+| EasyMail 版本 |  |
+| classic Outlook / Windows 版本 |  |
+| 邮箱类型与测试 folder |  |
+| Copilot 模型 |  |
+
+结果栏统一填写：`通过`、`失败`、`部分通过` 或 `不适用`。失败或部分通过时，在“实际结果 / 证据”中写明现象、复现步骤、截图或日志位置；不要只填 issue 编号。
+
+### 2.2 G1-G7 人工验证表
+
+| 编号 | 对应 step | 人工验证点 | 验证步骤 | 预期结果 | 验证结果 | 实际结果 / 证据 |
+|---|---|---|---|---|---|---|
+| R3-M01 | G1 | `auto` 模式批量分析与并发进度 | 1. 在 Settings 设置 `easyMail.draftGeneration=auto`。<br>2. Fetch 约 20 封允许分析的真实邮件。<br>3. Load Copilot Models 并选择模型。<br>4. 执行 Analyze Next Batch 或 Analyze All Allowed，记录开始/结束时间并观察进度。 | 分析完成且无邮件因并发丢失；进度使用“已完成 x/N chunk（约剩 X 分钟）”；界面不会长期卡在 busy/cancelling；记录本次耗时供 M02 比较。 | 待验证 |  |
+| R3-M02 | G1 | `onDemand` 提速与手动草稿 | 1. 设置 `easyMail.draftGeneration=onDemand`。<br>2. 用数量和正文规模相近的另一批邮件重复分析并记录耗时。<br>3. 打开一个分析结果，确认初始草稿为空。<br>4. 点击 Generate Draft，再执行编辑、Polish 或 Compose in Outlook 中至少一个后续动作。 | 分析结果正常且初始不生成草稿；耗时记录可与 M01 对比；Generate Draft 能补生成草稿，后续草稿操作可用。 | 待验证 |  |
+| R3-M03 | G2 | 会议邀请主队列、折叠组与计数 | 1. 确保 Outlook 中同时存在未响应邀请和未来已接受/暂定/自己组织的日程。<br>2. Fetch New 后打开 Sidebar 的“会议邀请 / Meeting Invites”。<br>3. 记录导航徽标数量。<br>4. 展开“已接受的日程 / Accepted schedule”，触发一次 Sidebar 刷新后再次查看。 | 未响应邀请直接平铺并排在主体区域；未来非待响应日程默认收起；导航徽标只等于未响应数量；组头显示次级数量；展开状态在刷新后保留。 | 待验证 |  |
+| R3-M04 | G3 | 分类词表变更触发已有邮件重算 | 1. 选择一封已 Fetch 且未删除的邮件，记录当前 classification。<br>2. 把该邮件标题或正文中的独特词加入 `easyMail.classificationLevel3Keywords`。<br>3. 保存 Settings 并刷新/重新打开 Sidebar，不重新 Fetch。<br>4. 验证后恢复原设置。 | 已有邮件无需重新 Fetch 即按新词表重算为 3 级；移除测试词并恢复设置后可再次按当前词表重算。 | 待验证 |  |
+| R3-M05 | G3 | hard-block、manual-confirm 与空数组语义 | 1. 分别把测试邮件中的独特词加入 `easyMail.hardBlockKeywords`、`easyMail.manualConfirmKeywords` 并尝试分析。<br>2. 分别临时设置为空数组并再次查看 gate 行为。<br>3. 测试完成后恢复原值。 | hard-block 命中时不可送模；manual-confirm 命中时要求人工确认；空数组明确关闭对应层；所有变化无需重新 Fetch。 | 待验证 |  |
+| R3-M06 | G4 | 明确期限的提取、排序与展示 | 1. 准备正文明确写出 `YYYY-MM-DD` 期限的真实邮件，至少覆盖未来日期；条件允许时再覆盖今天或已过期日期。<br>2. 分析邮件。<br>3. 查看 Sidebar 的 Must Handle Today / Waiting for Me 队列和 Workbench 详情。 | 模型只为明确期限输出 dueDate；有期限项在两个目标桶内按日期升序排在无期限项前；Sidebar 有期限徽标；今天/过期为紧急红色；Workbench 显示 Due/期限字段。 | 待验证 |  |
+| R3-M07 | G5 | Sidebar CSP 后的完整点击回归 | 1. 逐一点击 Fetch、Analyze、Load More、所有 queue、邮件/线程/会议/Next Action 行。<br>2. 测试 pending folder 与 accepted schedule 折叠。<br>3. 测试语言、Settings、Reports；Clear 只打开确认并取消即可。 | 每个入口都有响应，无“点击无反应”；队列、折叠、语言和设置状态正常；没有因 CSP 阻止脚本导致的局部失效。 | 待验证 |  |
+| R3-M08 | G5 | Workbench CSP 后的完整点击回归 | 1. 分别打开 pending、analyzed、manual-confirm、ignored 邮件，以及 thread 和 meeting。<br>2. 测试 Analyze/Re-analyze、Open in Outlook、Ignore/Restore。<br>3. 测试 Generate、Copy、Polish、Refine、Reply/Reply All/Forward。 | 所有详情与草稿按钮正常；Webview 与 extension 消息往返正常；Outlook 动作只打开对应窗口，不自动发送。 | 待验证 |  |
+| R3-M09 | G5 | Guide CSP 与 QuickPick 回归 | 1. 打开 EasyMail Guide。<br>2. 逐一执行 Guide 中的命令入口。<br>3. 执行 Select Outlook Folders，完成一次 QuickPick 打开、选择和取消/确认。 | Guide 所有按钮可用；folder QuickPick 正常打开并显示真实 folder；无 CSP 导致的无响应。 | 待验证 |  |
+| R3-M10 | G6 | 普通队列上下键导航 | 1. 在 Sidebar 点击一封可见邮件，使列表获得焦点。<br>2. 连续使用 `ArrowUp` / `ArrowDown`。<br>3. 观察选中态、滚动和 Workbench。 | 只在当前真实可见的 `.sb-row` 间移动；Workbench 跟随打开对应项；长列表会滚动入视野；到首尾不循环且不报错。 | 待验证 |  |
+| R3-M11 | G6 | 折叠内容的键盘跳过 | 1. 收起一个 pending folder。<br>2. 收起 Accepted schedule。<br>3. 在相邻可见行间使用上下键跨过两个折叠区域。 | 隐藏子项和组头不会被选中；只遍历当前可见邮件/会议行；展开后其子项重新进入导航序列。 | 待验证 |  |
+| R3-M12 | G7 | 真实附件在 pending/analyzed UI 可见 | 1. 向测试邮箱发送一封带多个附件、文件名可辨识的邮件。<br>2. Fetch 后在 pending Sidebar 与 Workbench 查看。<br>3. 分析后再次查看 analyzed Sidebar 与 Workbench。 | Sidebar 显示 📎、数量和文件名 tooltip；Workbench 显示附件数量与文件名；pending 和 analyzed 两条路径一致；无附件邮件不出现空附件字段。 | 待验证 |  |
+| R3-M13 | G7 | 模型只使用附件元数据且不声称读过内容 | 1. 分析一封正文写“详见附件”且确实有附件的邮件。<br>2. 条件允许时再分析一封正文声称有附件但实际未附的邮件。<br>3. 检查 summary、risk、reason 和建议动作。 | 模型可以依据附件数量/文件名判断附件是否存在或疑似漏附，但不得概括、引用或声称读取附件内容；附件名中的敏感信息不应原样进入模型提示。 | 待验证 |  |
+| R3-M14 | G1-G7 | 安装包端到端 smoke test | 1. 安装本轮 VSIX 并 reload VS Code。<br>2. 执行 Fetch New、Load Models、一次分析。<br>3. 打开邮件、线程、会议详情。<br>4. 执行一次 Open in Outlook 和一次 Compose in Outlook，但不要发送。 | 扩展正常激活；Sidebar/Workbench/Guide 可加载；真实 Outlook 与 Copilot 主链路无回归；Compose 仅打开草稿窗口。 | 待验证 |  |
+
 ---
 
 ## 3. Current Snapshot
