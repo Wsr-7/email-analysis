@@ -427,7 +427,7 @@ export class EasyMailApp {
     const visibleThreadStore = filterVisibleThreadsForDashboard(threadStore);
     return renderEasyMailGuideHtml({
       locale,
-      version: String(this.context.extension.packageJSON?.version || "0.3.0"),
+      version: String(this.context.extension.packageJSON?.version || "0.4.0"),
       stats: {
         pulled: store.items.length,
         pending: queue.pending.length,
