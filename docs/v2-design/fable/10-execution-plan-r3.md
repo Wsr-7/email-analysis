@@ -161,7 +161,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G7 已完成（`e323af6`）：pending/analyzed 单封邮件在 Sidebar 与 Workbench 显示附件元数据，batch prompt 含 count/name 且附件名先脱敏，实际 system prompt 明确禁止声称读取附件内容。全量测试 454 pass。Next: 全量收口复验。
 - 2026-07-14 · R3 G 批次收口完成：G1-G7 全部 `[x]`，整体 diff 复核未发现 Critical/Important 问题；最终 `npm run compile`、454 项全量测试与 `git diff --check` 均通过。14 个本地 commit，未 push。
 - 2026-07-14 · G8.1 已完成（`5683136`）：keyword 型 `manual_confirm` 不再落入 Pending，而是进入 Manual Confirm Required；显式确认分析仍可用，两个关键词设置的机制差异已写清。全量测试 455 pass。Next: claim G8.2。
-- 2026-07-14 · G8.2 已完成（`f59eedf`）：Sidebar 发起的 Workbench 首次打开与后续 reveal 均保留 Sidebar 焦点，使既有上下键 handler 可继续接收按键。全量测试 456 pass。Next: claim G8.3。
+- 2026-07-14 · G8.2 已完成（`f59eedf`，边界收紧 `9110a4b`）：Sidebar 发起的 Workbench 首次打开与后续 reveal 均保留 Sidebar 焦点，使既有上下键 handler 可继续接收按键；命令直接打开 Workbench 仍正常获得焦点。全量测试 456 pass。Next: claim G8.3。
 - 2026-07-14 · G8.3 已完成（`1dac69c`）：Workbench 回传线程 id 时保留唯一 Next Action 选择，不再高亮同线程全部 action；按钮改为“标记已完成 / Mark Done”。全量测试 457 pass。Next: claim G8.4。
 - 2026-07-14 · G8.4 已完成（`c807e46`）：批量分析初始 toast 恢复邮件数与 chunk 数，初始/进行中文案均按 zh-CN/en-US 本地化；代码级并发测试继续通过。全量测试 458 pass。Next: claim G8.5。
 - 2026-07-14 · G8.5 已完成（`01843d5`）：两类折叠组头统一使用更亮的 section header 前景、700 字重和轻微字距/垂直 padding，字号保持 11px。全量测试 459 pass。Next: claim G8.6。
@@ -169,6 +169,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G8.7 已完成（`1890870`）：draftGeneration 的 auto label 从“Automatic”统一为“Auto”，并检查所有 enum/enumItemLabels 数量一致。全量测试 462 pass。Next: claim G8.8。
 - 2026-07-14 · G8.8 已完成（`f9899df`）：VBS 通过 PR_ATTACHMENT_HIDDEN 过滤隐藏内嵌附件，属性/对象读取失败时保守计入；sample 输出不变。全量测试 463 pass。Next: claim G8.9。
 - 2026-07-14 · G8.9 已完成（`08ce54c`）：Polish/Refine/Compose/Generate 任一草稿动作都会先立即收起全部已打开的 Outlook Actions 菜单。全量测试 464 pass。Next: G8 全批次收口复验。
+- 2026-07-14 · G8 全批次收口完成：G8.1-G8.9 全部 `[x]`；fresh `npm test` 464 pass / 0 fail，VBS help/sample 与 sample 端到端通过，`git diff --check` 通过；已重打 `releases/easymail-0.3.0.vsix`，本地 commit，未 push。
 
 ---
 
@@ -278,7 +279,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.2 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `6261038`；重新定位确认 Sidebar 点击 `openItem` 前已显式聚焦 `#itemList`，键盘 handler 也会按真实可见性过滤行；焦点随后被 `openWorkbench` 的既有 panel `reveal(ViewColumn.One)` 或首次 `createWebviewPanel(..., ViewColumn.One, ...)` 抢走。边界：只让 Sidebar 发起的 Workbench 打开/跟随保留 Sidebar 焦点，并补 caller 级回归断言；不改键位、循环规则、队列过滤或 Workbench 内部焦点行为。Action: claim G8.2。
 
-- **2026-07-14 · Codex（G8.2 completion）**：Action: 为已有 Workbench panel 的 `reveal` 传入 `preserveFocus=true`，首次创建 panel 时使用同等 showOptions；保留 Sidebar 既有显式列表聚焦、可见行过滤和 openItem 路径。Validated: TDD RED 锁定两个焦点保留 caller；`npm run compile` 通过；sidebar/message-handler 相关测试 89 pass；fresh `npm test` 456 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——点击任意邮件后直接按 ↑/↓，确认 Workbench 跟随切换；在 pending folder 与已接受日程折叠组中确认跳过隐藏项和组头。Next: G8.3。
+- **2026-07-14 · Codex（G8.2 completion）**：Action: 为已有 Workbench panel 的 `reveal` 传入 `preserveFocus=true`，首次创建 panel 时仅在携带 Sidebar focusId 时保留焦点；保留 Sidebar 既有显式列表聚焦、可见行过滤和 openItem 路径，命令直接打开仍聚焦 Workbench。Validated: TDD RED 锁定两个焦点保留 caller；`npm run compile` 通过；sidebar/message-handler 相关测试 89 pass；fresh `npm test` 456 pass / 0 fail；最终边界复核后 91 pass；`git diff --check` 通过。Manual: **needs user validation**——点击任意邮件后直接按 ↑/↓，确认 Workbench 跟随切换；在 pending folder 与已接受日程折叠组中确认跳过隐藏项和组头。Next: G8.3。
 
   **Completion Notes**
   - 改动文件：`src/extension.ts`、`src/test/sidebar-render.test.ts`、本计划。
@@ -286,7 +287,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - 验收结果：首次创建和既有 panel reveal 两条路径都有 caller 级回归断言；既有可见行导航测试继续通过；全量 456 pass。
   - Manual validation：**needs user validation**，按用户要求由用户在 Extension Development Host 手动验证普通队列与两类折叠组的 ↑/↓ 全流程。
   - Known issues：本轮未执行 UI 自动控制；真实 Webview 焦点链仍以用户手动结果为最终依据。
-  - Commit：`f59eedf`（本地，未 push）。
+  - Commit：`f59eedf`；边界收紧 `9110a4b`（均为本地，未 push）。
 
 - **2026-07-14 · Codex（G8.3 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `ac52f37`；重新定位确认点击 Next Action 时 `openItem` 先用唯一 `data-next-action-id` 高亮，但 Workbench `showReader(threadId)` 随即回传 `focusSidebarItem(threadId)`，现有 `setActiveRow` 又以共享 `data-thread-id` 匹配同线程全部 action，覆盖唯一高亮。按钮文案锚点在 `dashboard-labels.ts` 的 `nextActions.markDone`。边界：保留当前 action 的唯一 id 选择，线程回传时不扩散到同线程兄弟 action；同步中英文按钮文案；不改 NextActionsStore、状态协议或排序。Action: claim G8.3。
 
@@ -372,6 +373,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：无新的代码级已知问题。
   - Commit：`08ce54c`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8 final verification）**：Action: 复核 `73897c5..9110a4b` 的 G8 代码与测试 diff，确认九项边界完整；最终把首次 Workbench 创建的 preserveFocus 收紧为仅 Sidebar 携带 focusId 时启用，避免命令直接打开失去焦点。Validated: fresh `npm test` 464 pass / 0 fail（69 suites）；`cscript //nologo scripts/collect-outlook-mails.vbs --help` 通过；同脚本 `--sample` 通过；`npm run validate:sample` 17 pass；`git diff --check 73897c5..HEAD` 通过；`npm run package:vsix` 成功生成 `releases/easymail-0.3.0.vsix`（109 files，533.55 KB）。Manual: 按各 G8 Completion Notes 的 **needs user validation** 清单由用户手动验证，重点是 G8.2 真机方向键、G8.4 真实 Copilot 日志并发、G8.8 真实 Outlook 附件标记。Next: 用户人工验证；当前分支 `v3` 保留，本地 commit，不 push。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -392,7 +395,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **做法**：`allowed` 过滤改为排除 `decision === "block" || decision === "manual_confirm"`；确认 blocked 队列的 UI 文案/确认按钮对 keyword 型 manual_confirm 与 level 型行为一致（workbench 的 Confirm and Analyze 应可用）。顺带回答用户 M04 的疑问——在两个设置的 description 中写清差异：`classificationLevel3Keywords` 改变邮件**分级**（影响徽标显示与阈值比较，调高 `autoAnalyzeMaxClassificationLevel` 到 3 后可自动分析）；`manualConfirmKeywords` **无视分级强制人工确认**（任何阈值下都要确认）。两者在默认阈值下效果相似但机制不同，不是重复配置。
 - **验收**：单测——keyword 命中进 blocked 队列、Confirm and Analyze 可分析、与 level 型行为一致；`npm test` 全绿。**needs user validation**：manualConfirmKeywords 加词后邮件进入 Manual Confirm Required 队列且可确认分析。
 
-### [x] G8.2 方向键导航真机无反应（M10/M11，P1，高概率根因已定位）— `f59eedf`
+### [x] G8.2 方向键导航真机无反应（M10/M11，P1，高概率根因已定位）— `f59eedf`, `9110a4b`
 
 - **现状**：G6 实现存在（`#itemList` tabindex=0 + keydown 监听，sidebar-render.ts ~L567/L742），单测通过但真机零反应。
 - **首要假设**：点击邮件行触发 `openInWorkbench` → workbench panel `reveal()` **抢走焦点** → sidebar webview 失焦，方向键从此进不来。修法：workbench reveal 加 `preserveFocus: true`（sidebar 发起的打开/跟随不抢焦点；用户主动点 workbench 时焦点自然过去）。次要排查点：VS Code webview 中点击非聚焦子元素是否真的把焦点给到 tabindex 容器（必要时在行 mousedown 里显式 `itemList.focus()`）。
