@@ -333,6 +333,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：若 VS Code 自身的 `settings.update` 成功返回后仍延迟向 `getConfiguration` 可见，将属于平台行为；当前 API 合约和自动化 mock 均以 promise resolve 作为可读边界。
   - Commit：`5087a8a`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8.7 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `ff1f567`；扫描 `package.json` 全部 enum/enumItemLabels，长度与顺序均一致；唯一同义不一致是 `draftLanguage.auto` 显示“Auto”，而 `draftGeneration.auto` 显示“Automatic”。边界：只把后者改为“Auto”并加 manifest 一致性测试；不改 enum value、默认值、description 或运行时逻辑。Action: claim G8.7。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -383,7 +385,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **做法**：extension 侧跟踪"最近一次设置写入"的 promise（`updateSettings` 赋值），`pullMail`/`analyze` 等读取 config 的动作入口先 `await` 它再读配置。不改 UI、不加额外点击。注意别把长任务本身串进链里（只 await 设置写入，不 await 其他动作）。
 - **验收**：单测——改设置消息后立刻发 fetch 消息，fetch 读到新值；`npm test` 全绿。**needs user validation**：改 maxItems 后直接点 Fetch New 即按新值工作。
 
-### [ ] G8.7 设置枚举文案统一（额外反馈#5，P3）
+### [~] G8.7 设置枚举文案统一（额外反馈#5，P3）
 
 - `easyMail.draftGeneration` 的 enumItemLabels `Automatic` → `Auto`（与 Draft Language 的 Auto 一致）；顺带扫一遍其余枚举 label 用词一致性。
 - **验收**：`npm test` 全绿。
