@@ -268,6 +268,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：首次全量复验出现一次既有 G1 cancellation 测试的完成顺序抖动；该用例隔离重跑 5/5 通过，随后 fresh 全量 455/455 通过，因此未越界修改 G1。
   - Commit：`5683136`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8.2 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `6261038`；重新定位确认 Sidebar 点击 `openItem` 前已显式聚焦 `#itemList`，键盘 handler 也会按真实可见性过滤行；焦点随后被 `openWorkbench` 的既有 panel `reveal(ViewColumn.One)` 或首次 `createWebviewPanel(..., ViewColumn.One, ...)` 抢走。边界：只让 Sidebar 发起的 Workbench 打开/跟随保留 Sidebar 焦点，并补 caller 级回归断言；不改键位、循环规则、队列过滤或 Workbench 内部焦点行为。Action: claim G8.2。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -288,7 +290,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **做法**：`allowed` 过滤改为排除 `decision === "block" || decision === "manual_confirm"`；确认 blocked 队列的 UI 文案/确认按钮对 keyword 型 manual_confirm 与 level 型行为一致（workbench 的 Confirm and Analyze 应可用）。顺带回答用户 M04 的疑问——在两个设置的 description 中写清差异：`classificationLevel3Keywords` 改变邮件**分级**（影响徽标显示与阈值比较，调高 `autoAnalyzeMaxClassificationLevel` 到 3 后可自动分析）；`manualConfirmKeywords` **无视分级强制人工确认**（任何阈值下都要确认）。两者在默认阈值下效果相似但机制不同，不是重复配置。
 - **验收**：单测——keyword 命中进 blocked 队列、Confirm and Analyze 可分析、与 level 型行为一致；`npm test` 全绿。**needs user validation**：manualConfirmKeywords 加词后邮件进入 Manual Confirm Required 队列且可确认分析。
 
-### [ ] G8.2 方向键导航真机无反应（M10/M11，P1，高概率根因已定位）
+### [~] G8.2 方向键导航真机无反应（M10/M11，P1，高概率根因已定位）
 
 - **现状**：G6 实现存在（`#itemList` tabindex=0 + keydown 监听，sidebar-render.ts ~L567/L742），单测通过但真机零反应。
 - **首要假设**：点击邮件行触发 `openInWorkbench` → workbench panel `reveal()` **抢走焦点** → sidebar webview 失焦，方向键从此进不来。修法：workbench reveal 加 `preserveFocus: true`（sidebar 发起的打开/跟随不抢焦点；用户主动点 workbench 时焦点自然过去）。次要排查点：VS Code webview 中点击非聚焦子元素是否真的把焦点给到 tabindex 容器（必要时在行 mousedown 里显式 `itemList.focus()`）。
