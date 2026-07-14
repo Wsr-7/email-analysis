@@ -163,6 +163,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 2026-07-14 · G8.1 已完成（`5683136`）：keyword 型 `manual_confirm` 不再落入 Pending，而是进入 Manual Confirm Required；显式确认分析仍可用，两个关键词设置的机制差异已写清。全量测试 455 pass。Next: claim G8.2。
 - 2026-07-14 · G8.2 已完成（`f59eedf`）：Sidebar 发起的 Workbench 首次打开与后续 reveal 均保留 Sidebar 焦点，使既有上下键 handler 可继续接收按键。全量测试 456 pass。Next: claim G8.3。
 - 2026-07-14 · G8.3 已完成（`1dac69c`）：Workbench 回传线程 id 时保留唯一 Next Action 选择，不再高亮同线程全部 action；按钮改为“标记已完成 / Mark Done”。全量测试 457 pass。Next: claim G8.4。
+- 2026-07-14 · G8.4 已完成（`c807e46`）：批量分析初始 toast 恢复邮件数与 chunk 数，初始/进行中文案均按 zh-CN/en-US 本地化；代码级并发测试继续通过。全量测试 458 pass。Next: claim G8.5。
 
 ---
 
@@ -296,6 +297,16 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 
 - **2026-07-14 · Codex（G8.4 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `8e9f5a4`；重新定位确认 `app-analysis.ts` 在 chunk 划分后掌握 batch/chunk 总数，但初始 progress 固定为 `Completed 0/N chunks.`，后续完成进度也固定英文；`analyze:chunkStart` 在 transport 前、`analyze:response` 在返回后记录，足以供真实日志判断两个请求是否重叠。边界：只恢复含邮件数/chunk 数的本地化初始 toast，并保持现有完成数/预计剩余时间语义；不改并发池、日志事件、估时算法或模型调用。真实 Copilot 并发实效按用户要求留给人工日志验证。Action: claim G8.4。
 
+- **2026-07-14 · Codex（G8.4 completion）**：Action: 新增双语批量分析进度格式化，初始 toast 显示邮件总数和 chunk 总数，完成进度保留 x/N 与预计分钟；复用已解析 locale。Validated: TDD RED 锁定英文初始文案与中英文 start/update；`npm run compile` 通过；app-analysis 32 pass（含两请求同时 in-flight 的代码级并发测试）；fresh `npm test` 458 pass / 0 fail；`git diff --check` 通过。Manual: **needs user validation**——真实批量分析确认初始 toast 为“Analyzing 20 emails in 2 chunks…”或中文等价文案，并在日志中比较同轮两个 `analyze:chunkStart` 是否均早于首个对应 `analyze:response`。Next: G8.5。
+
+  **Completion Notes**
+  - 改动文件：`src/lib/app-analysis.ts`、`src/test/app-analysis.test.ts`、本计划。
+  - 实现边界：只改进度字符串及 locale 复用；未改并发度 2、worker 补位、chunk 划分、估时公式或日志事件。
+  - 验收结果：英文/中文初始与完成文案均有直接单测，真实 batch 流的首条消息锁定邮件数与 chunk 数；代码级并发、失败隔离和取消测试继续通过；全量 458 pass。
+  - Manual validation：**needs user validation**，真实 Copilot toast 与日志时间戳由用户手动核查。
+  - Known issues：自动化 MockProvider 可证明代码同时发起两个 transport，但不能证明 `vscode.lm` 服务端实际并行；若真实日志显示第二个 `chunkStart` 在首个 `response` 前而总耗时仍近似串行，应视为平台内部排队，不在本 step 强行绕过。
+  - Commit：`c807e46`（本地，未 push）。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -328,7 +339,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - 用 sample 线程数据复现"多个 action 同时高亮"（F7.2 修过一次，线程来源的 action 疑似再破）；修复并补覆盖线程场景的单测。按钮 label：`Done/完成` → `Mark Done/标记已完成`（中英文）。
 - **验收**：单测 + `npm test` 全绿。**needs user validation**：sample 线程下单选高亮正确。
 
-### [~] G8.4 分析进度 toast 恢复丰富文案 + 并发实效核查（M01 附带要求 + 额外反馈#2，P2）
+### [x] G8.4 分析进度 toast 恢复丰富文案 + 并发实效核查（M01 附带要求 + 额外反馈#2，P2）— `c807e46`
 
 - 文案回滚增强：初始行恢复上一版信息量——`Analyzing 20 emails in 2 chunks…`（含邮件总数与 chunk 总数，替换现在干瘪的 `Completed 0/2 chunks.`）；进行中保留 `Completed x/N chunks (about X minutes remaining)`。中英文同步。
 - **并发实效核查（用户反馈提速无感）**：在日志中对比同一次分析里两个 chunk 的 `analyze:chunkStart`/`analyze:response` 时间戳是否重叠——若 vscode.lm 对同会话请求内部串行化导致并发无效，如实记入 Completion Notes 的 Known issues（属平台限制，不强行绕），并在 §7 汇报给规划者。
