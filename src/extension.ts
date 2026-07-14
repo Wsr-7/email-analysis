@@ -248,7 +248,7 @@ export class EasyMailApp {
     const panel = vscode.window.createWebviewPanel(
       "easyMail.workbench",
       "EasyMail",
-      { viewColumn: vscode.ViewColumn.One, preserveFocus: true },
+      { viewColumn: vscode.ViewColumn.One, preserveFocus: Boolean(focusId) },
       { enableScripts: true, retainContextWhenHidden: true }
     );
     this.workbenchPanel = panel;
