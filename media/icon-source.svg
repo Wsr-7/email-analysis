@@ -1,0 +1,16 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>EasyMail</title>
+  <defs>
+    <mask id="back-card-visible" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/>
+      <rect x="126" y="136" width="350" height="290" rx="55" fill="black"/>
+    </mask>
+  </defs>
+  <g transform="rotate(-6 256 256)">
+    <rect x="62" y="68" width="330" height="250" rx="43" fill="#60A5FA" mask="url(#back-card-visible)"/>
+    <path d="M98 105H238" stroke="#22D3EE" stroke-width="16" stroke-linecap="round"/>
+    <rect x="140" y="150" width="326" height="266" rx="43" fill="#2563EB"/>
+    <path d="M159 197L262 270M326 270L447 184" stroke="#EFF6FF" stroke-width="28" stroke-linecap="round"/>
+    <path d="M294 236C302 265 315 278 344 286C315 294 302 307 294 336C286 307 273 294 244 286C273 278 286 265 294 236Z" fill="#22D3EE"/>
+  </g>
+</svg>

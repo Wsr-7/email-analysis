@@ -180,10 +180,10 @@ rtk npx vsce ls --readme-path docs/marketplace-details.md
 
 Completion Notes（2026-07-14）：基线 `npm test` 为 467 pass / 0 fail；`npm run package:vsix` 生成 109 files、534.55 KB 的 `easymail-0.4.0.vsix`。`vsce ls` 确认当前包仍含 37 个 `out/test/**`、`workbench-render-v1.js`、`mock-provider.js`、8 个 scripts、`AGENTS.md`、`setup.md` 与根目录 `user guide.md`，作为 H2/H5 的前后对照。用户已确认 #10 全部人工通过；H0 无未决 blocker。
 
-### [ ] H1 · 重做统一的 AI 邮件图标系统
+### [x] H1 · 重做统一的 AI 邮件图标系统
 
-1. 以“信封轮廓 + 位于主体内部的 AI 星芒/电路线”为唯一核心符号；不使用头像、文字、右上角小圆点/徽标、拟物材质、阴影或依赖高分辨率才能看清的细节。
-2. `media/activity-icon.svg` 使用 24×24 视口、单色线条、足够粗的主轮廓和 2px 左右安全边距；AI 特征必须位于信封主体内并在 16/20/24px 下仍可辨识。
+1. 以“斜置双层邮件卡片 + 位于前层折线汇聚点的 AI 决策核心”为唯一核心符号；不使用头像、文字、右上角小圆点/徽标、拟物材质、阴影或依赖高分辨率才能看清的细节。
+2. `media/activity-icon.svg` 使用 24×24 视口、单色高占比轮廓/负形、足够粗的主轮廓和约 1px 安全边距；AI 特征必须位于邮件主体内并在 16/20/24px 下仍可辨识。
 3. 为 Marketplace 图标建立可编辑 SVG 母版，并从同一几何符号导出透明背景的 512×512 `media/icon.png`；允许使用少量品牌色，但保持扁平线条设计，不用生成式纹理。
 4. 通过本地矢量渲染导出 PNG，检查 alpha、尺寸与缩小后的边缘；`package.json` 继续引用 `media/icon.png` 与 `media/activity-icon.svg`。
 5. 本任务是用户对 §2“UI 不改”的明确例外；只替换品牌资产，不改任何 Webview 布局或交互。
@@ -197,6 +197,8 @@ rtk npm run package:vsix
 ```
 
 人工验证：Marketplace / Extension Details 图标边缘平滑；Activity Bar 图标在常用缩放下主体足够大，能直接识别为“AI 驱动的邮件工具”。
+
+Completion Notes（2026-07-14）：用户从多轮候选中确认 N 的斜置双卡片方向，并确认“决策核心”而非“信息路由”。新增 `media/icon-source.svg` 作为透明背景的 SVG 母版；由本地矢量渲染生成 512×512 `media/icon.png`，实测左上角 alpha 为 0。Marketplace 图标使用蓝色卡片、暖白邮件折线与青蓝核心；Activity Bar 使用同结构的单色负形版本，并在不裁边的前提下放大约 10%。深浅主题及 16/20/24px 本地预览已检查。`npm run compile` 通过；最终 `npm test` 为 467 pass / 0 fail；`npm run package:vsix` 为 110 files、271.9 KB。首次全量测试曾出现一次既有 `app-analysis` 并发用例失败，单测连续 5 次与后续完整重跑均通过，未改业务代码。真实 VS Code Activity Bar、Marketplace / Extension Details 仍需用户在实际安装包中确认。
 
 ### [ ] H2 · 清理已证明无引用的发布污染
 
