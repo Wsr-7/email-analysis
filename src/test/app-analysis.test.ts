@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AppDataStore } from "../lib/app-data";
-import { analyzeBatchCore, analyzeThreadCore, sendPromptToModel, splitByTokenBudget } from "../lib/app-analysis";
+import { analyzeBatchCore, analyzeThreadCore, formatAnalysisProgressStart, formatAnalysisProgressUpdate, sendPromptToModel, splitByTokenBudget } from "../lib/app-analysis";
 import { emptyMailIndex, type StoredMail } from "../lib/mail-store";
 import { MockProvider } from "../lib/mock-provider";
 import type { CancellationTokenLike, LlmProvider, LlmRequestOptions } from "../lib/llm-provider";
@@ -117,6 +117,13 @@ function threadRecord(messages: ThreadMessage[]): ThreadRecord {
 }
 
 describe("analyzeBatchCore", () => {
+  it("formats batch progress in the configured locale", () => {
+    assert.equal(formatAnalysisProgressStart("en-US", 20, 2), "Analyzing 20 emails in 2 chunks…");
+    assert.equal(formatAnalysisProgressStart("zh-CN", 20, 2), "正在分析 20 封邮件，共 2 个分块…");
+    assert.equal(formatAnalysisProgressUpdate("en-US", 1, 2, 1), "Completed 1/2 chunks (about 1 minute remaining)");
+    assert.equal(formatAnalysisProgressUpdate("zh-CN", 1, 2, 1), "已完成 1/2 个分块（预计还需 1 分钟）");
+  });
+
   it("splits mails by token budget without looping on oversized mails", () => {
     const mails = Array.from({ length: 5 }, (_, index) => ({ ...mail(index + 1), bodyExcerpt: "x".repeat(100) }));
     const chunks = splitByTokenBudget(mails, 1100, 400);
@@ -982,7 +989,7 @@ describe("analyzeBatchCore", () => {
       assert.equal(result.batchSize, 2);
       assert.equal(provider.prompts.length, 2);
       assert.deepEqual(progressMessages, [
-        "Completed 0/2 chunks.",
+        "Analyzing 2 emails in 2 chunks…",
         "Completed 1/2 chunks (about 1 minute remaining)",
         "Completed 2/2 chunks (about 0 minutes remaining)"
       ]);

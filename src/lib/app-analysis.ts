@@ -22,6 +22,20 @@ const ANALYSIS_OUTPUT_RESERVE_PER_MAIL = 400;
 const ANALYSIS_CHUNK_CONCURRENCY = 2;
 const DEFAULT_RETRY_DELAYS_MS = [2000, 8000];
 
+export function formatAnalysisProgressStart(locale: Locale, mailCount: number, chunkCount: number): string {
+  if (locale === "zh-CN") {
+    return `正在分析 ${mailCount} 封邮件，共 ${chunkCount} 个分块…`;
+  }
+  return `Analyzing ${mailCount} ${mailCount === 1 ? "email" : "emails"} in ${chunkCount} ${chunkCount === 1 ? "chunk" : "chunks"}…`;
+}
+
+export function formatAnalysisProgressUpdate(locale: Locale, completedChunks: number, chunkCount: number, remainingMinutes: number): string {
+  if (locale === "zh-CN") {
+    return `已完成 ${completedChunks}/${chunkCount} 个分块（预计还需 ${remainingMinutes} 分钟）`;
+  }
+  return `Completed ${completedChunks}/${chunkCount} chunks (about ${remainingMinutes} ${remainingMinutes === 1 ? "minute" : "minutes"} remaining)`;
+}
+
 export interface AnalysisContext {
   data: AppDataStore;
   llmProvider: LlmProvider;
@@ -303,7 +317,8 @@ export async function analyzeBatchCore(
   let completedChunks = 0;
   let completedChunkElapsedMs = 0;
   let mergeTail = Promise.resolve();
-  const summaryLabels = buildCategoryLabels(getLabels(getLocaleFromConfig(config)), promptConfig, getLocaleFromConfig(config));
+  const locale = getLocaleFromConfig(config);
+  const summaryLabels = buildCategoryLabels(getLabels(locale), promptConfig, locale);
   const mergeAndPersist = async (incoming: ReturnType<typeof normalizeAnalysis>): Promise<void> => {
     merged = pruneAnalysisResult(
       mergeAnalysisResults(merged, incoming, allowedCategoryIds(promptConfig)),
@@ -331,9 +346,9 @@ export async function analyzeBatchCore(
     completedChunks += 1;
     const averageChunkMs = completedChunkElapsedMs / completedChunks;
     const remainingMinutes = Math.ceil((averageChunkMs * (chunks.length - completedChunks)) / ANALYSIS_CHUNK_CONCURRENCY / 60000);
-    ctx.progress?.(`Completed ${completedChunks}/${chunks.length} chunks (about ${remainingMinutes} ${remainingMinutes === 1 ? "minute" : "minutes"} remaining)`);
+    ctx.progress?.(formatAnalysisProgressUpdate(locale, completedChunks, chunks.length, remainingMinutes));
   };
-  ctx.progress?.(`Completed 0/${chunks.length} chunks.`);
+  ctx.progress?.(formatAnalysisProgressStart(locale, batch.length, chunks.length));
 
   const runChunk = async (index: number): Promise<void> => {
     const chunk = chunks[index];
