@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderEasyMailGuideHtml } from "../lib/guide-webview";
+import { renderEasyMailGuideHtml } from "../lib/ui/guide-webview";
 
 test("renderEasyMailGuideHtml renders guide content and command buttons", () => {
   const html = renderEasyMailGuideHtml({

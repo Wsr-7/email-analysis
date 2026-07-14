@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyReplyTemplateToAnalysis, defaultReplyTemplate, renderReplyDraftFromTemplate, validateReplyTemplate } from "../lib/reply-template";
-import type { AnalysisResult } from "../lib/analysis-schema";
+import { applyReplyTemplateToAnalysis, defaultReplyTemplate, renderReplyDraftFromTemplate, validateReplyTemplate } from "../lib/analysis/reply-template";
+import type { AnalysisResult } from "../lib/analysis/analysis-schema";
 
 test("renderReplyDraftFromTemplate replaces fixed placeholders", () => {
   const draft = renderReplyDraftFromTemplate(defaultReplyTemplate(), {

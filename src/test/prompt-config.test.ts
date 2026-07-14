@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { composeAnalysisPrompt, normalizePromptConfig } from "../lib/prompt-config";
+import { composeAnalysisPrompt, normalizePromptConfig } from "../lib/analysis/prompt-config";
 
 test("composeAnalysisPrompt includes custom categories and language instruction", () => {
   const config = normalizePromptConfig({

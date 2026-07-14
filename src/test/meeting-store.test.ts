@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { emptyMeetingStore, mergeMeetingDigestIntoStore, pruneMeetingStore, normalizeMeetingStore } from "../lib/meeting-store";
-import type { MeetingDigestData } from "../lib/meeting-digest";
+import { emptyMeetingStore, mergeMeetingDigestIntoStore, pruneMeetingStore, normalizeMeetingStore } from "../lib/storage/meeting-store";
+import type { MeetingDigestData } from "../lib/domain/meeting-digest";
 
 function stubDigest(overrides?: Partial<MeetingDigestData["items"][number]>[]): MeetingDigestData {
   return {

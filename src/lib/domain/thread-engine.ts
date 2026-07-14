@@ -1,4 +1,4 @@
-import type { StoredMail } from "./mail-store";
+import type { StoredMail } from "../storage/mail-store";
 import type { ThreadContentStatus, ThreadMessage, ThreadRecord, ThreadStore } from "./thread-schema";
 import { cleanMailBody, extractReplyDelta, markDuplicateBodies } from "./thread-timeline";
 

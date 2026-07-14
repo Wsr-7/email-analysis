@@ -1,18 +1,18 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { normalizeAnalysis, parseAnalysisJson, pruneAnalysisResult, type AnalysisResult } from "./analysis-schema";
-import { ensureClassifications, normalizeClassificationCache, type ClassificationCache } from "./classification";
-import { parseDigest } from "./digest";
+import { normalizeAnalysis, parseAnalysisJson, pruneAnalysisResult, type AnalysisResult } from "../analysis/analysis-schema";
+import { ensureClassifications, normalizeClassificationCache, type ClassificationCache } from "../security/classification";
+import { parseDigest } from "../domain/digest";
 import { emptyMailIndex, emptyMailStore, mergeDigestIntoStore, normalizeMailIndex, normalizeMailStore, type MailIndex, type MailStore } from "./mail-store";
-import { allowedCategoryIds, normalizePromptConfig, type PromptConfig } from "./prompt-config";
-import { LEGACY_REPLY_TEMPLATE_FILE_NAME, REPLY_TEMPLATE_FILE_NAME, validateReplyTemplate } from "./reply-template";
+import { allowedCategoryIds, normalizePromptConfig, type PromptConfig } from "../analysis/prompt-config";
+import { LEGACY_REPLY_TEMPLATE_FILE_NAME, REPLY_TEMPLATE_FILE_NAME, validateReplyTemplate } from "../analysis/reply-template";
 import { normalizeNextActionsStore, type NextActionsStore } from "./next-actions";
-import { normalizeThreadAnalysis, type ThreadAnalysisResult } from "./thread-analysis-schema";
-import { buildThreadStore } from "./thread-engine";
+import { normalizeThreadAnalysis, type ThreadAnalysisResult } from "../analysis/thread-analysis-schema";
+import { buildThreadStore } from "../domain/thread-engine";
 import { emptyThreadStore, mergeThreadStores, normalizeThreadStore, type ThreadStore } from "./thread-store";
-import { normalizeAvailableModel, type AvailableModel } from "./llm-provider";
+import { normalizeAvailableModel, type AvailableModel } from "../analysis/llm-provider";
 import { emptyMeetingStore, normalizeMeetingStore, type MeetingStore } from "./meeting-store";
-import { formatError } from "./process-runner";
+import { formatError } from "../shared/process-runner";
 
 export interface AppPaths {
   globalStoragePath: string;

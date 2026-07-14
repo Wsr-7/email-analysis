@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { buildThreadAnalysisPrompt, buildThreadPromptPayload } from "../lib/thread-prompt-builder";
-import type { ThreadRecord } from "../lib/thread-schema";
+import { buildThreadAnalysisPrompt, buildThreadPromptPayload } from "../lib/analysis/thread-prompt-builder";
+import type { ThreadRecord } from "../lib/domain/thread-schema";
 
 test("buildThreadPromptPayload emits JSON-like timeline without markdown digest shape", () => {
   const payload = buildThreadPromptPayload(thread());

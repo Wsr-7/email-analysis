@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyAnalysisTranslation, buildAnalysisTranslationPrompt } from "../lib/analysis-translation";
-import type { AnalysisResult } from "../lib/analysis-schema";
-import type { ThreadAnalysisResult } from "../lib/thread-analysis-schema";
+import { applyAnalysisTranslation, buildAnalysisTranslationPrompt } from "../lib/analysis/analysis-translation";
+import type { AnalysisResult } from "../lib/analysis/analysis-schema";
+import type { ThreadAnalysisResult } from "../lib/analysis/thread-analysis-schema";
 
 const mail: AnalysisResult = {
   generatedAt: "2026-06-18T00:00:00.000Z",

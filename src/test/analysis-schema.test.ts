@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseAnalysisJson } from "../lib/analysis-schema";
+import { parseAnalysisJson } from "../lib/analysis/analysis-schema";
 
 test("parseAnalysisJson accepts fenced JSON and normalizes overview", () => {
   const analysis = parseAnalysisJson(`\`\`\`json

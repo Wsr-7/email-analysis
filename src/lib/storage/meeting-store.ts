@@ -1,4 +1,4 @@
-import type { MeetingDigestData, MeetingResponseStatus, MeetingSource } from "./meeting-digest";
+import type { MeetingDigestData, MeetingResponseStatus, MeetingSource } from "../domain/meeting-digest";
 
 export interface StoredMeeting {
   meetingId: string;

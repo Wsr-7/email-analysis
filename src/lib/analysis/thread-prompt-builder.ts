@@ -1,7 +1,7 @@
-import { formatTodayLine } from "./config-utils";
+import { formatTodayLine } from "../shared/config-utils";
 import { buildLanguageContract, normalizeDraftLanguage, type DraftLanguage } from "./language-contract";
 import { escapePromptDelimiters } from "./prompt-config";
-import type { ThreadRecord } from "./thread-schema";
+import type { ThreadRecord } from "../domain/thread-schema";
 
 const THREAD_TIMELINE_DELIMITER_START = "<easy-mail-thread-timeline-json>";
 const THREAD_TIMELINE_DELIMITER_END = "</easy-mail-thread-timeline-json>";

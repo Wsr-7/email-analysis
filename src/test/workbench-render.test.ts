@@ -1,15 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderWorkbenchHtml as renderWorkbenchHtmlWithNonce } from "../lib/workbench-render";
-import { normalizeClassificationCache } from "../lib/classification";
-import { normalizePromptConfig } from "../lib/prompt-config";
-import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/mail-store";
-import { emptyThreadStore } from "../lib/thread-store";
-import type { StoredMeeting as StoredMeetingItem } from "../lib/meeting-store";
-import type { DashboardRenderInput } from "../lib/dashboard-render";
-import type { DashboardState } from "../lib/dashboard-state";
-import type { AnalysisItem } from "../lib/analysis-schema";
-import type { ThreadAnalysisResult } from "../lib/thread-analysis-schema";
+import { renderWorkbenchHtml as renderWorkbenchHtmlWithNonce } from "../lib/ui/workbench-render";
+import { normalizeClassificationCache } from "../lib/security/classification";
+import { normalizePromptConfig } from "../lib/analysis/prompt-config";
+import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/storage/mail-store";
+import { emptyThreadStore } from "../lib/storage/thread-store";
+import type { StoredMeeting as StoredMeetingItem } from "../lib/storage/meeting-store";
+import type { DashboardRenderInput } from "../lib/ui/dashboard-render";
+import type { DashboardState } from "../lib/ui/dashboard-state";
+import type { AnalysisItem } from "../lib/analysis/analysis-schema";
+import type { ThreadAnalysisResult } from "../lib/analysis/thread-analysis-schema";
 
 function stubMail(overrides?: Partial<StoredMail>): StoredMail {
   return {

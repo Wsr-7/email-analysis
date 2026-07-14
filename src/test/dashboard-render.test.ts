@@ -17,8 +17,8 @@ import {
   renderModelOptions,
   renderThreadAnalysisSummary,
   renderEditableDraftBox,
-} from "../lib/dashboard-render";
-import { LABELS, getLabels } from "../lib/dashboard-labels";
+} from "../lib/ui/dashboard-render";
+import { LABELS, getLabels } from "../lib/ui/dashboard-labels";
 
 const zhLabels = getLabels("zh-CN");
 const enLabels = getLabels("en-US");

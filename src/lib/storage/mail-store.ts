@@ -1,5 +1,5 @@
 import * as crypto from "node:crypto";
-import type { DigestData, DigestItem } from "./digest";
+import type { DigestData, DigestItem } from "../domain/digest";
 
 export interface StoredMail {
   mailId: string;

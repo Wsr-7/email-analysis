@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { formatElapsedSeconds, formatError, sanitizeProcessArgs } from "../lib/process-runner";
+import { formatElapsedSeconds, formatError, sanitizeProcessArgs } from "../lib/shared/process-runner";
 
 describe("formatElapsedSeconds", () => {
   it("formats sub-10s with one decimal", () => {

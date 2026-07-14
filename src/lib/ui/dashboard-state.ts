@@ -1,6 +1,6 @@
-import type { AnalysisResult } from "./analysis-schema";
-import type { DigestData } from "./digest";
-import type { ThreadStore } from "./thread-store";
+import type { AnalysisResult } from "../analysis/analysis-schema";
+import type { DigestData } from "../domain/digest";
+import type { ThreadStore } from "../storage/thread-store";
 
 export const CATEGORY_ORDER = [
   "mustHandleToday",

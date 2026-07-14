@@ -1,5 +1,5 @@
-import type { StoredMail } from "./mail-store";
-import type { ThreadStore } from "./thread-store";
+import type { StoredMail } from "../storage/mail-store";
+import type { ThreadStore } from "../storage/thread-store";
 
 export interface RedactionPolicy {
   enabled: boolean;

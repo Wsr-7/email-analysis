@@ -1,5 +1,5 @@
-import type { SecurityGateSettings } from "./security-types";
-import type { RedactionPolicy } from "./redaction";
+import type { SecurityGateSettings } from "../security/security-types";
+import type { RedactionPolicy } from "../security/redaction";
 
 export type Locale = "zh-CN" | "en-US";
 

@@ -1,5 +1,5 @@
-import { positiveNumber, parseFolders, normalizeMailFolders, parseClassificationLevel } from "./config-utils";
-import { normalizeDraftLanguage } from "./language-contract";
+import { positiveNumber, parseFolders, normalizeMailFolders, parseClassificationLevel } from "../shared/config-utils";
+import { normalizeDraftLanguage } from "../analysis/language-contract";
 
 export interface MessageHandlerContext {
   log: (event: string, data: Record<string, unknown>) => Promise<void>;

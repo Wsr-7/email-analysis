@@ -1,18 +1,18 @@
-import type { AnalysisResult } from "./analysis-schema";
-import type { ClassificationCache } from "./classification";
-import { classificationFor } from "./classification";
-import { getLocaleFromConfig, mergeStringLists, parseFolders, positiveNumber } from "./config-utils";
+import type { AnalysisResult } from "../analysis/analysis-schema";
+import type { ClassificationCache } from "../security/classification";
+import { classificationFor } from "../security/classification";
+import { getLocaleFromConfig, mergeStringLists, parseFolders, positiveNumber } from "../shared/config-utils";
 import { getLabels, buildCategoryLabels, type DashboardLabels, LABELS } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard, buildThreadLookup, compareTimelineMessagesForDisplay, type DashboardState } from "./dashboard-state";
 import { escapeHtml, escapeAttr, domIdForMail, domIdForThread, domIdForThreadMessage, domIdForCategory, selected, senderDisplayName } from "./html-utils";
-import { formatModelLabel, isSelectedModel, modelKey, selectConfiguredModel, type AvailableModel } from "./llm-provider";
-import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, type MailIndex, type MailStore, type StoredMail } from "./mail-store";
-import { normalizePromptConfig, type PromptConfig } from "./prompt-config";
-import { normalizeClassificationCache } from "./classification";
-import type { SecurityGateDecisionResult } from "./security-types";
-import { emptyThreadStore, type ThreadStore } from "./thread-store";
-import type { ThreadAnalysisResult } from "./thread-analysis-schema";
-import type { MeetingStore } from "./meeting-store";
+import { formatModelLabel, isSelectedModel, modelKey, selectConfiguredModel, type AvailableModel } from "../analysis/llm-provider";
+import { emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, type MailIndex, type MailStore, type StoredMail } from "../storage/mail-store";
+import { normalizePromptConfig, type PromptConfig } from "../analysis/prompt-config";
+import { normalizeClassificationCache } from "../security/classification";
+import type { SecurityGateDecisionResult } from "../security/security-types";
+import { emptyThreadStore, type ThreadStore } from "../storage/thread-store";
+import type { ThreadAnalysisResult } from "../analysis/thread-analysis-schema";
+import type { MeetingStore } from "../storage/meeting-store";
 
 type SecurityDecisionMap = Map<string, SecurityGateDecisionResult>;
 
@@ -364,7 +364,7 @@ export interface DashboardRenderInput {
   threadStore: ThreadStore;
   threadAnalysis: ThreadAnalysisResult;
   meetingStore?: MeetingStore;
-  nextActionsStore?: import("./next-actions").NextActionsStore;
+  nextActionsStore?: import("../storage/next-actions").NextActionsStore;
   ignoredIds?: Set<string>;
   availableModels: AvailableModel[];
   busyKind: string;

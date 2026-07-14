@@ -1,4 +1,4 @@
-import type { ThreadAnalysisItem, ThreadAnalysisResult } from "./thread-analysis-schema";
+import type { ThreadAnalysisItem, ThreadAnalysisResult } from "../analysis/thread-analysis-schema";
 
 export function buildThreadReport(result: ThreadAnalysisResult): string {
   const lines: string[] = [

@@ -1,6 +1,6 @@
 import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { handleWebviewMessage, saveConfigFromMessage, type MessageHandlerContext } from "../lib/message-handler";
+import { handleWebviewMessage, saveConfigFromMessage, type MessageHandlerContext } from "../lib/ui/message-handler";
 
 function stubContext(overrides?: Partial<MessageHandlerContext>): MessageHandlerContext {
   return {

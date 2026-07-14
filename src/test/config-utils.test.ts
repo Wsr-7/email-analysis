@@ -2,8 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { positiveNumber, parseFolders, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildClassificationKeywords, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/config-utils";
-import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/language-contract";
+import { positiveNumber, parseFolders, normalizeMailFolders, parseOutlookFolderList, buildOutlookFolderPickItems, normalizeOutlookFolderSelection, mergeStringLists, serializeFolderDateMap, getLocaleFromConfig, resolveModelFamily, shouldMigrateLegacyModelFamily, parseClassificationLevel, buildSecuritySettings, buildClassificationKeywords, buildDefaultRedactionPolicy, formatTodayLine } from "../lib/shared/config-utils";
+import { detectDraftLanguageFromText, latestNonSelfThreadText, resolveDraftLanguage, resolveOutputLanguage } from "../lib/analysis/language-contract";
 
 describe("positiveNumber", () => {
   it("returns parsed number when positive", () => {

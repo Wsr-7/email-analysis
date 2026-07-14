@@ -1,5 +1,5 @@
-import type { AnalysisItem, AnalysisResult } from "./analysis-schema";
-import type { ThreadAnalysisItem, ThreadAnalysisResult } from "./thread-analysis-schema";
+import type { AnalysisItem, AnalysisResult } from "../analysis/analysis-schema";
+import type { ThreadAnalysisItem, ThreadAnalysisResult } from "../analysis/thread-analysis-schema";
 
 export function buildDailyBrief(
   mailResult: AnalysisResult,

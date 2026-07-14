@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSingleMailReport } from "../lib/report-single-mail";
-import type { AnalysisResult } from "../lib/analysis-schema";
+import { buildSingleMailReport } from "../lib/reports/report-single-mail";
+import type { AnalysisResult } from "../lib/analysis/analysis-schema";
 
 test("buildSingleMailReport renders analyzed fields and security review signals", () => {
   const result: AnalysisResult = {

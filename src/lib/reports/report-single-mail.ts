@@ -1,4 +1,4 @@
-import type { AnalysisItem, AnalysisResult } from "./analysis-schema";
+import type { AnalysisItem, AnalysisResult } from "../analysis/analysis-schema";
 
 export function buildSingleMailReport(result: AnalysisResult): string {
   const lines: string[] = [

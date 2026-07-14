@@ -1,15 +1,15 @@
-import type { AnalysisResult } from "./analysis-schema";
-import { classificationFor, normalizeClassificationCache } from "./classification";
-import { getLocaleFromConfig, positiveNumber } from "./config-utils";
+import type { AnalysisResult } from "../analysis/analysis-schema";
+import { classificationFor, normalizeClassificationCache } from "../security/classification";
+import { getLocaleFromConfig, positiveNumber } from "../shared/config-utils";
 import { getLabels, type DashboardLabels } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard, compareTimelineMessagesForDisplay } from "./dashboard-state";
 import { escapeHtml, escapeAttr, toJsLiteral, senderDisplayName, recipientDisplayNames } from "./html-utils";
-import type { StoredMail } from "./mail-store";
-import type { SecurityGateDecisionResult } from "./security-types";
-import { emptyThreadStore, type ThreadStore } from "./thread-store";
-import type { ThreadAnalysisResult } from "./thread-analysis-schema";
+import type { StoredMail } from "../storage/mail-store";
+import type { SecurityGateDecisionResult } from "../security/security-types";
+import { emptyThreadStore, type ThreadStore } from "../storage/thread-store";
+import type { ThreadAnalysisResult } from "../analysis/thread-analysis-schema";
 import { renderButtonSpinner, formatClassification, formatThreadSecurity, formatPriority, renderDraftBox, renderEditableDraftBox, type DashboardRenderInput } from "./dashboard-render";
-import { emptyMeetingStore, type StoredMeeting } from "./meeting-store";
+import { emptyMeetingStore, type StoredMeeting } from "../storage/meeting-store";
 
 function ignoreOrRestore(queue: string, mailId: string, labels: DashboardLabels): string {
   if (queue === "ignored") {

@@ -217,7 +217,7 @@ rtk git diff --check
 
 Completion Notes（2026-07-14）：caller 审计确认 `workbench-render-v1.ts` 与 legacy `renderDashboardHtml` 均为零 caller；只删除后者的单体入口，保留 Sidebar、Workbench 与单测仍复用的 render helper。`MockProvider` 已移至 `src/test/support/`，两处测试 import 及其内部相对 import 已更新。同步稳定了一个既有的并发取消测试：此前并发 chunk 竞争按调用顺序出队的 mock response，导致全量测试偶发错误地假设 `mail-001` 必先进入模型传输；现改为按实际 prompt 返回对应响应，并断言首个完成模型调用的邮件，未改产品逻辑。`npm run compile` 通过；`npm test` 为 467 pass / 0 fail；源代码引用检查零命中，`git diff --check` 通过。
 
-### [ ] H3 · 一次性完成 `src/lib` 物理分类
+### [x] H3 · 一次性完成 `src/lib` 物理分类
 
 1. 按 §5.1 使用 `git mv` 移动文件。
 2. 用 `rg` 枚举并更新 `src/extension.ts`、`src/lib/**`、`src/test/**` 的直接相对 import。
@@ -235,6 +235,8 @@ rtk git diff --check
 ```
 
 预期：编译零错误，全量测试零失败，引用检查零命中。
+
+Completion Notes（2026-07-14）：按 §5.1 用 `git mv` 将 40 个运行时模块一次性归入 `analysis/`、`domain/`、`storage/`、`security/`、`ui/`、`reports/`、`shared/`；测试文件仍保持平铺。已更新 `extension.ts`、运行时模块、测试的直接相对 import，以及一处 `import()` 类型引用和 `extension-cancellation` 测试中的 CommonJS `require()` 路径；未新增 alias 或 barrel，未改函数、类型、常量或导出名。`npm run compile` 通过；`npm test` 为 467 pass / 0 fail；旧平铺 `src/lib` import 检查零命中，`git diff --check` 通过。
 
 ### [ ] H4 · 分离公开文档与本地开发资料
 

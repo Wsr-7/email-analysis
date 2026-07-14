@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildThreadReport } from "../lib/report-thread";
-import type { ThreadAnalysisResult } from "../lib/thread-analysis-schema";
+import { buildThreadReport } from "../lib/reports/report-thread";
+import type { ThreadAnalysisResult } from "../lib/analysis/thread-analysis-schema";
 
 test("buildThreadReport renders thread analysis and partial context signals", () => {
   const result: ThreadAnalysisResult = {

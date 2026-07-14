@@ -1,6 +1,6 @@
 import { classificationFor, type ClassificationCache, type MailClassification } from "./classification";
-import type { StoredMail } from "./mail-store";
-import type { ThreadRecord, ThreadSecuritySummary } from "./thread-schema";
+import type { StoredMail } from "../storage/mail-store";
+import type { ThreadRecord, ThreadSecuritySummary } from "../domain/thread-schema";
 import type {
   MailSecurityGateInput,
   SecurityGateDecision,

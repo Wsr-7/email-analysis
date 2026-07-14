@@ -37,7 +37,7 @@ const { EasyMailApp, buildSidebarRenderInput } = require("../extension") as {
   EasyMailApp: new (context: unknown) => object;
   buildSidebarRenderInput: (state: any, availableModels: unknown[], nextActionsStore: unknown, busyKind: string, isBusy: boolean) => any;
 };
-const { CopilotProvider } = require("../lib/copilot-provider") as { CopilotProvider: new () => { listModels: () => Promise<unknown[]>; sendPrompt: (prompt: string, options: unknown) => Promise<{ rawText: string }> } };
+const { CopilotProvider } = require("../lib/analysis/copilot-provider") as { CopilotProvider: new () => { listModels: () => Promise<unknown[]>; sendPrompt: (prompt: string, options: unknown) => Promise<{ rawText: string }> } };
 internalModule._load = originalLoad;
 
 async function renderWorkbenchDraft(app: any, draftReply: string): Promise<string> {
@@ -98,7 +98,7 @@ test("folder picker shows one concise English Outlook startup tip", async () => 
   progressMessages.length = 0;
   const globalStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), "easy-mail-test-"));
   const app = new EasyMailApp({ globalStorageUri: { fsPath: globalStoragePath }, extensionPath: "", subscriptions: [] });
-  const processRunner = require("../lib/process-runner") as { runProcess: () => Promise<void> };
+  const processRunner = require("../lib/shared/process-runner") as { runProcess: () => Promise<void> };
   const originalRunProcess = processRunner.runProcess;
   (app as any).readConfig = async () => ({ folders: ["Inbox"] });
   (app as any).findScript = async () => "collector.vbs";
@@ -117,7 +117,7 @@ test("folder picker shows one concise Chinese Outlook startup tip", async () => 
   progressMessages.length = 0;
   const globalStoragePath = fs.mkdtempSync(path.join(os.tmpdir(), "easy-mail-test-"));
   const app = new EasyMailApp({ globalStorageUri: { fsPath: globalStoragePath }, extensionPath: "", subscriptions: [] });
-  const processRunner = require("../lib/process-runner") as { runProcess: () => Promise<void> };
+  const processRunner = require("../lib/shared/process-runner") as { runProcess: () => Promise<void> };
   const originalRunProcess = processRunner.runProcess;
   (app as any).readConfig = async () => ({ folders: ["Inbox"], outputLanguage: "zh-CN" });
   (app as any).findScript = async () => "collector.vbs";

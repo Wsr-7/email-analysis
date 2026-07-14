@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { escapeHtml, escapeAttr, domIdForMail, domIdForThread, domIdForThreadMessage, domIdForCategory, safeDomId, selected, toJsLiteral } from "../lib/html-utils";
+import { escapeHtml, escapeAttr, domIdForMail, domIdForThread, domIdForThreadMessage, domIdForCategory, safeDomId, selected, toJsLiteral } from "../lib/ui/html-utils";
 
 describe("escapeHtml", () => {
   it("escapes all HTML special characters", () => {

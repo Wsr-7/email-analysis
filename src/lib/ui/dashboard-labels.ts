@@ -1,5 +1,5 @@
-import type { Locale } from "./config-utils";
-import type { PromptConfig } from "./prompt-config";
+import type { Locale } from "../shared/config-utils";
+import type { PromptConfig } from "../analysis/prompt-config";
 
 export type DashboardLabels = {
   toolbar: Record<"pullMail" | "loadMore" | "sample" | "analyze" | "analyzeSelected" | "analyzeAllAllowed" | "refresh" | "openDigest" | "openSummary" | "generateReports" | "openDailyBrief" | "openThreadReport" | "openSingleMailReport" | "settingsFile" | "promptConfig" | "clearStore" | "loadModels", string>;

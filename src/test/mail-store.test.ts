@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildBatchDigestMarkdown, emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, normalizeMailStore, pruneMailIndex, pruneMailStore, stableMailId } from "../lib/mail-store";
+import { buildBatchDigestMarkdown, emptyMailIndex, emptyMailStore, folderOldestReceivedTimes, mergeDigestIntoIndex, mergeDigestIntoStore, normalizeMailStore, pruneMailIndex, pruneMailStore, stableMailId } from "../lib/storage/mail-store";
 
 test("mergeDigestIntoStore adds new mail and skips duplicates by stable id", () => {
   const digest = {

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseMeetingDigest } from "../lib/meeting-digest";
+import { parseMeetingDigest } from "../lib/domain/meeting-digest";
 
 describe("parseMeetingDigest", () => {
   const sample = `# Outlook Meeting Digest

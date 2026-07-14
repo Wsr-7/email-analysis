@@ -1,6 +1,6 @@
-import type { ThreadMessage, ThreadRecord, ThreadSecuritySummary, ThreadStore } from "./thread-schema";
+import type { ThreadMessage, ThreadRecord, ThreadSecuritySummary, ThreadStore } from "../domain/thread-schema";
 
-export type { ThreadContentStatus, ThreadMessage, ThreadRecord, ThreadSecuritySummary, ThreadStore } from "./thread-schema";
+export type { ThreadContentStatus, ThreadMessage, ThreadRecord, ThreadSecuritySummary, ThreadStore } from "../domain/thread-schema";
 
 export function emptyThreadStore(): ThreadStore {
   const now = new Date().toISOString();

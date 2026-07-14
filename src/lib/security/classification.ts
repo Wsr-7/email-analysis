@@ -1,7 +1,7 @@
-import type { AnalysisResult } from "./analysis-schema";
+import type { AnalysisResult } from "../analysis/analysis-schema";
 import { createHash } from "node:crypto";
-import { buildClassificationKeywords, parseClassificationLevel, parseFolders, type ClassificationKeywords } from "./config-utils";
-import type { StoredMail } from "./mail-store";
+import { buildClassificationKeywords, parseClassificationLevel, parseFolders, type ClassificationKeywords } from "../shared/config-utils";
+import type { StoredMail } from "../storage/mail-store";
 import type { SecurityGateDecisionResult } from "./security-types";
 
 export interface MailClassification {

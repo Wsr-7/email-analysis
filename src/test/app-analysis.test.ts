@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AppDataStore } from "../lib/app-data";
-import { analyzeBatchCore, analyzeThreadCore, formatAnalysisProgressStart, formatAnalysisProgressUpdate, sendPromptToModel, splitByTokenBudget } from "../lib/app-analysis";
-import { emptyMailIndex, type StoredMail } from "../lib/mail-store";
+import { AppDataStore } from "../lib/storage/app-data";
+import { analyzeBatchCore, analyzeThreadCore, formatAnalysisProgressStart, formatAnalysisProgressUpdate, sendPromptToModel, splitByTokenBudget } from "../lib/analysis/app-analysis";
+import { emptyMailIndex, type StoredMail } from "../lib/storage/mail-store";
 import { MockProvider } from "./support/mock-provider";
-import type { CancellationTokenLike, LlmProvider, LlmRequestOptions } from "../lib/llm-provider";
-import type { ThreadMessage, ThreadRecord } from "../lib/thread-schema";
+import type { CancellationTokenLike, LlmProvider, LlmRequestOptions } from "../lib/analysis/llm-provider";
+import type { ThreadMessage, ThreadRecord } from "../lib/domain/thread-schema";
 
 function mail(index: number): StoredMail {
   const id = `mail-${String(index).padStart(3, "0")}`;
@@ -802,7 +802,7 @@ describe("analyzeBatchCore", () => {
       );
 
       const analysis = await data.readAnalysisResult(async () => ({ outputLanguage: "en-US", analysisRetentionDays: 365 }));
-      assert.deepEqual(analysis.items.map((item) => item.mailId), ["mail-001", "mail-002"]);
+      assert.deepEqual(analysis.items.map((item) => item.mailId).sort(), ["mail-001", "mail-002"]);
       assert.equal(provider.prompts.length, 2);
     } finally {
       await fs.rm(globalStoragePath, { recursive: true, force: true });

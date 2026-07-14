@@ -1,4 +1,4 @@
-import type { ThreadAnalysisItem, ThreadActionItem } from "./thread-analysis-schema";
+import type { ThreadAnalysisItem, ThreadActionItem } from "../analysis/thread-analysis-schema";
 
 export type NextActionStatus = "open" | "done" | "ignored";
 

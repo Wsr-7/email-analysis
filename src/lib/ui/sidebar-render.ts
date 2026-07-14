@@ -1,16 +1,16 @@
-import type { AnalysisResult } from "./analysis-schema";
-import { classificationFor, normalizeClassificationCache, type ClassificationCache } from "./classification";
-import { getLocaleFromConfig, mergeStringLists, parseFolders } from "./config-utils";
+import type { AnalysisResult } from "../analysis/analysis-schema";
+import { classificationFor, normalizeClassificationCache, type ClassificationCache } from "../security/classification";
+import { getLocaleFromConfig, mergeStringLists, parseFolders } from "../shared/config-utils";
 import { getLabels, buildCategoryLabels, type DashboardLabels } from "./dashboard-labels";
 import { filterVisibleThreadsForDashboard } from "./dashboard-state";
 import { escapeHtml, escapeAttr, selected, senderDisplayName } from "./html-utils";
-import { selectConfiguredModel } from "./llm-provider";
-import { emptyMailIndex, folderOldestReceivedTimes, type StoredMail } from "./mail-store";
-import type { NextActionItem } from "./next-actions";
-import { normalizePromptConfig } from "./prompt-config";
-import { emptyThreadStore, type ThreadStore } from "./thread-store";
+import { selectConfiguredModel } from "../analysis/llm-provider";
+import { emptyMailIndex, folderOldestReceivedTimes, type StoredMail } from "../storage/mail-store";
+import type { NextActionItem } from "../storage/next-actions";
+import { normalizePromptConfig } from "../analysis/prompt-config";
+import { emptyThreadStore, type ThreadStore } from "../storage/thread-store";
 import { renderButtonSpinner, formatPriority, formatClassification, renderModelOptions, renderRangeValueControl, formatAnalyzeNextLabel, type DashboardRenderInput } from "./dashboard-render";
-import { emptyMeetingStore, type StoredMeeting } from "./meeting-store";
+import { emptyMeetingStore, type StoredMeeting } from "../storage/meeting-store";
 
 const QUEUE_ORDER = [
   "meetings",

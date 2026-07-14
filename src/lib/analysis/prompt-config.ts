@@ -1,4 +1,4 @@
-import { formatTodayLine } from "./config-utils";
+import { formatTodayLine } from "../shared/config-utils";
 import { buildLanguageContract, normalizeDraftLanguage, type DraftLanguage } from "./language-contract";
 
 export interface PromptCategory {

@@ -4,7 +4,7 @@ import {
   type LlmProvider,
   type LlmRequestOptions,
   type LlmResponse
-} from "../../lib/llm-provider";
+} from "../../lib/analysis/llm-provider";
 
 export interface MockProviderOptions {
   models?: AvailableModel[];

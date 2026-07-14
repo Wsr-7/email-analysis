@@ -2,16 +2,16 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { renderSidebarHtml as renderSidebarHtmlWithNonce } from "../lib/sidebar-render";
-import { normalizeClassificationCache } from "../lib/classification";
-import { normalizePromptConfig } from "../lib/prompt-config";
-import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/mail-store";
-import { emptyThreadStore } from "../lib/thread-store";
-import { emptyMeetingStore, type StoredMeeting as StoredMeetingItem } from "../lib/meeting-store";
-import type { DashboardRenderInput } from "../lib/dashboard-render";
-import type { DashboardState } from "../lib/dashboard-state";
-import type { AnalysisItem } from "../lib/analysis-schema";
-import { buildDashboardState } from "../lib/dashboard-state";
+import { renderSidebarHtml as renderSidebarHtmlWithNonce } from "../lib/ui/sidebar-render";
+import { normalizeClassificationCache } from "../lib/security/classification";
+import { normalizePromptConfig } from "../lib/analysis/prompt-config";
+import { emptyMailStore, emptyMailIndex, type StoredMail } from "../lib/storage/mail-store";
+import { emptyThreadStore } from "../lib/storage/thread-store";
+import { emptyMeetingStore, type StoredMeeting as StoredMeetingItem } from "../lib/storage/meeting-store";
+import type { DashboardRenderInput } from "../lib/ui/dashboard-render";
+import type { DashboardState } from "../lib/ui/dashboard-state";
+import type { AnalysisItem } from "../lib/analysis/analysis-schema";
+import { buildDashboardState } from "../lib/ui/dashboard-state";
 
 function stubMail(overrides?: Partial<StoredMail>): StoredMail {
   return {
