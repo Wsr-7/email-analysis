@@ -254,3 +254,22 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Commit：`e323af6`（本地，未 push）。
 
 - **2026-07-14 · Codex（R3 G 批次 final verification）**：Action: 对 `fc062db..b499ac9` 的 34 个改动文件、G1-G7 状态/边界及 commit 链做整体复核，无 Critical/Important 发现；未越界改 VBS、collector 或 digest 文件格式。Validated: fresh `npm run compile` 通过；fresh `npm test` 454 pass / 0 fail（69 suites）；`git diff --check` 通过；G1-G7 均 `[x]` 且附实现 commit。Manual: 仍按各 step Completion Notes 的 **needs user validation** 清单进入真实 VS Code/Copilot/Outlook 验证轮。Next: 规划者全量复审与重打 VSIX；当前 worker 不 push。
+
+---
+
+## 5. 规划者复审记录与 R3 人工验证清单（2026-07-14）
+
+**复审结论：G1-G7 全部通过**（复审范围 `fc062db..24e2906`）。独立验证：`npm test` 全绿；双 VBS `--help` 通过；`run-sample-validation.ps1` 端到端通过；vsix 拆包确认含 G1 并发常量与 G5 CSP。逐项要点：G1 共享游标 worker pool + `serializeMerge` promise 链串行化 + 取消不启新块 + 预估除以并行度，全部符合处方；G3 `keywordsHash` 变更触发全量重算已实现；G5 三个运行时模板 onclick 清零、CSP meta + nonce 齐备（`dashboard-render.ts` 残留的 14 处 onclick 经核实全部位于无生产 caller 的死代码路径 `renderDashboardHtml`，无运行时暴露，留待 11 计划 H1 处理）；G7 `redactStoredMails` 已覆盖附件名。已知可接受边界：G1 的 merge 串行链在写盘失败时会污染后续合并（磁盘故障场景，本就是灾难态，不另行处理）。
+
+### R3 人工验证清单（用户填写，✅/❌/⏭️，❌ 附现象与日志）
+
+| # | 验证点 | 操作方法 | 预期结果 | 结果 |
+|---|---|---|---|---|
+| 1 | 并行分析提速（G1） | 分析 20+ 封（多 chunk），对比此前耗时 | 耗时约减半；进度显示 `Completed x/N chunks（约剩 X 分钟）` | |
+| 2 | 草稿开关（G1） | Settings 设 `draftGeneration=onDemand` 再分析一批；然后改回 auto | onDemand 更快且草稿框显示 Generate Draft 可手动生成；auto 恢复自动草稿 | |
+| 3 | 会议邀请（G2） | 打开会议队列 | 名称为"会议邀请"；未响应平铺置顶；已接受/组织的收进折叠组（默认收起）；徽标计数只含未响应 | |
+| 4 | 词表配置（G3） | Settings 里从 `hardBlockKeywords` 删掉一个词（如 密码），刷新后看之前被阻断的邮件；再改 `classificationKeywords` 看分级 | 无需重新 Fetch，hard block 与分级立即随词表变化；改回后恢复 | |
+| 5 | 期限排序（G4） | 分析含明确期限的邮件（如"周五前回复"） | 行尾有期限徽标；过期/今天到期红色；Must Handle Today 桶内期限近的在前；详情有 Due 字段 | |
+| 6 | CSP 回归（G5，重点全面点一遍） | 三个页面（sidebar/workbench/guide）每个按钮、折叠、输入框、草稿操作都点一遍 | 全部正常响应——任何"点了没反应"都请记下具体按钮 | |
+| 7 | 方向键导航（G6） | 点击 sidebar 后用 ↑/↓ | 选中高亮移动、workbench 跟随打开、折叠组内隐藏项被跳过 | |
+| 8 | 附件可见性（G7） | 看带附件的真实邮件；分析一封"正文称有附件"的邮件 | 列表行尾 📎（悬停见文件名）；详情显示附件行；分析结果正确反映附件存在与否 | |

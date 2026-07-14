@@ -328,3 +328,14 @@ rtk git status --short --branch
 - **VSIX 缺运行时资源**：以 `vsce ls` 前后对照和安装后 Sample/Outlook smoke test 兜底。
 - **文档再次漂移**：文档只描述稳定边界；commands/settings 以 `package.json` 为准，测试数量不写死。
 - **整理演变成重构**：任何函数正文变化、文件拆分或新抽象都视为越界，另开计划。
+
+---
+
+## 10. 规划者审核补充（2026-07-14，方案批准，附 3 条修订）
+
+本计划经规划者审核**批准**（分阶段 commit、vsce files/.vscodeignore 互斥认知、`.gitignore` 不影响已跟踪文件、先复制校验再删除等关键防线齐备）。补充修订：
+
+1. **H1 追加事实**：`dashboard-render.ts` 的 legacy `renderDashboardHtml` 已由 G5 复审确认无生产 caller，且其模板内残留 14 处 `onclick=` 内联属性（G5 已把三个运行时页面清零，这是最后的死代码残留）——若 H1 函数级审计确认其私有调用链（含 `renderPendingPanel` 等仅被它使用的函数）不被共用 helper 依赖，应连同删除，使全仓 `onclick=` 归零并可加回归断言；若确有共用，保留部分必须在 Notes 列出保留函数清单与理由。
+2. **H3/H5 追加检查**：文档改名/移动后，除计划已列的 README/AGENTS/docs/package.json 一致性 grep 外，**必须补 `rg -n "user guide|setup\.md|vsix-build|docs/v2-design" src/` 确认零命中**（规划者已预核实 `user guide.md` 当前无运行时代码引用，Guide 命令走 webview 渲染而非打开 md 文件——此检查是防回归，不是已知问题）。
+3. **H4 追加验证**：收紧 `files` 后的首次打包，除 `vsce ls` 对照外，**必须安装该 vsix 并跑一次 Generate Sample Digest + 打开 Guide**——`files` 漏掉运行时资源（prompts/media/default-config）的故障只有装包才能暴露，listing 看不出加载失败。
+4. **执行时机确认**：H0 的硬门槛以用户在对话中明确回复"#10（R3）人工验证通过"为准；R3 验证清单见 `10-execution-plan-r3.md` §5。
