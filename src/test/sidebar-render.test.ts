@@ -141,6 +141,14 @@ describe("renderSidebarHtml", () => {
     assert.ok(html.includes('>Legacy Folder (1)</button>'));
   });
 
+  it("uses a stronger shared style for collapsible group headers", () => {
+    const html = renderSidebarHtml(stubInput());
+
+    assert.ok(html.includes("color: var(--vscode-sideBarSectionHeader-foreground"));
+    assert.ok(html.includes("font-size: 11px; font-weight: 700"));
+    assert.ok(html.includes("letter-spacing: 0.02em"));
+  });
+
   it("renders blocked items with reason", () => {
     const input = stubInput({
       queue: { pending: [], blocked: [stubMail({ mailId: "b1", subject: "Classified" })], analysed: [], allowed: [], ignoredPending: [] },

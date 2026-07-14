@@ -438,7 +438,7 @@ export function renderSidebarHtml(input: DashboardRenderInput, nonce: string): s
   .sb-row-dim { opacity: 0.45; }
   .sb-action-status { cursor: pointer; font-size: 10px; padding: 1px 6px; border-radius: 8px; border: none; background: var(--vscode-badge-background, #4d4d4d); color: var(--vscode-badge-foreground, #fff); }
   .sb-pending-folder[hidden], .sb-meeting-schedule[hidden] { display: none; }
-  .sb-pending-folder-header { width: 100%; padding: 6px 12px; text-align: left; background: transparent; color: var(--vscode-sideBar-foreground, var(--vscode-foreground, #ccc)); font-size: 11px; font-weight: 600; }
+  .sb-pending-folder-header { width: 100%; padding: 7px 12px; text-align: left; background: transparent; color: var(--vscode-sideBarSectionHeader-foreground, var(--vscode-foreground, #ddd)); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
   .sb-pending-folder-header:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08)); }
   .sb-pending-folder-header::before { content: "›"; display: inline-block; width: 12px; }
   .sb-pending-folder-header[aria-expanded="true"]::before { transform: rotate(90deg); }
