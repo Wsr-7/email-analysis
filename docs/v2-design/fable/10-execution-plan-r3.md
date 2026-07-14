@@ -359,6 +359,8 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
   - Known issues：首次全量运行出现一次既有 G1 并发测试的时序抖动（期望同时 in-flight=2，瞬时观测为 1）；隔离重跑通过，随后 fresh 全量 463/463 通过，未修改 G1。未被 Outlook 标记 hidden 的内嵌对象仍会保守显示，这是本 step 的明确边界。
   - Commit：`f9899df`（本地，未 push）。
 
+- **2026-07-14 · Codex（G8.9 pre-work checkpoint）**：`v3` 工作树 clean，HEAD `d569c1e`；重新定位确认 compose 按钮只收起自身最近的 `.draft-outlook-actions`，Polish/Refine/Generate 均不主动收起，因此任务开始到重渲染前菜单保持展开。边界：新增统一 helper，任一草稿动作点击后立即收起所有打开的 `details.draft-outlook-actions`，再沿用原 post 逻辑；不改草稿内容、按钮状态、消息协议或其他 details。Action: claim G8.9。
+
 ---
 
 ## 5. 规划者复审记录（2026-07-14）
@@ -420,7 +422,7 @@ G1（收益最大、改动最大，单独一人）∥ 其余 G2-G7 互相独立�
 - **做法**：VBS `SafeAttachmentCount`/`SafeAttachmentNames` 过滤隐藏/内嵌附件——用 `Attachment.PropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")`（PR_ATTACHMENT_HIDDEN）为 True 的跳过；读取失败时保守保留（宁可多算不可漏算真附件）；On Error 守护齐全。sample 不受影响。
 - **验收**：VBS `--help`/`--sample` 通过；`npm test` 全绿。**needs user validation**：带签名图片的普通邮件不再显示 📎，真附件仍显示。
 
-### [ ] G8.9 草稿动作时收起 Outlook Actions 下拉（额外反馈#8，P3）
+### [~] G8.9 草稿动作时收起 Outlook Actions 下拉（额外反馈#8，P3）
 
 - workbench 点击 Polish/Refine（或任何草稿动作）时，立即关闭处于展开态的 `details.draft-outlook-actions`（`document.querySelectorAll('details[open]')` 收起），不等任务结束由重渲染关闭。
 - **验收**：单测断言收起逻辑存在；`npm test` 全绿。**needs user validation**：点 Polish 瞬间下拉收起。
