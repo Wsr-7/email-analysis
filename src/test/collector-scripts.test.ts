@@ -34,3 +34,19 @@ test("sample mail bodies each contain multiple lines", () => {
   assert.ok(longBody);
   assert.ok((longBody[1].match(/vbCrLf/g) || []).length >= 23);
 });
+
+test("attachment metadata excludes hidden inline attachments and preserves read failures", () => {
+  const source = fs.readFileSync(path.join(process.cwd(), "scripts", "collect-outlook-mails.vbs"), "utf8");
+  const visibility = source.match(/Function IsVisibleAttachment[\s\S]*?End Function/);
+  const count = source.match(/Function SafeAttachmentCount[\s\S]*?End Function/);
+  const names = source.match(/Function SafeAttachmentNames[\s\S]*?End Function/);
+
+  assert.ok(visibility);
+  assert.ok(count);
+  assert.ok(names);
+  assert.match(visibility[0], /IsVisibleAttachment = True/);
+  assert.match(visibility[0], /0x7FFE000B/);
+  assert.match(visibility[0], /IsVisibleAttachment = Not CBool\(hidden\)/);
+  assert.match(count[0], /visibleCount = visibleCount \+ 1[\s\S]*IsVisibleAttachment\(attachment\)/);
+  assert.match(names[0], /IsVisibleAttachment\(attachment\)/);
+});

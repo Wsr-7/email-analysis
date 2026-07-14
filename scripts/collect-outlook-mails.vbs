@@ -924,11 +924,28 @@ End Function
 
 Function SafeAttachmentCount(byRef mail)
   On Error Resume Next
-  SafeAttachmentCount = CLng(mail.Attachments.Count)
-  If Err.Number <> 0 Then
+  Dim count
+  count = CLng(mail.Attachments.Count)
+  If Err.Number <> 0 Or count <= 0 Then
     Err.Clear
     SafeAttachmentCount = 0
+    On Error GoTo 0
+    Exit Function
   End If
+
+  Dim visibleCount, i, attachment
+  visibleCount = 0
+  For i = 1 To count
+    Set attachment = Nothing
+    Set attachment = mail.Attachments.Item(i)
+    If Err.Number <> 0 Or attachment Is Nothing Then
+      Err.Clear
+      visibleCount = visibleCount + 1
+    ElseIf IsVisibleAttachment(attachment) Then
+      visibleCount = visibleCount + 1
+    End If
+  Next
+  SafeAttachmentCount = visibleCount
   On Error GoTo 0
 End Function
 
@@ -943,17 +960,54 @@ Function SafeAttachmentNames(byRef mail)
     Exit Function
   End If
 
-  Dim names()
-  ReDim names(count - 1)
-  Dim i
+  Dim namesText, i, attachment, fileName
+  namesText = ""
   For i = 1 To count
-    names(i - 1) = SafeString(mail.Attachments.Item(i).FileName)
+    Set attachment = Nothing
+    Set attachment = mail.Attachments.Item(i)
     If Err.Number <> 0 Then
       Err.Clear
-      names(i - 1) = ""
+    ElseIf Not attachment Is Nothing And IsVisibleAttachment(attachment) Then
+      fileName = SafeString(attachment.FileName)
+      If Err.Number <> 0 Then
+        Err.Clear
+        fileName = ""
+      End If
+      If fileName <> "" Then
+        If namesText <> "" Then
+          namesText = namesText & "; "
+        End If
+        namesText = namesText & fileName
+      End If
     End If
   Next
-  SafeAttachmentNames = Join(names, "; ")
+  SafeAttachmentNames = namesText
+  On Error GoTo 0
+End Function
+
+Function IsVisibleAttachment(byRef attachment)
+  IsVisibleAttachment = True
+  On Error Resume Next
+  Dim accessor
+  Set accessor = attachment.PropertyAccessor
+  If Err.Number <> 0 Or accessor Is Nothing Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Function
+  End If
+
+  Dim hidden
+  hidden = accessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x7FFE000B")
+  If Err.Number <> 0 Then
+    Err.Clear
+    On Error GoTo 0
+    Exit Function
+  End If
+  IsVisibleAttachment = Not CBool(hidden)
+  If Err.Number <> 0 Then
+    Err.Clear
+    IsVisibleAttachment = True
+  End If
   On Error GoTo 0
 End Function
 
