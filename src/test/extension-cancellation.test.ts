@@ -401,6 +401,47 @@ test("a user-cleared working draft remains an explicit empty value", async () =>
   assert.ok(!html.includes('<textarea class="draft-textarea">Model draft</textarea>'));
 });
 
+test("a fetch message waits for the immediately preceding settings write", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  let config = { rangeMode: "maxItems", maxItems: 50, folders: ["Inbox"] };
+  let releaseWrite!: () => void;
+  const writeGate = new Promise<void>((resolve) => { releaseWrite = resolve; });
+  let fetchedMaxItems: number | undefined;
+  (app as any).readConfig = async () => config;
+  (app as any).updateSettings = async (next: Record<string, unknown>) => {
+    await writeGate;
+    config = { ...config, ...next } as typeof config;
+  };
+  (app as any).refresh = async () => {};
+  (app as any).pullMail = async () => { fetchedMaxItems = config.maxItems; };
+
+  const save = (app as any).handleMessage({ type: "saveConfig", config: { maxItems: 7 }, silent: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  const fetch = (app as any).handleMessage({ type: "pullMail" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(fetchedMaxItems, undefined, "fetch must not start while the settings write is pending");
+  releaseWrite();
+  await Promise.all([save, fetch]);
+  assert.equal(fetchedMaxItems, 7);
+});
+
+test("settings ordering does not serialize long-running actions with each other", async () => {
+  const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
+  let releaseActions!: () => void;
+  const actionGate = new Promise<void>((resolve) => { releaseActions = resolve; });
+  let started = 0;
+  (app as any).pullMail = async () => { started += 1; await actionGate; };
+
+  const first = (app as any).handleMessage({ type: "pullMail" });
+  const second = (app as any).handleMessage({ type: "pullMail" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(started, 2);
+  releaseActions();
+  await Promise.all([first, second]);
+});
+
 test("Generate and Polish keep their non-empty working drafts", async () => {
   cancellationRequested = false;
   const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });

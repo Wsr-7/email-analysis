@@ -22,7 +22,7 @@ import { type Locale, serializeFolderDateMap, getLocaleFromConfig, buildSecurity
 import { getLabels, buildCategoryLabels } from "./lib/dashboard-labels";
 import { renderSidebarHtml } from "./lib/sidebar-render";
 import { analyzeBatchCore as analyzeBatchCoreImpl, analyzeThreadCore as analyzeThreadCoreImpl, translateExistingAnalysis as translateExistingAnalysisImpl, sendPromptToModel, type AnalysisBatchResult, type AnalysisContext } from "./lib/app-analysis";
-import { handleWebviewMessage, type MessageHandlerContext } from "./lib/message-handler";
+import { handleWebviewMessage, saveConfigFromMessage, type MessageHandlerContext } from "./lib/message-handler";
 import { draftOutputInstruction, latestNonSelfThreadText, normalizeDraftLanguage, resolveDraftLanguage, resolveOutputLanguage } from "./lib/language-contract";
 import { buildPolishDraftPrompt, buildRefineDraftPrompt } from "./lib/draft-prompt";
 import { runProcess, formatElapsedSeconds, formatError, deleteFileIfExists, sanitizeProcessArgs } from "./lib/process-runner";
@@ -41,6 +41,11 @@ type BusyState = {
 };
 
 type SecurityDecisionMap = Map<string, SecurityGateDecisionResult>;
+
+const SETTINGS_DEPENDENT_MESSAGE_TYPES = new Set([
+  "pullMail", "loadMore", "sampleDigest", "analyze", "analyzeAllAllowed", "analyzeSelected", "analyzeThread",
+  "generateDraft", "polishDraft", "refineDraft", "openWorkbench", "openInWorkbench"
+]);
 
 type LoadedDashboardState = DashboardState & {
   modelInfo?: Record<string, unknown>;
@@ -153,6 +158,7 @@ export class EasyMailApp {
   private workingDrafts: Map<string, string> = new Map();
   private pendingWorkbenchDraftFlush: { requestId: string; done: Promise<void>; resolve: () => void } | null = null;
   private workbenchDraftFlushSequence = 0;
+  private latestSettingsWrite: Promise<void> = Promise.resolve();
 
   public constructor(private readonly context: vscode.ExtensionContext) {
     this.llmProvider = new CopilotProvider();
@@ -1339,7 +1345,22 @@ export class EasyMailApp {
   }
 
   private async handleMessage(message: unknown): Promise<void> {
-    return handleWebviewMessage(this.messageHandlerContext(), message);
+    const typed = message && typeof message === "object" ? message as Record<string, unknown> : {};
+    const type = String(typed.type || "");
+    const context = this.messageHandlerContext();
+    if (type === "saveConfig") {
+      const write = this.latestSettingsWrite
+        .catch(() => {})
+        .then(() => saveConfigFromMessage(context, typed));
+      this.latestSettingsWrite = write;
+      await write;
+      await context.refresh();
+      return;
+    }
+    if (SETTINGS_DEPENDENT_MESSAGE_TYPES.has(type)) {
+      await this.latestSettingsWrite;
+    }
+    return handleWebviewMessage(context, message);
   }
 
   private async getDashboardHtml(): Promise<string> {
