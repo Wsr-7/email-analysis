@@ -47,6 +47,12 @@ const SETTINGS_DEPENDENT_MESSAGE_TYPES = new Set([
   "generateDraft", "polishDraft", "refineDraft", "openWorkbench", "openInWorkbench"
 ]);
 
+const GUIDE_ONBOARDING_STEP_IDS = new Set(["sample", "models", "folders", "settings", "firstRun"]);
+
+function guideProgressKey(version: string): string {
+  return `easyMail.guideProgress.${version}`;
+}
+
 type LoadedDashboardState = DashboardState & {
   modelInfo?: Record<string, unknown>;
   store?: MailStore;
@@ -425,9 +431,11 @@ export class EasyMailApp {
     const queue = (state as DashboardState & { queue?: ReturnType<typeof buildQueueState> }).queue || { pending: [], blocked: [], analysed: [], allowed: [] };
     const threadStore = (state as DashboardState & { threadStore?: ThreadStore }).threadStore || emptyThreadStore();
     const visibleThreadStore = filterVisibleThreadsForDashboard(threadStore);
+    const version = String(this.context.extension.packageJSON?.version || "0.4.0");
     return renderEasyMailGuideHtml({
       locale,
-      version: String(this.context.extension.packageJSON?.version || "0.4.0"),
+      version,
+      completedOnboardingStepIds: this.context.globalState.get<string[]>(guideProgressKey(version)) || [],
       stats: {
         pulled: store.items.length,
         pending: queue.pending.length,
@@ -441,11 +449,27 @@ export class EasyMailApp {
     if (!message || typeof message !== "object") {
       return;
     }
-    const typed = message as { type?: string; action?: string };
+    const typed = message as { type?: string; action?: string; stepId?: string };
     if (typed.type !== "guideAction") {
       return;
     }
     await this.log("guide:action", { action: typed.action || "" });
+    if (typed.action === "completeOnboardingStep") {
+      const stepId = typed.stepId || "";
+      if (!GUIDE_ONBOARDING_STEP_IDS.has(stepId)) {
+        return;
+      }
+      const version = String(this.context.extension.packageJSON?.version || "0.4.0");
+      const key = guideProgressKey(version);
+      const completed = this.context.globalState.get<string[]>(key) || [];
+      if (!completed.includes(stepId)) {
+        await this.context.globalState.update(key, [...completed, stepId]);
+      }
+      if (this.guidePanel) {
+        this.guidePanel.webview.html = await this.getGuideHtml();
+      }
+      return;
+    }
     if (typed.action === "openDashboard") {
       await vscode.commands.executeCommand("workbench.view.extension.easyMail");
       await vscode.commands.executeCommand("easyMail.dashboard.focus");

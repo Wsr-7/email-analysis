@@ -16,6 +16,18 @@ Use **Generate Sample Digest** first when you want to explore the extension with
 
 EasyMail never sends mail automatically. Outlook compose actions only open a draft window.
 
+## First use
+
+Open **EasyMail: Open User Guide** for the same five-step checklist inside VS Code. The checklist remembers completed steps in your local VS Code profile.
+
+1. **Load Sample Data** first to explore the Sidebar, Workbench, and analysis flow without reading Outlook.
+2. **Load Copilot Models**, then choose the model in the Sidebar before running analysis.
+3. **Select Outlook Folders** after starting Outlook. The selected folders are saved to VS Code Settings.
+4. Optionally open **Settings** for important or ignored senders, security keywords, and retention. These are non-blocking: choose **Set up later** when you are not ready to decide, and return at any time.
+5. **Fetch New Mail** for the first real collection. Choose an item in the Sidebar, then analyze the next batch or selected mail as needed.
+
+The checklist does not infer completion from defaults or saved settings. Mark a step complete after you have performed it, so it remains a deliberate, user-controlled record.
+
 ## Commands
 
 | Command | What it does |

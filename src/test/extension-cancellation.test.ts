@@ -285,6 +285,29 @@ test("maybeOpenGuide uses install metadata, directory birth time, then version a
   assert.equal(opened, 4, "each installation signature opens the guide only once");
 });
 
+test("guide records a reviewed optional setup step and refreshes the panel", async () => {
+  const values = new Map<string, unknown>();
+  const app = new EasyMailApp({
+    globalStorageUri: { fsPath: "" },
+    extensionPath: "",
+    extension: { packageJSON: { version: "0.4.0" } },
+    globalState: {
+      get: (key: string) => values.get(key),
+      update: async (key: string, value: unknown) => { values.set(key, value); }
+    },
+    subscriptions: []
+  });
+  let refreshed = 0;
+  (app as any).log = async () => {};
+  (app as any).guidePanel = { webview: {} };
+  (app as any).getGuideHtml = async () => { refreshed += 1; return "guide"; };
+
+  await (app as any).handleGuideMessage({ type: "guideAction", action: "completeOnboardingStep", stepId: "settings" });
+
+  assert.deepEqual(values.get("easyMail.guideProgress.0.4.0"), ["settings"]);
+  assert.equal(refreshed, 1);
+});
+
 test("getDashboardHtml forwards the meeting store attached by loadState", async () => {
   const app = new EasyMailApp({ globalStorageUri: { fsPath: "" }, extensionPath: "", subscriptions: [] });
   (app as any).loadState = async () => ({
